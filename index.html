@@ -54,6 +54,18 @@
           </svg>
           <span>Agents</span>
         </button>
+        <button class="nav-tab" data-tab="dashboard">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+          </svg>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-tab" data-tab="mcp">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17 16l-4-4V8.82C14.16 8.4 15 7.3 15 6c0-1.66-1.34-3-3-3S9 4.34 9 6c0 1.3.84 2.4 2 2.82V12l-4 4H3v5h5v-3.05l4-4.2 4 4.2V21h5v-5h-4z"/>
+          </svg>
+          <span>MCP</span>
+        </button>
       </nav>
       <div class="sidebar-footer">
         <button class="notification-toggle active" id="btn-notifications" title="Notifications">
@@ -61,6 +73,12 @@
             <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
           </svg>
           <span>Notifications</span>
+        </button>
+        <button class="settings-btn" id="btn-settings" title="Parametres">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+          <span>Parametres</span>
         </button>
         <span class="version">v1.0.0</span>
       </div>
@@ -84,6 +102,15 @@
 
           <!-- Terminals Panel -->
           <div class="terminals-panel">
+            <div class="terminals-header">
+              <div class="terminals-filter" id="terminals-filter" style="display: none;">
+                <span class="filter-label">Terminaux de</span>
+                <span class="filter-project" id="filter-project-name"></span>
+                <button class="filter-clear" id="btn-show-all" title="Afficher tous les terminaux">
+                  <svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                </button>
+              </div>
+            </div>
             <div class="terminals-tabs" id="terminals-tabs"></div>
             <div class="terminals-container" id="terminals-container">
               <div class="empty-state" id="empty-terminals">
@@ -125,6 +152,66 @@
           <div class="list-container" id="agents-list"></div>
         </div>
       </div>
+
+      <!-- Dashboard Tab -->
+      <div class="tab-content" id="tab-dashboard">
+        <div class="dashboard-layout">
+          <div class="dashboard-header">
+            <h2>Dashboard</h2>
+            <div class="dashboard-project-select">
+              <select id="dashboard-project">
+                <option value="">Selectionnez un projet</option>
+              </select>
+              <button class="btn-icon" id="btn-refresh-dashboard" title="Rafraichir">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="dashboard-content" id="dashboard-content">
+            <div class="dashboard-empty">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+              <p>Selectionnez un projet pour voir son dashboard</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MCP Tab -->
+      <div class="tab-content" id="tab-mcp">
+        <div class="mcp-layout">
+          <div class="mcp-main">
+            <div class="list-header">
+              <h2>Serveurs MCP</h2>
+              <button class="btn-primary" id="btn-new-mcp">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                Nouveau MCP
+              </button>
+            </div>
+            <div class="mcp-list" id="mcp-list"></div>
+          </div>
+          <div class="mcp-logs-panel" id="mcp-logs-panel">
+            <div class="mcp-logs-header">
+              <div class="mcp-logs-title">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
+                <span>Logs</span>
+                <span class="mcp-logs-name" id="mcp-logs-name"></span>
+              </div>
+              <div class="mcp-logs-actions">
+                <button class="btn-icon btn-small" id="btn-clear-logs" title="Effacer les logs">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+                <button class="btn-icon btn-small" id="btn-toggle-logs" title="Reduire">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="mcp-logs-content" id="mcp-logs-content">
+              <div class="mcp-logs-empty">Selectionnez un MCP pour voir ses logs</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -138,6 +225,23 @@
         </button>
       </div>
       <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Quick Picker Modal -->
+  <div class="quick-picker-overlay" id="quick-picker-overlay">
+    <div class="quick-picker">
+      <div class="quick-picker-search">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="quick-picker-input" placeholder="Rechercher un projet..." autocomplete="off">
+        <span class="quick-picker-shortcut">Ctrl+Shift+P</span>
+      </div>
+      <div class="quick-picker-list" id="quick-picker-list"></div>
+      <div class="quick-picker-footer">
+        <span><kbd>↑↓</kbd> Naviguer</span>
+        <span><kbd>Enter</kbd> Ouvrir</span>
+        <span><kbd>Esc</kbd> Fermer</span>
+      </div>
     </div>
   </div>
 
