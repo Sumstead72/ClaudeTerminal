@@ -1416,6 +1416,14 @@ registerShortcut('Ctrl+Down', () => {
 // Settings shortcut
 registerShortcut('Ctrl+,', () => showSettingsModal(), { global: true });
 
+// Close current terminal with Ctrl+W
+registerShortcut('Ctrl+W', () => {
+  const currentId = terminalsState.get().activeTerminal;
+  if (currentId) {
+    TerminalManager.closeTerminal(currentId);
+  }
+}, { global: true });
+
 // ========== UPDATE SYSTEM (GitHub Desktop style) ==========
 const updateBanner = document.getElementById('update-banner');
 const updateMessage = document.getElementById('update-message');
