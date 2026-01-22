@@ -778,11 +778,13 @@ async function renderSessionsPanel(project, emptyState) {
 /**
  * Resume a Claude session
  */
-async function resumeSession(project, sessionId) {
+async function resumeSession(project, sessionId, options = {}) {
+  const { skipPermissions = false } = options;
   const id = await ipcRenderer.invoke('terminal-create', {
     cwd: project.path,
     runClaude: true,
-    resumeSessionId: sessionId
+    resumeSessionId: sessionId,
+    skipPermissions
   });
 
   const terminal = new Terminal({
@@ -936,6 +938,7 @@ module.exports = {
   showAll,
   setCallbacks,
   updateTerminalStatus,
+  resumeSession,
   // FiveM console functions
   createFivemConsole,
   closeFivemConsole,
