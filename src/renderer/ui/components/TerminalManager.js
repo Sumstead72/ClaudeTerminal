@@ -15,15 +15,19 @@ const {
   getTerminal,
   getActiveTerminal,
   projectsState,
-  getProjectIndex
+  getProjectIndex,
+  getFivemServer,
+  addFivemLog
 } = require('../../state');
 const { escapeHtml } = require('../../utils');
+
+// Store FiveM console IDs by project index
+const fivemConsoleIds = new Map();
 
 // Callbacks
 let callbacks = {
   onNotification: null,
-  onRenderProjects: null,
-  onUpdateWindowTitle: null
+  onRenderProjects: null
 };
 
 // Title extraction
@@ -43,7 +47,7 @@ function setCallbacks(cbs) {
 }
 
 /**
- * Extract title from user input
+ * Extract title from user input - takes significant words to create a meaningful tab name
  */
 function extractTitleFromInput(input) {
   let text = input.trim();
@@ -51,7 +55,29 @@ function extractTitleFromInput(input) {
   const words = text.toLowerCase().replace(/[^\w\sàâäéèêëïîôùûüç-]/g, ' ').split(/\s+/)
     .filter(word => word.length > 2 && !TITLE_STOP_WORDS.has(word));
   if (words.length === 0) return null;
-  return words.slice(0, 2).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  // Take up to 4 significant words for a more descriptive title
+  const titleWords = words.slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1));
+  return titleWords.join(' ');
+}
+
+/**
+ * Update terminal tab name
+ */
+function updateTerminalTabName(id, name) {
+  const termData = getTerminal(id);
+  if (!termData) return;
+
+  // Update state
+  updateTerminal(id, { name });
+
+  // Update DOM
+  const tab = document.querySelector(`.terminal-tab[data-id="${id}"]`);
+  if (tab) {
+    const nameSpan = tab.querySelector('.tab-name');
+    if (nameSpan) {
+      nameSpan.textContent = name;
+    }
+  }
 }
 
 /**
@@ -143,11 +169,11 @@ function closeTerminal(id) {
  * Create a new terminal for a project
  */
 async function createTerminal(project, options = {}) {
-  const { skipPermissions = false } = options;
+  const { skipPermissions = false, runClaude = true } = options;
 
   const id = await ipcRenderer.invoke('terminal-create', {
     cwd: project.path,
-    runClaude: true,
+    runClaude,
     skipPermissions
   });
 
@@ -203,10 +229,27 @@ async function createTerminal(project, options = {}) {
   setTimeout(() => fitAddon.fit(), 100);
   setActiveTerminal(id);
 
-  // Custom key handler for global shortcuts (Ctrl+Arrow to switch terminals)
+  // Custom key handler for global shortcuts and copy/paste
   terminal.attachCustomKeyEventHandler((e) => {
+    // Ctrl+Arrow to switch terminals - let event bubble up
     if (e.ctrlKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-      // Let the event bubble up to our global handler
+      return false;
+    }
+    // Ctrl+Shift+C to copy selection
+    if (e.ctrlKey && e.shiftKey && e.key === 'C' && e.type === 'keydown') {
+      const selection = terminal.getSelection();
+      if (selection) {
+        navigator.clipboard.writeText(selection);
+      }
+      return false;
+    }
+    // Ctrl+Shift+V to paste
+    if (e.ctrlKey && e.shiftKey && e.key === 'V' && e.type === 'keydown') {
+      navigator.clipboard.readText().then(text => {
+        if (text) {
+          ipcRenderer.send('terminal-input', { id, data: text });
+        }
+      });
       return false;
     }
     // Let xterm handle other keys
@@ -241,8 +284,9 @@ async function createTerminal(project, options = {}) {
       updateTerminalStatus(id, 'working');
       if (td && td.inputBuffer.trim().length > 0) {
         const title = extractTitleFromInput(td.inputBuffer);
-        if (title && callbacks.onUpdateWindowTitle) {
-          callbacks.onUpdateWindowTitle(title, project.name);
+        if (title) {
+          // Update terminal tab name instead of window title
+          updateTerminalTabName(id, title);
         }
         updateTerminal(id, { inputBuffer: '' });
       }
@@ -271,6 +315,192 @@ async function createTerminal(project, options = {}) {
   tab.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeTerminal(id); };
 
   return id;
+}
+
+/**
+ * Create a FiveM console as a terminal tab
+ */
+function createFivemConsole(project, projectIndex, options = {}) {
+  // Check if console already exists for this project
+  const existingId = fivemConsoleIds.get(projectIndex);
+  if (existingId && getTerminal(existingId)) {
+    setActiveTerminal(existingId);
+    return existingId;
+  }
+
+  const id = `fivem-${projectIndex}-${Date.now()}`;
+
+  const terminal = new Terminal({
+    theme: {
+      background: '#0d0d0d',
+      foreground: '#d4d4d4',
+      cursor: '#d4d4d4',
+      cursorAccent: '#0d0d0d',
+      selection: 'rgba(255, 255, 255, 0.2)',
+      black: '#1e1e1e',
+      red: '#f44747',
+      green: '#6a9955',
+      yellow: '#d7ba7d',
+      blue: '#569cd6',
+      magenta: '#c586c0',
+      cyan: '#4ec9b0',
+      white: '#d4d4d4'
+    },
+    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: 13,
+    cursorBlink: false,
+    disableStdin: false,
+    scrollback: 10000
+  });
+
+  const fitAddon = new FitAddon();
+  terminal.loadAddon(fitAddon);
+
+  const termData = {
+    terminal,
+    fitAddon,
+    project,
+    projectIndex,
+    name: `🖥️ ${project.name}`,
+    status: 'ready',
+    type: 'fivem',
+    inputBuffer: ''
+  };
+
+  addTerminal(id, termData);
+  fivemConsoleIds.set(projectIndex, id);
+
+  // Create tab
+  const tabsContainer = document.getElementById('terminals-tabs');
+  const tab = document.createElement('div');
+  tab.className = 'terminal-tab fivem-tab status-ready';
+  tab.dataset.id = id;
+  tab.innerHTML = `
+    <span class="status-dot fivem-dot"></span>
+    <span class="tab-name">${escapeHtml(`🖥️ ${project.name}`)}</span>
+    <button class="tab-close"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>`;
+  tabsContainer.appendChild(tab);
+
+  // Create wrapper
+  const container = document.getElementById('terminals-container');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'terminal-wrapper fivem-wrapper';
+  wrapper.dataset.id = id;
+  container.appendChild(wrapper);
+
+  document.getElementById('empty-terminals').style.display = 'none';
+
+  terminal.open(wrapper);
+  setTimeout(() => fitAddon.fit(), 100);
+  setActiveTerminal(id);
+
+  // Write existing logs
+  const server = getFivemServer(projectIndex);
+  if (server && server.logs && server.logs.length > 0) {
+    terminal.write(server.logs.join(''));
+  }
+
+  // Custom key handler for global shortcuts and copy/paste
+  terminal.attachCustomKeyEventHandler((e) => {
+    // Ctrl+Arrow to switch terminals - let event bubble up
+    if (e.ctrlKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      return false;
+    }
+    // Ctrl+Shift+C to copy selection
+    if (e.ctrlKey && e.shiftKey && e.key === 'C' && e.type === 'keydown') {
+      const selection = terminal.getSelection();
+      if (selection) {
+        navigator.clipboard.writeText(selection);
+      }
+      return false;
+    }
+    // Ctrl+Shift+V to paste
+    if (e.ctrlKey && e.shiftKey && e.key === 'V' && e.type === 'keydown') {
+      navigator.clipboard.readText().then(text => {
+        if (text) {
+          ipcRenderer.send('fivem-input', { projectIndex, data: text });
+        }
+      });
+      return false;
+    }
+    // Let xterm handle other keys
+    return true;
+  });
+
+  // Handle input to FiveM console
+  terminal.onData(data => {
+    ipcRenderer.send('fivem-input', { projectIndex, data });
+  });
+
+  // Resize handling
+  const resizeObserver = new ResizeObserver(() => {
+    fitAddon.fit();
+    ipcRenderer.send('fivem-resize', {
+      projectIndex,
+      cols: terminal.cols,
+      rows: terminal.rows
+    });
+  });
+  resizeObserver.observe(wrapper);
+
+  // Send initial size
+  ipcRenderer.send('fivem-resize', {
+    projectIndex,
+    cols: terminal.cols,
+    rows: terminal.rows
+  });
+
+  // Filter and render
+  const selectedFilter = projectsState.get().selectedProjectFilter;
+  filterByProject(selectedFilter);
+  if (callbacks.onRenderProjects) callbacks.onRenderProjects();
+
+  // Tab events
+  tab.onclick = (e) => { if (!e.target.closest('.tab-close') && !e.target.closest('.tab-name-input')) setActiveTerminal(id); };
+  tab.querySelector('.tab-name').ondblclick = (e) => { e.stopPropagation(); startRenameTab(id); };
+  tab.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeFivemConsole(id, projectIndex); };
+
+  return id;
+}
+
+/**
+ * Close FiveM console
+ */
+function closeFivemConsole(id, projectIndex) {
+  const termData = getTerminal(id);
+  if (termData && termData.terminal) termData.terminal.dispose();
+  removeTerminal(id);
+  fivemConsoleIds.delete(projectIndex);
+  document.querySelector(`.terminal-tab[data-id="${id}"]`)?.remove();
+  document.querySelector(`.terminal-wrapper[data-id="${id}"]`)?.remove();
+
+  const selectedFilter = projectsState.get().selectedProjectFilter;
+  filterByProject(selectedFilter);
+  if (callbacks.onRenderProjects) callbacks.onRenderProjects();
+}
+
+/**
+ * Get FiveM console terminal for a project
+ */
+function getFivemConsoleTerminal(projectIndex) {
+  const id = fivemConsoleIds.get(projectIndex);
+  if (id) {
+    const termData = getTerminal(id);
+    if (termData) {
+      return termData.terminal;
+    }
+  }
+  return null;
+}
+
+/**
+ * Write data to FiveM console
+ */
+function writeFivemConsole(projectIndex, data) {
+  const terminal = getFivemConsoleTerminal(projectIndex);
+  if (terminal) {
+    terminal.write(data);
+  }
 }
 
 /**
@@ -364,5 +594,10 @@ module.exports = {
   countTerminalsForProject,
   showAll,
   setCallbacks,
-  updateTerminalStatus
+  updateTerminalStatus,
+  // FiveM console functions
+  createFivemConsole,
+  closeFivemConsole,
+  getFivemConsoleTerminal,
+  writeFivemConsole
 };
