@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npm install)",
       "Bash(npm install:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(tree:*)",
+      "Bash(node:*)",
+      "Bash(where /r \"%APPDATA%\" *claude*)",
+      "Bash(claude mcp:*)"
     ]
   }
 }
