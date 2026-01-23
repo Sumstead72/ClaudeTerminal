@@ -32,12 +32,5 @@ function registerAllHandlers(mainWindow) {
 }
 
 module.exports = {
-  registerAllHandlers,
-  registerTerminalHandlers,
-  registerGitHandlers,
-  registerMcpHandlers,
-  registerFivemHandlers,
-  registerDialogHandlers,
-  registerProjectHandlers,
-  registerClaudeHandlers
+  registerAllHandlers
 };

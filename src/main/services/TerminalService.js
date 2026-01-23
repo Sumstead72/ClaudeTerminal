@@ -4,6 +4,7 @@
  */
 
 const os = require('os');
+const fs = require('fs');
 const pty = require('node-pty');
 
 class TerminalService {
@@ -22,37 +23,76 @@ class TerminalService {
   }
 
   /**
+   * Send data to renderer safely (checks if window is destroyed)
+   * @param {string} channel - IPC channel
+   * @param {Object} data - Data to send
+   */
+  sendToRenderer(channel, data) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send(channel, data);
+    }
+  }
+
+  /**
    * Create a new terminal
    * @param {Object} options
    * @param {string} options.cwd - Working directory
    * @param {boolean} options.runClaude - Whether to run Claude CLI on start
    * @param {boolean} options.skipPermissions - Skip permissions flag for Claude
    * @param {string} options.resumeSessionId - Session ID to resume
-   * @returns {number} - Terminal ID
+   * @returns {Object} - { success: boolean, id?: number, error?: string }
    */
   create({ cwd, runClaude, skipPermissions, resumeSessionId }) {
     const id = ++this.terminalId;
     const shellPath = process.platform === 'win32' ? 'powershell.exe' : 'bash';
 
-    const ptyProcess = pty.spawn(shellPath, [], {
-      name: 'xterm-256color',
-      cols: 120,
-      rows: 30,
-      cwd: cwd || os.homedir(),
-      env: process.env
-    });
+    // Validate and resolve working directory
+    let effectiveCwd = os.homedir();
+    if (cwd) {
+      try {
+        if (fs.existsSync(cwd) && fs.statSync(cwd).isDirectory()) {
+          effectiveCwd = cwd;
+        } else {
+          console.warn(`Terminal cwd does not exist: ${cwd}, using home directory`);
+        }
+      } catch (e) {
+        console.warn(`Error checking cwd: ${e.message}, using home directory`);
+      }
+    }
+
+    let ptyProcess;
+    try {
+      ptyProcess = pty.spawn(shellPath, [], {
+        name: 'xterm-256color',
+        cols: 120,
+        rows: 30,
+        cwd: effectiveCwd,
+        env: process.env
+      });
+
+      if (!ptyProcess) {
+        throw new Error('PTY process creation returned null');
+      }
+    } catch (error) {
+      console.error('Failed to spawn terminal:', error);
+      this.sendToRenderer('terminal-error', {
+        id,
+        error: `Failed to create terminal: ${error.message}`
+      });
+      return { success: false, error: error.message };
+    }
 
     this.terminals.set(id, ptyProcess);
 
     // Handle data output
     ptyProcess.onData(data => {
-      this.mainWindow?.webContents.send('terminal-data', { id, data });
+      this.sendToRenderer('terminal-data', { id, data });
     });
 
     // Handle exit
     ptyProcess.onExit(() => {
       this.terminals.delete(id);
-      this.mainWindow?.webContents.send('terminal-exit', { id });
+      this.sendToRenderer('terminal-exit', { id });
     });
 
     // Run Claude CLI if requested
@@ -69,7 +109,7 @@ class TerminalService {
       }, 500);
     }
 
-    return id;
+    return { success: true, id };
   }
 
   /**
