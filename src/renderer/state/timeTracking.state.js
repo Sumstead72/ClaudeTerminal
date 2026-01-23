@@ -366,6 +366,90 @@ function getTrackingState() {
   return trackingState.get();
 }
 
+/**
+ * Check if a date is in the current week (Monday to Sunday)
+ * @param {Date} date
+ * @returns {boolean}
+ */
+function isInCurrentWeek(date) {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  const day = startOfWeek.getDay();
+  const diff = day === 0 ? 6 : day - 1; // Adjust for Monday start
+  startOfWeek.setDate(startOfWeek.getDate() - diff);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+  return date >= startOfWeek && date < endOfWeek;
+}
+
+/**
+ * Check if a date is in the current month
+ * @param {Date} date
+ * @returns {boolean}
+ */
+function isInCurrentMonth(date) {
+  const now = new Date();
+  return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+}
+
+/**
+ * Get global time tracking stats across all projects
+ * @returns {{ today: number, week: number, month: number }}
+ */
+function getGlobalTimes() {
+  if (!projectsStateRef) {
+    return { today: 0, week: 0, month: 0 };
+  }
+
+  const projects = projectsStateRef.get().projects;
+  const today = getTodayString();
+  const now = new Date();
+  const state = trackingState.get();
+
+  let todayTotal = 0;
+  let weekTotal = 0;
+  let monthTotal = 0;
+
+  for (const project of projects) {
+    if (!project.timeTracking) continue;
+
+    const tracking = project.timeTracking;
+
+    // Today's time (from saved todayTime if date matches)
+    if (tracking.lastActiveDate === today) {
+      todayTotal += tracking.todayTime || 0;
+    }
+
+    // Calculate week and month from sessions
+    if (tracking.sessions && tracking.sessions.length > 0) {
+      for (const session of tracking.sessions) {
+        const sessionDate = new Date(session.startTime);
+        const duration = session.duration || 0;
+
+        if (isInCurrentWeek(sessionDate)) {
+          weekTotal += duration;
+        }
+        if (isInCurrentMonth(sessionDate)) {
+          monthTotal += duration;
+        }
+      }
+    }
+  }
+
+  // Add current active session time
+  if (state.activeProjectId && state.sessionStartTime && !state.isIdle) {
+    const currentSessionTime = Date.now() - state.sessionStartTime;
+    todayTotal += currentSessionTime;
+    weekTotal += currentSessionTime;
+    monthTotal += currentSessionTime;
+  }
+
+  return { today: todayTotal, week: weekTotal, month: monthTotal };
+}
+
 module.exports = {
   trackingState,
   initTimeTracking,
@@ -376,6 +460,7 @@ module.exports = {
   resumeTracking,
   switchProject,
   getProjectTimes,
+  getGlobalTimes,
   saveAllActiveSessions,
   hasTerminalsForProject,
   getTrackingState,

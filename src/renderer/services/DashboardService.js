@@ -4,8 +4,25 @@
  */
 
 const { ipcRenderer } = require('electron');
-const { projectsState, setGitPulling, setGitPushing, setGitMerging, setMergeInProgress, getGitOperation } = require('../state');
+const { projectsState, setGitPulling, setGitPushing, setGitMerging, setMergeInProgress, getGitOperation, getProjectTimes } = require('../state');
 const { escapeHtml } = require('../utils');
+
+/**
+ * Format duration in milliseconds to human-readable string
+ * @param {number} ms - Duration in milliseconds
+ * @returns {string}
+ */
+function formatDuration(ms) {
+  if (!ms || ms < 60000) return '0m';
+
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
+}
 
 // ========== CACHE SYSTEM ==========
 const dashboardCache = new Map(); // projectId -> { data, timestamp, loading }
@@ -535,6 +552,7 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
   const isFivem = project.type === 'fivem';
   const gitOps = getGitOperation(project.id);
   const hasMergeConflict = gitOps.mergeInProgress && gitOps.conflicts.length > 0;
+  const projectTimes = getProjectTimes(project.id);
 
   // Build HTML
   container.innerHTML = `
@@ -589,6 +607,12 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
       <div class="quick-stat">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.89 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
         <span>${terminalCount} terminal${terminalCount > 1 ? 's' : ''}</span>
+      </div>
+      <div class="quick-stat time-stat">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+        <span class="time-today">${formatDuration(projectTimes.today)}</span>
+        <span class="time-sep">/</span>
+        <span class="time-total">${formatDuration(projectTimes.total)}</span>
       </div>
       ${isFivem ? `
       <div class="quick-stat ${fivemStatus}">
