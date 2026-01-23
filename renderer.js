@@ -1037,7 +1037,7 @@ async function renameProjectUI(projectId) {
 }
 
 // ========== SETTINGS MODAL ==========
-async function showSettingsModal() {
+async function showSettingsModal(initialTab = 'general') {
   const settings = settingsState.get();
 
   // Get launch at startup setting
@@ -1048,68 +1048,137 @@ async function showSettingsModal() {
     console.error('Error getting launch at startup:', e);
   }
 
+  // Get GitHub auth status
+  let githubStatus = { authenticated: false };
+  try {
+    githubStatus = await ipcRenderer.invoke('github-auth-status');
+  } catch (e) {
+    console.error('Error getting GitHub status:', e);
+  }
+
   showModal('Parametres', `
-    <div class="settings-form">
-      <div class="settings-section">
-        <div class="settings-title">Mode d'execution</div>
-        <div class="execution-mode-selector">
-          <div class="execution-mode-card ${!settings.skipPermissions ? 'selected' : ''}" data-mode="safe">
-            <div class="execution-mode-icon safe">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+    <div class="settings-tabs">
+      <button class="settings-tab ${initialTab === 'general' ? 'active' : ''}" data-tab="general">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        General
+      </button>
+      <button class="settings-tab ${initialTab === 'claude' ? 'active' : ''}" data-tab="claude">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
+        Claude
+      </button>
+      <button class="settings-tab ${initialTab === 'github' ? 'active' : ''}" data-tab="github">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </button>
+    </div>
+    <div class="settings-content">
+      <!-- General Tab -->
+      <div class="settings-panel ${initialTab === 'general' ? 'active' : ''}" data-panel="general">
+        <div class="settings-section">
+          <div class="settings-title">Apparence</div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <div>Couleur d'accent</div>
+              <div class="settings-desc">Personnalisez la couleur principale de l'interface</div>
             </div>
-            <div class="execution-mode-content">
-              <div class="execution-mode-title">Mode securise</div>
-              <div class="execution-mode-desc">Claude demande confirmation avant chaque action</div>
-            </div>
-            <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
           </div>
-          <div class="execution-mode-card ${settings.skipPermissions ? 'selected' : ''}" data-mode="dangerous">
-            <div class="execution-mode-icon dangerous">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
-            </div>
-            <div class="execution-mode-content">
-              <div class="execution-mode-title">Mode autonome</div>
-              <div class="execution-mode-desc">Claude execute les actions sans confirmation</div>
-              <div class="execution-mode-flag">--dangerously-skip-permissions</div>
-            </div>
-            <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+          <div class="color-picker">
+            ${['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].map(c =>
+              `<button class="color-swatch ${settings.accentColor === c ? 'selected' : ''}" style="background:${c}" data-color="${c}"></button>`
+            ).join('')}
           </div>
         </div>
-        <div class="settings-warning" id="dangerous-warning" style="display: ${settings.skipPermissions ? 'flex' : 'none'};">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
-          <span>Ce mode permet a Claude d'executer des commandes sans validation.</span>
+        <div class="settings-section">
+          <div class="settings-title">Systeme</div>
+          <div class="settings-toggle-row">
+            <div class="settings-toggle-label">
+              <div>Lancer au demarrage</div>
+              <div class="settings-toggle-desc">Demarrer automatiquement avec Windows</div>
+            </div>
+            <label class="settings-toggle">
+              <input type="checkbox" id="launch-at-startup-toggle" ${launchAtStartup ? 'checked' : ''}>
+              <span class="settings-toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <div>Fermeture de la fenetre</div>
+              <div class="settings-desc">Action quand vous cliquez sur fermer</div>
+            </div>
+            <select id="close-action-select" class="settings-select">
+              <option value="ask" ${settings.closeAction === 'ask' || !settings.closeAction ? 'selected' : ''}>Demander</option>
+              <option value="minimize" ${settings.closeAction === 'minimize' ? 'selected' : ''}>Minimiser</option>
+              <option value="quit" ${settings.closeAction === 'quit' ? 'selected' : ''}>Quitter</option>
+            </select>
+          </div>
         </div>
       </div>
-      <div class="settings-section">
-        <div class="settings-title">Systeme</div>
-        <div class="settings-toggle-row">
-          <div class="settings-toggle-label">
-            <div>Lancer au demarrage de Windows</div>
-            <div class="settings-toggle-desc">L'application se lancera automatiquement au demarrage de l'ordinateur</div>
+      <!-- Claude Tab -->
+      <div class="settings-panel ${initialTab === 'claude' ? 'active' : ''}" data-panel="claude">
+        <div class="settings-section">
+          <div class="settings-title">Mode d'execution</div>
+          <div class="execution-mode-selector">
+            <div class="execution-mode-card ${!settings.skipPermissions ? 'selected' : ''}" data-mode="safe">
+              <div class="execution-mode-icon safe">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+              </div>
+              <div class="execution-mode-content">
+                <div class="execution-mode-title">Mode securise</div>
+                <div class="execution-mode-desc">Claude demande confirmation avant chaque action</div>
+              </div>
+              <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+            </div>
+            <div class="execution-mode-card ${settings.skipPermissions ? 'selected' : ''}" data-mode="dangerous">
+              <div class="execution-mode-icon dangerous">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+              </div>
+              <div class="execution-mode-content">
+                <div class="execution-mode-title">Mode autonome</div>
+                <div class="execution-mode-desc">Claude execute sans confirmation</div>
+                <div class="execution-mode-flag">--dangerously-skip-permissions</div>
+              </div>
+              <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+            </div>
           </div>
-          <label class="settings-toggle">
-            <input type="checkbox" id="launch-at-startup-toggle" ${launchAtStartup ? 'checked' : ''}>
-            <span class="settings-toggle-slider"></span>
-          </label>
-        </div>
-        <div class="settings-row">
-          <div class="settings-label">
-            <div>Comportement a la fermeture</div>
-            <div class="settings-desc">Action a effectuer quand vous cliquez sur fermer</div>
+          <div class="settings-warning" id="dangerous-warning" style="display: ${settings.skipPermissions ? 'flex' : 'none'};">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+            <span>Ce mode permet a Claude d'executer des commandes sans validation.</span>
           </div>
-          <select id="close-action-select" class="settings-select">
-            <option value="ask" ${settings.closeAction === 'ask' || !settings.closeAction ? 'selected' : ''}>Toujours demander</option>
-            <option value="minimize" ${settings.closeAction === 'minimize' ? 'selected' : ''}>Minimiser dans le tray</option>
-            <option value="quit" ${settings.closeAction === 'quit' ? 'selected' : ''}>Quitter completement</option>
-          </select>
         </div>
       </div>
-      <div class="settings-section">
-        <div class="settings-title">Couleur d'accent</div>
-        <div class="color-picker">
-          ${['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].map(c =>
-            `<button class="color-swatch ${settings.accentColor === c ? 'selected' : ''}" style="background:${c}" data-color="${c}"></button>`
-          ).join('')}
+      <!-- GitHub Tab -->
+      <div class="settings-panel ${initialTab === 'github' ? 'active' : ''}" data-panel="github">
+        <div class="settings-section">
+          <div class="settings-title">Compte GitHub</div>
+          <div class="github-account-card" id="github-account-card">
+            ${githubStatus.authenticated ? `
+              <div class="github-account-connected">
+                <div class="github-account-info">
+                  <img src="${githubStatus.avatar_url || ''}" alt="" class="github-avatar" onerror="this.style.display='none'">
+                  <div class="github-account-details">
+                    <div class="github-account-name">${githubStatus.name || githubStatus.login}</div>
+                    <div class="github-account-login">@${githubStatus.login}</div>
+                  </div>
+                </div>
+                <button type="button" class="btn-outline-danger btn-sm" id="btn-github-disconnect">Deconnecter</button>
+              </div>
+            ` : `
+              <div class="github-account-disconnected">
+                <div class="github-account-message">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                  <div>
+                    <div class="github-account-title">Connectez votre compte GitHub</div>
+                    <div class="github-account-desc">Permet de cloner vos repositories prives</div>
+                  </div>
+                </div>
+                <button type="button" class="btn-github-connect" id="btn-github-connect">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                  Connecter GitHub
+                </button>
+              </div>
+            `}
+          </div>
+          <div class="github-device-flow-container" id="github-device-flow" style="display: none;"></div>
         </div>
       </div>
     </div>
@@ -1118,6 +1187,17 @@ async function showSettingsModal() {
     <button type="button" class="btn-primary" id="btn-save-settings">Sauvegarder</button>
   `);
 
+  // Tab switching
+  document.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`)?.classList.add('active');
+    };
+  });
+
+  // Execution mode cards
   document.querySelectorAll('.execution-mode-card').forEach(card => {
     card.onclick = () => {
       document.querySelectorAll('.execution-mode-card').forEach(c => c.classList.remove('selected'));
@@ -1126,6 +1206,7 @@ async function showSettingsModal() {
     };
   });
 
+  // Color swatches
   document.querySelectorAll('.color-swatch').forEach(swatch => {
     swatch.onclick = () => {
       document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
@@ -1133,6 +1214,80 @@ async function showSettingsModal() {
     };
   });
 
+  // GitHub connect button
+  async function setupGitHubAuth() {
+    const connectBtn = document.getElementById('btn-github-connect');
+    const disconnectBtn = document.getElementById('btn-github-disconnect');
+    const deviceFlowEl = document.getElementById('github-device-flow');
+    const accountCard = document.getElementById('github-account-card');
+
+    if (connectBtn) {
+      connectBtn.onclick = async () => {
+        connectBtn.disabled = true;
+        connectBtn.innerHTML = '<span class="btn-spinner"></span> Connexion...';
+
+        try {
+          const result = await ipcRenderer.invoke('github-start-auth');
+          if (!result.success) {
+            connectBtn.disabled = false;
+            connectBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> Connecter GitHub';
+            return;
+          }
+
+          // Show device flow UI
+          deviceFlowEl.style.display = 'block';
+          deviceFlowEl.innerHTML = `
+            <div class="github-device-flow">
+              <div class="device-code-section">
+                <div class="device-code-label">Copiez ce code :</div>
+                <div class="device-code">${result.user_code}</div>
+              </div>
+              <div class="device-flow-steps">
+                <a href="#" class="device-flow-link" id="open-github-link">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                  Ouvrir GitHub et coller le code
+                </a>
+              </div>
+              <div class="github-waiting">
+                <span class="btn-spinner"></span> En attente d'autorisation...
+              </div>
+            </div>
+          `;
+
+          document.getElementById('open-github-link').onclick = (e) => {
+            e.preventDefault();
+            ipcRenderer.invoke('github-open-auth-url', result.verification_uri);
+          };
+
+          // Poll for token
+          const pollResult = await ipcRenderer.invoke('github-poll-token', {
+            deviceCode: result.device_code,
+            interval: result.interval || 5
+          });
+
+          if (pollResult.success) {
+            // Refresh the whole modal to show connected state
+            showSettingsModal('github');
+          } else {
+            deviceFlowEl.innerHTML = `<div class="github-error">${pollResult.error}</div>`;
+          }
+        } catch (e) {
+          connectBtn.disabled = false;
+          connectBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> Connecter GitHub';
+        }
+      };
+    }
+
+    if (disconnectBtn) {
+      disconnectBtn.onclick = async () => {
+        await ipcRenderer.invoke('github-logout');
+        showSettingsModal('github');
+      };
+    }
+  }
+  setupGitHubAuth();
+
+  // Save settings
   document.getElementById('btn-save-settings').onclick = async () => {
     const selectedMode = document.querySelector('.execution-mode-card.selected');
     const closeActionSelect = document.getElementById('close-action-select');
@@ -1660,11 +1815,29 @@ document.getElementById('btn-new-project').onclick = () => {
   showModal('Nouveau Projet', `
     <form id="form-project">
       <div class="form-group">
+        <label>Source du projet</label>
+        <div class="source-selector">
+          <div class="source-option selected" data-source="folder">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>
+            <span>Dossier existant</span>
+          </div>
+          <div class="source-option" data-source="clone">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>
+            <span>Cloner un repo</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group clone-config" style="display: none;">
+        <label>URL du repository</label>
+        <input type="text" id="inp-repo-url" placeholder="https://github.com/user/repo.git">
+        <div class="github-status-hint" id="github-status-hint"></div>
+      </div>
+      <div class="form-group">
         <label>Nom du projet</label>
         <input type="text" id="inp-name" placeholder="Mon Projet" required>
       </div>
       <div class="form-group">
-        <label>Chemin du projet</label>
+        <label id="label-path">Chemin du projet</label>
         <div class="input-with-btn">
           <input type="text" id="inp-path" placeholder="C:\\chemin\\projet" required>
           <button type="button" class="btn-browse" id="btn-browse">
@@ -1692,14 +1865,70 @@ document.getElementById('btn-new-project').onclick = () => {
           <button type="button" id="btn-browse-fivem" class="btn-browse">Parcourir</button>
         </div>
       </div>
+      <div class="form-group clone-status" style="display: none;">
+        <div class="clone-progress">
+          <span class="clone-progress-text">Clonage en cours...</span>
+          <div class="clone-progress-bar"><div class="clone-progress-fill"></div></div>
+        </div>
+      </div>
       <div class="form-actions">
         <button type="button" class="btn-cancel" onclick="closeModal()">Annuler</button>
-        <button type="submit" class="btn-primary">Creer</button>
+        <button type="submit" class="btn-primary" id="btn-create-project">Creer</button>
       </div>
     </form>
   `);
 
   let selectedType = 'standalone';
+  let selectedSource = 'folder';
+  let githubConnected = false;
+
+  // Check GitHub auth status (simple hint)
+  async function updateGitHubHint() {
+    const hintEl = document.getElementById('github-status-hint');
+    if (!hintEl) return;
+
+    try {
+      const result = await ipcRenderer.invoke('github-auth-status');
+      githubConnected = result.authenticated;
+      if (result.authenticated) {
+        hintEl.innerHTML = `<span class="hint-success"><svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> GitHub connecte (${result.login})</span>`;
+      } else {
+        hintEl.innerHTML = `<span class="hint-warning"><svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> Repos prives inaccessibles - <a href="#" id="link-github-settings">connecter GitHub</a></span>`;
+        document.getElementById('link-github-settings')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          closeModal();
+          showSettingsModal('github');
+        });
+      }
+    } catch (e) {
+      hintEl.innerHTML = '';
+    }
+  }
+
+  // Source selector (folder vs clone)
+  document.querySelectorAll('.source-option').forEach(opt => {
+    opt.onclick = () => {
+      document.querySelectorAll('.source-option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      selectedSource = opt.dataset.source;
+      const isClone = selectedSource === 'clone';
+      document.querySelector('.clone-config').style.display = isClone ? 'block' : 'none';
+      document.getElementById('label-path').textContent = isClone ? 'Dossier de destination' : 'Chemin du projet';
+      document.getElementById('inp-path').placeholder = isClone ? 'C:\\chemin\\destination' : 'C:\\chemin\\projet';
+      if (isClone) updateGitHubHint();
+    };
+  });
+
+  // Auto-fill name from repo URL
+  document.getElementById('inp-repo-url')?.addEventListener('input', (e) => {
+    const url = e.target.value.trim();
+    if (url && !document.getElementById('inp-name').value) {
+      // Extract repo name from URL
+      const match = url.match(/\/([^\/]+?)(\.git)?$/);
+      if (match) document.getElementById('inp-name').value = match[1];
+    }
+  });
+
   document.querySelectorAll('.type-card').forEach(card => {
     card.onclick = () => {
       document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
@@ -1713,7 +1942,9 @@ document.getElementById('btn-new-project').onclick = () => {
     const folder = await ipcRenderer.invoke('select-folder');
     if (folder) {
       document.getElementById('inp-path').value = folder;
-      if (!document.getElementById('inp-name').value) document.getElementById('inp-name').value = path.basename(folder);
+      if (!document.getElementById('inp-name').value && selectedSource === 'folder') {
+        document.getElementById('inp-name').value = path.basename(folder);
+      }
     }
   };
 
@@ -1722,21 +1953,51 @@ document.getElementById('btn-new-project').onclick = () => {
     if (file) document.getElementById('inp-fivem-cmd').value = file;
   };
 
-  document.getElementById('form-project').onsubmit = (e) => {
+  document.getElementById('form-project').onsubmit = async (e) => {
     e.preventDefault();
     const name = document.getElementById('inp-name').value.trim();
-    const projPath = document.getElementById('inp-path').value.trim();
-    if (name && projPath) {
-      const project = { id: generateProjectId(), name, path: projPath, type: selectedType, folderId: null };
-      if (selectedType === 'fivem') project.fivemConfig = { runCommand: document.getElementById('inp-fivem-cmd').value.trim() };
+    let projPath = document.getElementById('inp-path').value.trim();
+    const repoUrl = document.getElementById('inp-repo-url')?.value.trim();
 
-      const projects = [...projectsState.get().projects, project];
-      const rootOrder = [...projectsState.get().rootOrder, project.id];
-      projectsState.set({ projects, rootOrder });
-      saveProjects();
-      ProjectList.render();
-      closeModal();
+    if (!name || !projPath) return;
+
+    // If cloning, append project name to path and clone
+    if (selectedSource === 'clone' && repoUrl) {
+      projPath = path.join(projPath, name);
+
+      // Show progress
+      const submitBtn = document.getElementById('btn-create-project');
+      const cloneStatus = document.querySelector('.clone-status');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="btn-spinner"></span> Clonage...';
+      cloneStatus.style.display = 'block';
+
+      try {
+        const result = await ipcRenderer.invoke('git-clone', { repoUrl, targetPath: projPath });
+
+        if (!result.success) {
+          cloneStatus.innerHTML = `<div class="clone-error">${result.error}</div>`;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Creer';
+          return;
+        }
+      } catch (err) {
+        cloneStatus.innerHTML = `<div class="clone-error">${err.message}</div>`;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Creer';
+        return;
+      }
     }
+
+    const project = { id: generateProjectId(), name, path: projPath, type: selectedType, folderId: null };
+    if (selectedType === 'fivem') project.fivemConfig = { runCommand: document.getElementById('inp-fivem-cmd').value.trim() };
+
+    const projects = [...projectsState.get().projects, project];
+    const rootOrder = [...projectsState.get().rootOrder, project.id];
+    projectsState.set({ projects, rootOrder });
+    saveProjects();
+    ProjectList.render();
+    closeModal();
   };
 };
 
@@ -2330,6 +2591,58 @@ if (usageElements.container) {
   setTimeout(() => {
     refreshUsageDisplay();
   }, 2000);
+}
+
+// ========== TIME TRACKING DISPLAY ==========
+const timeElements = {
+  container: document.getElementById('titlebar-time'),
+  today: document.getElementById('time-today'),
+  week: document.getElementById('time-week'),
+  month: document.getElementById('time-month')
+};
+
+/**
+ * Format duration in milliseconds to human-readable string
+ * @param {number} ms - Duration in milliseconds
+ * @returns {string}
+ */
+function formatTimeDisplay(ms) {
+  if (!ms || ms < 60000) return '0h';
+
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h${minutes.toString().padStart(2, '0')}` : `${hours}h`;
+  }
+  return `${minutes}m`;
+}
+
+/**
+ * Update time tracking display in titlebar
+ */
+function updateTimeDisplay() {
+  if (!timeElements.container) return;
+
+  try {
+    const { getGlobalTimes } = require('./src/renderer');
+    const times = getGlobalTimes();
+
+    timeElements.today.textContent = formatTimeDisplay(times.today);
+    timeElements.week.textContent = formatTimeDisplay(times.week);
+    timeElements.month.textContent = formatTimeDisplay(times.month);
+  } catch (e) {
+    // State not initialized yet
+  }
+}
+
+// Initialize time tracking display
+if (timeElements.container) {
+  // Update every 30 seconds
+  setInterval(updateTimeDisplay, 30000);
+
+  // Initial update after state is initialized
+  setTimeout(updateTimeDisplay, 1000);
 }
 
 // ========== TIME TRACKING SAVE ON QUIT ==========
