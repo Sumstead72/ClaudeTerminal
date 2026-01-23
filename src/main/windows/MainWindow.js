@@ -68,6 +68,12 @@ function showMainWindow() {
   if (mainWindow) {
     mainWindow.show();
     mainWindow.focus();
+
+    // Refresh usage if stale
+    try {
+      const { onWindowShow } = require('../services/UsageService');
+      onWindowShow();
+    } catch (e) {}
   }
 }
 
@@ -98,11 +104,20 @@ function sendToMainWindow(channel, data) {
   }
 }
 
+/**
+ * Check if window is visible
+ * @returns {boolean}
+ */
+function isMainWindowVisible() {
+  return mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
+}
+
 module.exports = {
   createMainWindow,
   getMainWindow,
   showMainWindow,
   setQuitting,
   isAppQuitting,
-  sendToMainWindow
+  sendToMainWindow,
+  isMainWindowVisible
 };

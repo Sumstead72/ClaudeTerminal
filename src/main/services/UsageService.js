@@ -1,210 +1,188 @@
 /**
  * UsageService
- * Fetches Claude Code usage by running /usage command in background
+ * Fetches Claude Code usage by running /usage command
  */
 
 const pty = require('node-pty');
 const os = require('os');
-const path = require('path');
 
-// Usage data cache
+// Cache
 let usageData = null;
 let lastFetch = null;
 let fetchInterval = null;
 let isFetching = false;
 
-// Shell configuration
-const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
-
 /**
- * Parse usage output from Claude CLI
- * Extracts: Current session, Current week (all models), Current week (Sonnet only)
+ * Parse usage output - extract percentages from ANSI output
  * @param {string} output - Raw terminal output
- * @returns {Object|null} - Parsed usage data
+ * @returns {Object} - Parsed usage data
  */
 function parseUsageOutput(output) {
+  const data = {
+    timestamp: new Date().toISOString(),
+    session: null,
+    weekly: null,
+    sonnet: null
+  };
+
   try {
-    // Clean ANSI codes from output
-    const cleanOutput = output.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+    // Clean ANSI codes
+    const clean = output.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
 
-    const data = {
-      raw: cleanOutput,
-      timestamp: new Date().toISOString(),
-      session: null,
-      weekly: null,
-      sonnet: null
-    };
+    // Find percentages near keywords
+    // Pattern: "Current session" followed by percentage
+    const sessionMatch = clean.match(/Current session[\s\S]{0,100}?(\d+(?:\.\d+)?)\s*%/i);
+    if (sessionMatch) {
+      data.session = parseFloat(sessionMatch[1]);
+    }
 
-    // Split into lines and look for usage patterns
-    const lines = cleanOutput.split('\n');
+    // Pattern: "Current week" + "all models" followed by percentage
+    const weeklyMatch = clean.match(/Current week[\s\S]{0,50}?all models[\s\S]{0,100}?(\d+(?:\.\d+)?)\s*%/i);
+    if (weeklyMatch) {
+      data.weekly = parseFloat(weeklyMatch[1]);
+    }
 
-    let currentSection = null;
+    // Pattern: "Sonnet" followed by percentage
+    const sonnetMatch = clean.match(/Sonnet[\s\S]{0,100}?(\d+(?:\.\d+)?)\s*%/i);
+    if (sonnetMatch) {
+      data.sonnet = parseFloat(sonnetMatch[1]);
+    }
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      // Detect sections
-      if (line.includes('Current session')) {
-        currentSection = 'session';
-      } else if (line.includes('Current week') && line.includes('all models')) {
-        currentSection = 'weekly';
-      } else if (line.includes('Current week') && line.includes('Sonnet')) {
-        currentSection = 'sonnet';
-      }
-
-      // Extract percentage from lines containing "% used"
-      const percentMatch = line.match(/(\d+(?:\.\d+)?)\s*%\s*used/i);
-      if (percentMatch && currentSection) {
-        data[currentSection] = parseFloat(percentMatch[1]);
-        currentSection = null; // Reset after capturing
-      }
-
-      // Also check for standalone percentage on next line after section header
-      if (currentSection && !percentMatch) {
-        const standalonePercent = line.match(/(\d+(?:\.\d+)?)\s*%/);
-        if (standalonePercent) {
-          data[currentSection] = parseFloat(standalonePercent[1]);
-          currentSection = null;
-        }
+    // Fallback: find all percentages in order
+    if (data.session === null) {
+      const allPercents = clean.match(/(\d+(?:\.\d+)?)\s*%/g);
+      if (allPercents && allPercents.length >= 1) {
+        data.session = parseFloat(allPercents[0]);
+        if (allPercents.length >= 2) data.weekly = parseFloat(allPercents[1]);
+        if (allPercents.length >= 3) data.sonnet = parseFloat(allPercents[2]);
       }
     }
 
-    // Fallback: try to find all percentages in order (session, weekly, sonnet)
-    if (data.session === null && data.weekly === null && data.sonnet === null) {
-      const allPercents = cleanOutput.match(/(\d+(?:\.\d+)?)\s*%\s*used/gi);
-      if (allPercents && allPercents.length >= 3) {
-        data.session = parseFloat(allPercents[0].match(/(\d+(?:\.\d+)?)/)[1]);
-        data.weekly = parseFloat(allPercents[1].match(/(\d+(?:\.\d+)?)/)[1]);
-        data.sonnet = parseFloat(allPercents[2].match(/(\d+(?:\.\d+)?)/)[1]);
-      }
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error parsing usage output:', error);
-    return { raw: output, error: error.message, session: null, weekly: null, sonnet: null };
+    console.log('[Usage] Parsed:', data);
+  } catch (e) {
+    console.error('[Usage] Parse error:', e.message);
   }
+
+  return data;
 }
 
 /**
- * Fetch usage data by running claude /usage
- * @returns {Promise<Object>} - Usage data
+ * Fetch usage data
+ * @returns {Promise<Object>}
  */
 function fetchUsage() {
   return new Promise((resolve, reject) => {
     if (isFetching) {
-      resolve(usageData);
-      return;
+      return resolve(usageData);
     }
 
     isFetching = true;
     let output = '';
+    let phase = 'waiting_cmd'; // waiting_cmd -> waiting_claude -> waiting_usage -> done
     let resolved = false;
-    let claudeStarted = false;
-    let usageSent = false;
-    let usageComplete = false;
-    let exitTimeout = null;
 
-    const ptyProcess = pty.spawn(shell, [], {
+    console.log('[Usage] Starting fetch...');
+
+    const proc = pty.spawn('cmd.exe', [], {
       name: 'xterm-256color',
       cols: 120,
-      rows: 30,
+      rows: 40,
       cwd: os.homedir(),
       env: { ...process.env, TERM: 'xterm-256color' }
     });
 
+    // Timeout - kill and parse what we have
     const timeout = setTimeout(() => {
       if (!resolved) {
-        resolved = true;
-        isFetching = false;
-        ptyProcess.kill();
-        // Return partial data if we have any
-        if (output.includes('%')) {
-          const parsed = parseUsageOutput(output);
-          usageData = parsed;
-          lastFetch = new Date();
-          resolve(parsed);
-        } else {
-          reject(new Error('Timeout fetching usage'));
-        }
+        console.log('[Usage] Timeout - parsing available data');
+        finish();
       }
-    }, 20000); // 20 second timeout
+    }, 25000);
 
-    ptyProcess.onData((data) => {
-      output += data;
-
-      // Detect when claude is ready (look for the prompt character or welcome message)
-      if (!claudeStarted && (output.includes('╭') || output.includes('>') || output.includes('Claude'))) {
-        claudeStarted = true;
-        // Small delay before sending /usage
-        setTimeout(() => {
-          if (!usageSent) {
-            usageSent = true;
-            ptyProcess.write('/usage\r');
-          }
-        }, 800);
-      }
-
-      // Detect when usage output is complete
-      // Look for "esc to cancel" or "Sonnet only" which appear at the end of /usage
-      if (usageSent && !usageComplete) {
-        if (output.includes('esc to cancel') || output.includes('Sonnet only')) {
-          usageComplete = true;
-          // Give a moment to capture full output then exit
-          if (!exitTimeout) {
-            exitTimeout = setTimeout(() => {
-              if (!resolved) {
-                ptyProcess.write('\x1b'); // Send ESC to close /usage menu
-                setTimeout(() => {
-                  if (!resolved) {
-                    ptyProcess.write('/exit\r');
-                  }
-                }, 300);
-              }
-            }, 500);
-          }
-        }
-      }
-    });
-
-    ptyProcess.onExit(() => {
+    function finish() {
+      if (resolved) return;
+      resolved = true;
       clearTimeout(timeout);
-      if (exitTimeout) clearTimeout(exitTimeout);
+      isFetching = false;
 
-      if (!resolved) {
-        resolved = true;
-        isFetching = false;
+      try { proc.kill(); } catch (e) {}
 
-        // Parse the output
-        const parsed = parseUsageOutput(output);
+      const parsed = parseUsageOutput(output);
+      if (parsed.session !== null || parsed.weekly !== null) {
         usageData = parsed;
         lastFetch = new Date();
-
         resolve(parsed);
+      } else {
+        reject(new Error('Could not parse usage data'));
+      }
+    }
+
+    proc.onData((data) => {
+      output += data;
+
+      // Phase 1: Wait for CMD prompt, then start Claude
+      if (phase === 'waiting_cmd' && output.includes('>')) {
+        phase = 'waiting_claude';
+        console.log('[Usage] CMD ready, starting Claude...');
+        proc.write('claude --dangerously-skip-permissions\r');
+      }
+
+      // Phase 2: Wait for Claude to be ready (logo appears), then send /usage
+      if (phase === 'waiting_claude' && output.includes('Claude Code')) {
+        phase = 'waiting_usage';
+        console.log('[Usage] Claude ready, sending /usage...');
+        setTimeout(() => {
+          proc.write('/usage');
+          setTimeout(() => proc.write('\t'), 300);
+          setTimeout(() => proc.write('\r'), 500);
+        }, 1500);
+      }
+
+      // Phase 3: Wait for usage data, then finish
+      if (phase === 'waiting_usage') {
+        // Look for percentage in output (indicates usage displayed)
+        const hasData = output.includes('% used') ||
+                       (output.includes('Current session') && output.match(/\d+%/));
+
+        if (hasData) {
+          phase = 'done';
+          console.log('[Usage] Got usage data');
+          // Wait a bit for complete output then finish
+          setTimeout(finish, 2000);
+        }
       }
     });
 
-    // Start claude
-    setTimeout(() => {
-      ptyProcess.write('claude\r');
-    }, 500);
+    proc.onExit(() => {
+      if (!resolved) {
+        finish();
+      }
+    });
   });
 }
 
 /**
- * Start periodic usage fetching
- * @param {number} intervalMs - Interval in milliseconds (default: 60000 = 1 minute)
+ * Start periodic fetching
+ * @param {number} intervalMs - Interval (default: 5 minutes)
  */
-function startPeriodicFetch(intervalMs = 60000) {
-  // Fetch immediately on start
-  fetchUsage().catch(console.error);
+function startPeriodicFetch(intervalMs = 300000) {
+  const { isMainWindowVisible } = require('../windows/MainWindow');
 
-  // Then fetch periodically
-  if (fetchInterval) {
-    clearInterval(fetchInterval);
-  }
+  // Initial fetch after short delay (only if visible)
+  setTimeout(() => {
+    if (isMainWindowVisible()) {
+      fetchUsage().catch(e => console.error('[Usage]', e.message));
+    }
+  }, 5000);
+
+  // Periodic fetch (only if visible)
+  if (fetchInterval) clearInterval(fetchInterval);
   fetchInterval = setInterval(() => {
-    fetchUsage().catch(console.error);
+    if (isMainWindowVisible()) {
+      fetchUsage().catch(e => console.error('[Usage]', e.message));
+    } else {
+      console.log('[Usage] Skipping fetch - window hidden');
+    }
   }, intervalMs);
 }
 
@@ -220,7 +198,7 @@ function stopPeriodicFetch() {
 
 /**
  * Get cached usage data
- * @returns {Object|null}
+ * @returns {Object}
  */
 function getUsageData() {
   return {
@@ -231,11 +209,24 @@ function getUsageData() {
 }
 
 /**
- * Force refresh usage data
+ * Force refresh
  * @returns {Promise<Object>}
  */
-async function refreshUsage() {
+function refreshUsage() {
   return fetchUsage();
+}
+
+/**
+ * Called when window becomes visible - refresh if data is stale
+ */
+function onWindowShow() {
+  const staleMinutes = 5;
+  const isStale = !lastFetch || (Date.now() - lastFetch.getTime() > staleMinutes * 60 * 1000);
+
+  if (isStale && !isFetching) {
+    console.log('[Usage] Window shown, refreshing stale data...');
+    fetchUsage().catch(e => console.error('[Usage]', e.message));
+  }
 }
 
 module.exports = {
@@ -243,5 +234,6 @@ module.exports = {
   stopPeriodicFetch,
   getUsageData,
   refreshUsage,
-  fetchUsage
+  fetchUsage,
+  onWindowShow
 };
