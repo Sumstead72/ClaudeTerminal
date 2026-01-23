@@ -4,7 +4,8 @@
  */
 
 const { ipcMain } = require('electron');
-const { getGitInfo, getGitInfoFull, getGitStatusQuick, gitPull, gitPush, gitMerge, gitMergeAbort, gitMergeContinue, getMergeConflicts, isMergeInProgress, getProjectStats, getBranches, getCurrentBranch, checkoutBranch } = require('../utils/git');
+const { getGitInfo, getGitInfoFull, getGitStatusQuick, gitPull, gitPush, gitMerge, gitMergeAbort, gitMergeContinue, getMergeConflicts, isMergeInProgress, gitClone, getProjectStats, getBranches, getCurrentBranch, checkoutBranch } = require('../utils/git');
+const GitHubAuthService = require('../services/GitHubAuthService');
 
 /**
  * Register git IPC handlers
@@ -78,6 +79,13 @@ function registerGitHandlers() {
   // Check if merge in progress
   ipcMain.handle('git-merge-in-progress', async (event, { projectPath }) => {
     return isMergeInProgress(projectPath);
+  });
+
+  // Git clone (auto-uses GitHub token if available)
+  ipcMain.handle('git-clone', async (event, { repoUrl, targetPath }) => {
+    // Get GitHub token if available
+    const token = await GitHubAuthService.getTokenForGit();
+    return gitClone(repoUrl, targetPath, { token });
   });
 }
 

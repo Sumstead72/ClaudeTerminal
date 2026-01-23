@@ -466,6 +466,64 @@ async function isMergeInProgress(projectPath) {
 }
 
 /**
+ * Clone a git repository
+ * @param {string} repoUrl - URL of the repository to clone
+ * @param {string} targetPath - Path where to clone the repo
+ * @param {Object} options - Optional settings
+ * @param {string} options.token - GitHub token for private repos
+ * @param {Function} options.onProgress - Callback for progress updates
+ * @returns {Promise<Object>} - Result object with success/error
+ */
+function gitClone(repoUrl, targetPath, options = {}) {
+  return new Promise((resolve) => {
+    const { token, onProgress } = options;
+
+    // Ensure target directory exists
+    const parentDir = path.dirname(targetPath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+
+    // Inject token into HTTPS URL if provided
+    let cloneUrl = repoUrl;
+    if (token && repoUrl.startsWith('https://github.com/')) {
+      cloneUrl = repoUrl.replace('https://github.com/', `https://${token}@github.com/`);
+    } else if (token && repoUrl.startsWith('https://')) {
+      // Generic HTTPS URL with token
+      cloneUrl = repoUrl.replace('https://', `https://${token}@`);
+    }
+
+    const cloneProcess = exec(
+      `git clone --progress "${cloneUrl}" "${targetPath}"`,
+      { encoding: 'utf8', maxBuffer: 1024 * 1024 * 10, timeout: 300000 }, // 5 min timeout
+      (error, stdout, stderr) => {
+        if (error) {
+          // Check common errors
+          if (stderr.includes('already exists')) {
+            resolve({ success: false, error: 'Le dossier existe déjà' });
+          } else if (stderr.includes('not found') || stderr.includes('Could not resolve')) {
+            resolve({ success: false, error: 'Repository introuvable' });
+          } else if (stderr.includes('Authentication failed') || stderr.includes('could not read Username')) {
+            resolve({ success: false, error: 'Authentification échouée. Connectez-vous à GitHub.' });
+          } else {
+            resolve({ success: false, error: stderr || error.message });
+          }
+        } else {
+          resolve({ success: true, output: 'Clone réussi', path: targetPath });
+        }
+      }
+    );
+
+    // Handle progress if callback provided
+    if (onProgress && cloneProcess.stderr) {
+      cloneProcess.stderr.on('data', (data) => {
+        onProgress(data.toString());
+      });
+    }
+  });
+}
+
+/**
  * Count lines of code in a project
  * @param {string} projectPath - Path to the project
  * @returns {Promise<Object>} - Lines count by type
@@ -565,6 +623,7 @@ module.exports = {
   gitMergeContinue,
   getMergeConflicts,
   isMergeInProgress,
+  gitClone,
   countLinesOfCode,
   getProjectStats,
   getBranches,
