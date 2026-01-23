@@ -92,39 +92,15 @@ function bootstrapApp() {
 
   /**
    * Register global keyboard shortcuts
+   * Note: Global shortcuts are system-wide and may conflict with other apps.
+   * We only register truly global shortcuts here (that work even when app is in background).
+   * App-local shortcuts (Ctrl+Shift+T, Ctrl+Shift+E, Ctrl+Shift+P) are now handled
+   * in the renderer process via KeyboardShortcuts.js
    */
   function registerGlobalShortcuts() {
-    // Ctrl+Shift+P: Quick picker
-    const regP = globalShortcut.register('Ctrl+Shift+P', () => {
-      createQuickPickerWindow();
-    });
-    if (!regP) console.warn('[Shortcut] Failed to register Ctrl+Shift+P');
-
-    // Ctrl+Shift+T: New terminal in current project
-    const regT = globalShortcut.register('Ctrl+Shift+T', () => {
-      let mainWindow = getMainWindow();
-      if (!mainWindow) {
-        mainWindow = createMainWindow({ isDev: process.argv.includes('--dev') });
-      }
-      showMainWindow();
-      setTimeout(() => {
-        mainWindow.webContents.send('open-terminal-current-project');
-      }, 100);
-    });
-    if (!regT) console.warn('[Shortcut] Failed to register Ctrl+Shift+T');
-
-    // Ctrl+Shift+E: Show sessions panel to resume a conversation
-    const regE = globalShortcut.register('Ctrl+Shift+E', () => {
-      let mainWindow = getMainWindow();
-      if (!mainWindow) {
-        mainWindow = createMainWindow({ isDev: process.argv.includes('--dev') });
-      }
-      showMainWindow();
-      setTimeout(() => {
-        mainWindow.webContents.send('show-sessions-panel');
-      }, 100);
-    });
-    if (!regE) console.warn('[Shortcut] Failed to register Ctrl+Shift+E');
+    // No global shortcuts registered by default to avoid conflicts
+    // All shortcuts are now handled locally in the renderer when the app is focused
+    console.log('[Shortcut] Global shortcuts disabled - using local shortcuts instead');
   }
 
   /**

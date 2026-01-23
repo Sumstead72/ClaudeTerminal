@@ -4,6 +4,7 @@
  */
 
 const shortcuts = new Map();
+let initialized = false;
 
 /**
  * Register a keyboard shortcut
@@ -83,6 +84,10 @@ function getKeyFromEvent(e) {
  * Initialize keyboard shortcut handling
  */
 function initKeyboardShortcuts() {
+  // Prevent multiple initializations
+  if (initialized) return;
+  initialized = true;
+
   document.addEventListener('keydown', (e) => {
     // Skip if in input/textarea unless shortcut is global
     const isInInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) ||
