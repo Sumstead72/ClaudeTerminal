@@ -2461,21 +2461,42 @@ filterBtnBranch.onclick = async (e) => {
     if (!project) return;
 
     try {
-      const [branches, currentBranch] = await Promise.all([
+      const [branchesData, currentBranch] = await Promise.all([
         ipcRenderer.invoke('git-branches', { projectPath: project.path }),
         ipcRenderer.invoke('git-current-branch', { projectPath: project.path })
       ]);
 
-      if (branches.length === 0) {
+      const { local = [], remote = [] } = branchesData;
+
+      if (local.length === 0 && remote.length === 0) {
         branchDropdownList.innerHTML = '<div class="branch-dropdown-loading">Aucune branche trouvée</div>';
         return;
       }
 
-      branchDropdownList.innerHTML = branches.map(branch => `
-        <div class="branch-dropdown-item ${branch === currentBranch ? 'current' : ''}" data-branch="${escapeHtml(branch)}">
-          ${branch}
-        </div>
-      `).join('');
+      let html = '';
+
+      // Local branches section
+      if (local.length > 0) {
+        html += '<div class="branch-dropdown-section-title">Branches locales</div>';
+        html += local.map(branch => `
+          <div class="branch-dropdown-item ${branch === currentBranch ? 'current' : ''}" data-branch="${escapeHtml(branch)}">
+            ${branch}
+          </div>
+        `).join('');
+      }
+
+      // Remote branches section
+      if (remote.length > 0) {
+        html += '<div class="branch-dropdown-section-title remote">Branches distantes</div>';
+        html += remote.map(branch => `
+          <div class="branch-dropdown-item remote" data-branch="${escapeHtml(branch)}" data-remote="true">
+            <svg class="branch-remote-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            ${branch}
+          </div>
+        `).join('');
+      }
+
+      branchDropdownList.innerHTML = html;
 
       // Add click handlers
       branchDropdownList.querySelectorAll('.branch-dropdown-item').forEach(item => {
@@ -2726,7 +2747,9 @@ let updateState = {
   available: false,
   downloaded: false,
   version: null,
-  dismissed: false
+  downloadedVersion: null,  // Track actual downloaded version
+  dismissed: false,
+  dismissedVersion: null    // Track which version was dismissed
 };
 
 function showUpdateBanner() {
@@ -2751,6 +2774,18 @@ function updateProgress(percent) {
 ipcRenderer.on('update-status', (event, data) => {
   switch (data.status) {
     case 'available':
+      // If a new version is detected (different from what we knew about)
+      // Reset dismiss state so user sees the new version
+      if (updateState.version && data.version !== updateState.version) {
+        // New version detected, reset dismiss if it was for the old version
+        if (updateState.dismissedVersion !== data.version) {
+          updateState.dismissed = false;
+        }
+        // Reset downloaded state since we're downloading a new version
+        updateState.downloaded = false;
+        updateState.downloadedVersion = null;
+      }
+
       updateState.available = true;
       updateState.version = data.version;
       updateMessage.textContent = `Nouvelle version disponible: v${data.version}`;
@@ -2766,32 +2801,48 @@ ipcRenderer.on('update-status', (event, data) => {
 
     case 'downloaded':
       updateState.downloaded = true;
+      updateState.downloadedVersion = data.version;  // Track actual downloaded version
+      updateState.version = data.version;  // Update to actual version
       updateMessage.textContent = `v${data.version} prete a installer`;
       updateProgressContainer.style.display = 'none';
       updateBtn.style.display = 'block';
+      updateBtn.disabled = false;  // Re-enable button
+      updateBtn.textContent = 'Redémarrer pour mettre à jour';  // Reset button text
       updateBanner.classList.add('downloaded');
       showUpdateBanner();
       break;
 
     case 'not-available':
-      // Pas de nouvelle version, ne rien afficher
+      // No new version, hide banner if showing
+      if (updateState.available && !updateState.downloaded) {
+        hideUpdateBanner();
+        updateState.available = false;
+        updateState.version = null;
+      }
       break;
 
     case 'error':
       console.error('Update error:', data.error);
-      hideUpdateBanner();
+      // Only hide if we were downloading, not if already downloaded
+      if (!updateState.downloaded) {
+        hideUpdateBanner();
+      }
       break;
   }
 });
 
 // Restart and install button
 updateBtn.addEventListener('click', () => {
+  // Disable button and show installing state
+  updateBtn.disabled = true;
+  updateBtn.textContent = 'Installation...';
   ipcRenderer.send('update-install');
 });
 
 // Dismiss button
 updateDismiss.addEventListener('click', () => {
   updateState.dismissed = true;
+  updateState.dismissedVersion = updateState.version;  // Track which version was dismissed
   hideUpdateBanner();
 });
 
