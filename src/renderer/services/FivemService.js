@@ -16,7 +16,8 @@ const {
   getProjectIndex,
   containsFivemError,
   addFivemError,
-  getFivemErrors
+  getFivemErrors,
+  clearFivemErrors
 } = require('../state');
 
 // Buffer for capturing complete lines (last N lines per project)
@@ -63,6 +64,7 @@ async function startFivemServer(projectIndex) {
   if (!project) return { success: false, error: 'Project not found' };
 
   initFivemServer(projectIndex);
+  clearFivemErrors(projectIndex);
   setFivemServerStatus(projectIndex, 'starting');
 
   try {

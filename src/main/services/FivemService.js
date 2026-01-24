@@ -5,6 +5,7 @@
 
 const path = require('path');
 const pty = require('node-pty');
+const { exec } = require('child_process');
 
 class FivemService {
   constructor() {
@@ -90,6 +91,7 @@ class FivemService {
   stop({ projectIndex }) {
     const proc = this.processes.get(projectIndex);
     if (proc) {
+      const pid = proc.pid;
       try {
         // Send quit command first for graceful shutdown
         proc.write('quit\r');
@@ -97,17 +99,41 @@ class FivemService {
         // Force kill after timeout if still running
         setTimeout(() => {
           if (this.processes.has(projectIndex)) {
-            try {
-              proc.kill();
-            } catch (e) {}
+            this._forceKill(pid);
             this.processes.delete(projectIndex);
           }
-        }, 5000);
+        }, 3000);
       } catch (e) {
         console.error('Error stopping FiveM server:', e);
+        // Try force kill anyway
+        this._forceKill(pid);
+        this.processes.delete(projectIndex);
       }
     }
     return { success: true };
+  }
+
+  /**
+   * Force kill a process and all its children
+   * @param {number} pid - Process ID
+   */
+  _forceKill(pid) {
+    if (!pid) return;
+
+    try {
+      if (process.platform === 'win32') {
+        // Use taskkill with /T to kill process tree
+        exec(`taskkill /F /T /PID ${pid}`, (err) => {
+          if (err && !err.message.includes('not found')) {
+            console.error('taskkill error:', err.message);
+          }
+        });
+      } else {
+        process.kill(-pid, 'SIGKILL');
+      }
+    } catch (e) {
+      console.error('Force kill error:', e);
+    }
   }
 
   /**
@@ -140,12 +166,15 @@ class FivemService {
    */
   stopAll() {
     this.processes.forEach((proc, index) => {
+      const pid = proc.pid;
       try {
         proc.write('quit\r');
         setTimeout(() => {
-          try { proc.kill(); } catch (e) {}
+          this._forceKill(pid);
         }, 2000);
-      } catch (e) {}
+      } catch (e) {
+        this._forceKill(pid);
+      }
     });
     this.processes.clear();
   }
