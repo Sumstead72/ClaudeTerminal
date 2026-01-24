@@ -53,6 +53,10 @@ const {
   // Features
   initKeyboardShortcuts,
   registerShortcut,
+  unregisterShortcut,
+  clearAllShortcuts,
+  getKeyFromEvent,
+  normalizeKey,
   openQuickPicker
 } = require('./src/renderer');
 
@@ -86,10 +90,337 @@ const localState = {
   selectedDashboardProject: null
 };
 
+// ========== DEFAULT KEYBOARD SHORTCUTS ==========
+const DEFAULT_SHORTCUTS = {
+  openSettings: { key: 'Ctrl+,', label: 'Ouvrir les parametres' },
+  closeTerminal: { key: 'Ctrl+W', label: 'Fermer le terminal' },
+  showSessionsPanel: { key: 'Ctrl+Shift+E', label: 'Panneau sessions' },
+  openQuickPicker: { key: 'Ctrl+Shift+P', label: 'Selecteur rapide' },
+  nextTerminal: { key: 'Ctrl+Tab', label: 'Terminal suivant' },
+  prevTerminal: { key: 'Ctrl+Shift+Tab', label: 'Terminal precedent' }
+};
+
+// Shortcut capture state
+let shortcutCaptureState = {
+  active: false,
+  shortcutId: null,
+  overlay: null
+};
+
+/**
+ * Get the current key for a shortcut (custom or default)
+ */
+function getShortcutKey(id) {
+  const customShortcuts = settingsState.get().shortcuts || {};
+  return customShortcuts[id] || DEFAULT_SHORTCUTS[id]?.key || '';
+}
+
+/**
+ * Check if a key combination conflicts with another shortcut
+ */
+function checkShortcutConflict(key, excludeId) {
+  const normalizedKey = normalizeKey(key);
+  for (const [id, shortcut] of Object.entries(DEFAULT_SHORTCUTS)) {
+    if (id === excludeId) continue;
+    const currentKey = getShortcutKey(id);
+    if (normalizeKey(currentKey) === normalizedKey) {
+      return { id, label: shortcut.label };
+    }
+  }
+  return null;
+}
+
+/**
+ * Apply a new shortcut
+ */
+function applyShortcut(id, key) {
+  const customShortcuts = settingsState.get().shortcuts || {};
+  // If key is same as default, remove the override
+  if (normalizeKey(key) === normalizeKey(DEFAULT_SHORTCUTS[id]?.key || '')) {
+    delete customShortcuts[id];
+  } else {
+    customShortcuts[id] = key;
+  }
+  settingsState.setProp('shortcuts', customShortcuts);
+  saveSettings();
+  // Re-register all shortcuts
+  registerAllShortcuts();
+}
+
+/**
+ * Reset a shortcut to default
+ */
+function resetShortcut(id) {
+  const customShortcuts = settingsState.get().shortcuts || {};
+  delete customShortcuts[id];
+  settingsState.setProp('shortcuts', customShortcuts);
+  saveSettings();
+  registerAllShortcuts();
+}
+
+/**
+ * Reset all shortcuts to defaults
+ */
+function resetAllShortcuts() {
+  settingsState.setProp('shortcuts', {});
+  saveSettings();
+  registerAllShortcuts();
+}
+
+/**
+ * Format key for display
+ */
+function formatKeyForDisplay(key) {
+  if (!key) return '';
+  return key.split('+').map(part => {
+    const p = part.trim();
+    if (p.toLowerCase() === 'ctrl') return 'Ctrl';
+    if (p.toLowerCase() === 'alt') return 'Alt';
+    if (p.toLowerCase() === 'shift') return 'Shift';
+    if (p.toLowerCase() === 'meta') return 'Win';
+    if (p.toLowerCase() === 'tab') return 'Tab';
+    if (p.toLowerCase() === 'escape') return 'Esc';
+    return p.charAt(0).toUpperCase() + p.slice(1);
+  }).join(' + ');
+}
+
+/**
+ * Start shortcut capture mode
+ */
+function startShortcutCapture(id) {
+  shortcutCaptureState.active = true;
+  shortcutCaptureState.shortcutId = id;
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'shortcut-capture-overlay';
+  overlay.innerHTML = `
+    <div class="shortcut-capture-box">
+      <div class="shortcut-capture-title">Appuyez sur une combinaison de touches</div>
+      <div class="shortcut-capture-preview">En attente...</div>
+      <div class="shortcut-capture-hint">Appuyez sur Echap pour annuler</div>
+      <div class="shortcut-capture-conflict" style="display: none;"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  shortcutCaptureState.overlay = overlay;
+
+  // Handle keydown
+  const handleKeydown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const key = getKeyFromEvent(e);
+    const preview = overlay.querySelector('.shortcut-capture-preview');
+    const conflictDiv = overlay.querySelector('.shortcut-capture-conflict');
+
+    // Escape cancels
+    if (e.key === 'Escape') {
+      endShortcutCapture();
+      return;
+    }
+
+    // Need at least one modifier for non-function keys
+    const hasModifier = e.ctrlKey || e.altKey || e.shiftKey || e.metaKey;
+    const isFunctionKey = /^f\d+$/i.test(e.key);
+
+    if (!hasModifier && !isFunctionKey) {
+      preview.textContent = formatKeyForDisplay(key);
+      conflictDiv.style.display = 'block';
+      conflictDiv.textContent = 'Un modificateur (Ctrl, Alt, Shift) est requis';
+      conflictDiv.className = 'shortcut-capture-conflict warning';
+      return;
+    }
+
+    // Check only modifier pressed
+    if (['ctrl', 'alt', 'shift', 'meta', 'control'].includes(e.key.toLowerCase())) {
+      preview.textContent = formatKeyForDisplay(key) + '...';
+      return;
+    }
+
+    preview.textContent = formatKeyForDisplay(key);
+
+    // Check for conflicts
+    const conflict = checkShortcutConflict(key, id);
+    if (conflict) {
+      conflictDiv.style.display = 'block';
+      conflictDiv.textContent = `Conflit avec: ${conflict.label}`;
+      conflictDiv.className = 'shortcut-capture-conflict error';
+      return;
+    }
+
+    // Valid key combination - apply it
+    conflictDiv.style.display = 'none';
+    endShortcutCapture();
+    applyShortcut(id, key);
+
+    // Update the button in settings if modal is open
+    const btn = document.querySelector(`[data-shortcut-id="${id}"] .shortcut-key-btn`);
+    if (btn) {
+      btn.textContent = formatKeyForDisplay(key);
+    }
+  };
+
+  document.addEventListener('keydown', handleKeydown, true);
+  shortcutCaptureState.keydownHandler = handleKeydown;
+}
+
+/**
+ * End shortcut capture mode
+ */
+function endShortcutCapture() {
+  if (shortcutCaptureState.overlay) {
+    shortcutCaptureState.overlay.remove();
+  }
+  if (shortcutCaptureState.keydownHandler) {
+    document.removeEventListener('keydown', shortcutCaptureState.keydownHandler, true);
+  }
+  shortcutCaptureState = { active: false, shortcutId: null, overlay: null };
+}
+
+/**
+ * Render shortcuts panel content
+ */
+function renderShortcutsPanel() {
+  const customShortcuts = settingsState.get().shortcuts || {};
+
+  let html = `
+    <div class="settings-section">
+      <div class="settings-title">Raccourcis clavier</div>
+      <div class="shortcuts-list">
+  `;
+
+  for (const [id, shortcut] of Object.entries(DEFAULT_SHORTCUTS)) {
+    const currentKey = getShortcutKey(id);
+    const isCustom = customShortcuts[id] !== undefined;
+
+    html += `
+      <div class="shortcut-row" data-shortcut-id="${id}">
+        <div class="shortcut-label">${shortcut.label}</div>
+        <div class="shortcut-controls">
+          <button type="button" class="shortcut-key-btn ${isCustom ? 'custom' : ''}" title="Cliquez pour modifier">
+            ${formatKeyForDisplay(currentKey)}
+          </button>
+          ${isCustom ? `<button type="button" class="shortcut-reset-btn" title="Reinitialiser">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          </button>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  html += `
+      </div>
+      <div class="shortcuts-actions">
+        <button type="button" class="btn-outline" id="btn-reset-all-shortcuts">Reinitialiser tous les raccourcis</button>
+      </div>
+    </div>
+  `;
+
+  return html;
+}
+
+/**
+ * Setup shortcuts panel event handlers
+ */
+function setupShortcutsPanelHandlers() {
+  // Click on shortcut key button to edit
+  document.querySelectorAll('.shortcut-key-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const row = e.target.closest('.shortcut-row');
+      const id = row.dataset.shortcutId;
+      startShortcutCapture(id);
+    };
+  });
+
+  // Click on reset button
+  document.querySelectorAll('.shortcut-reset-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const row = e.target.closest('.shortcut-row');
+      const id = row.dataset.shortcutId;
+      resetShortcut(id);
+      // Update UI
+      const panel = document.querySelector('[data-panel="shortcuts"]');
+      if (panel) {
+        panel.innerHTML = renderShortcutsPanel();
+        setupShortcutsPanelHandlers();
+      }
+    };
+  });
+
+  // Reset all button
+  const resetAllBtn = document.getElementById('btn-reset-all-shortcuts');
+  if (resetAllBtn) {
+    resetAllBtn.onclick = () => {
+      resetAllShortcuts();
+      // Update UI
+      const panel = document.querySelector('[data-panel="shortcuts"]');
+      if (panel) {
+        panel.innerHTML = renderShortcutsPanel();
+        setupShortcutsPanelHandlers();
+      }
+    };
+  }
+}
+
+/**
+ * Register all keyboard shortcuts based on settings
+ */
+function registerAllShortcuts() {
+  // Clear existing shortcuts
+  clearAllShortcuts();
+
+  // Re-initialize the keyboard shortcut system
+  initKeyboardShortcuts();
+
+  // Register settings shortcut
+  registerShortcut(getShortcutKey('openSettings'), () => showSettingsModal(), { global: true });
+
+  // Close current terminal
+  registerShortcut(getShortcutKey('closeTerminal'), () => {
+    const currentId = terminalsState.get().activeTerminal;
+    if (currentId) {
+      TerminalManager.closeTerminal(currentId);
+    }
+  }, { global: true });
+
+  // Show sessions panel
+  registerShortcut(getShortcutKey('showSessionsPanel'), () => {
+    const selectedFilter = projectsState.get().selectedProjectFilter;
+    const projects = projectsState.get().projects;
+    if (selectedFilter !== null && projects[selectedFilter]) {
+      showSessionsModal(projects[selectedFilter]);
+    } else if (projects.length > 0) {
+      setSelectedProjectFilter(0);
+      ProjectList.render();
+      showSessionsModal(projects[0]);
+    }
+  }, { global: true });
+
+  // Quick picker
+  registerShortcut(getShortcutKey('openQuickPicker'), () => {
+    openQuickPicker(document.body, (project) => {
+      const projectIndex = getProjectIndex(project.id);
+      setSelectedProjectFilter(projectIndex);
+      ProjectList.render();
+      TerminalManager.filterByProject(projectIndex);
+      createTerminalForProject(project);
+    });
+  }, { global: true });
+
+  // Terminal navigation - Ctrl+Tab and Ctrl+Shift+Tab
+  registerShortcut(getShortcutKey('nextTerminal'), () => {
+    TerminalManager.focusNextTerminal();
+  }, { global: true });
+
+  registerShortcut(getShortcutKey('prevTerminal'), () => {
+    TerminalManager.focusPrevTerminal();
+  }, { global: true });
+}
+
 // ========== INITIALIZATION ==========
 ensureDirectories();
-loadSettings();
-loadProjects();
+initializeState(); // This loads settings, projects AND initializes time tracking
 applyAccentColor(settingsState.get().accentColor || '#d97706');
 
 // ========== NOTIFICATIONS ==========
@@ -1070,6 +1401,10 @@ async function showSettingsModal(initialTab = 'general') {
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
         GitHub
       </button>
+      <button class="settings-tab ${initialTab === 'shortcuts' ? 'active' : ''}" data-tab="shortcuts">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
+        Raccourcis
+      </button>
     </div>
     <div class="settings-content">
       <!-- General Tab -->
@@ -1086,6 +1421,24 @@ async function showSettingsModal(initialTab = 'general') {
             ${['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].map(c =>
               `<button class="color-swatch ${settings.accentColor === c ? 'selected' : ''}" style="background:${c}" data-color="${c}"></button>`
             ).join('')}
+          </div>
+          <div class="settings-row" style="margin-top: 16px;">
+            <div class="settings-label">
+              <div>Theme du terminal</div>
+              <div class="settings-desc">Changez les couleurs du terminal</div>
+            </div>
+            <select id="terminal-theme-select" class="settings-select">
+              <option value="claude" ${settings.terminalTheme === 'claude' || !settings.terminalTheme ? 'selected' : ''}>Claude</option>
+              <option value="dracula" ${settings.terminalTheme === 'dracula' ? 'selected' : ''}>Dracula</option>
+              <option value="monokai" ${settings.terminalTheme === 'monokai' ? 'selected' : ''}>Monokai</option>
+              <option value="nord" ${settings.terminalTheme === 'nord' ? 'selected' : ''}>Nord</option>
+              <option value="oneDark" ${settings.terminalTheme === 'oneDark' ? 'selected' : ''}>One Dark</option>
+              <option value="gruvbox" ${settings.terminalTheme === 'gruvbox' ? 'selected' : ''}>Gruvbox</option>
+              <option value="tokyoNight" ${settings.terminalTheme === 'tokyoNight' ? 'selected' : ''}>Tokyo Night</option>
+              <option value="catppuccin" ${settings.terminalTheme === 'catppuccin' ? 'selected' : ''}>Catppuccin</option>
+              <option value="synthwave" ${settings.terminalTheme === 'synthwave' ? 'selected' : ''}>Synthwave</option>
+              <option value="matrix" ${settings.terminalTheme === 'matrix' ? 'selected' : ''}>Matrix</option>
+            </select>
           </div>
         </div>
         <div class="settings-section">
@@ -1168,18 +1521,27 @@ async function showSettingsModal(initialTab = 'general') {
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
                   <div>
                     <div class="github-account-title">Connectez votre compte GitHub</div>
-                    <div class="github-account-desc">Permet de cloner vos repositories prives</div>
+                    <div class="github-account-desc">Entrez un Personal Access Token pour cloner vos repos prives</div>
                   </div>
                 </div>
-                <button type="button" class="btn-github-connect" id="btn-github-connect">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                  Connecter GitHub
-                </button>
+              </div>
+              <div class="github-token-form">
+                <div class="github-token-input-group">
+                  <input type="password" id="github-token-input" class="github-token-input" placeholder="ghp_xxxxxxxxxxxx">
+                  <button type="button" class="btn-github-connect" id="btn-github-connect">Connecter</button>
+                </div>
+                <div class="github-token-help">
+                  <a href="#" id="github-token-help-link">Comment creer un token ?</a>
+                </div>
               </div>
             `}
           </div>
           <div class="github-device-flow-container" id="github-device-flow" style="display: none;"></div>
         </div>
+      </div>
+      <!-- Shortcuts Tab -->
+      <div class="settings-panel ${initialTab === 'shortcuts' ? 'active' : ''}" data-panel="shortcuts">
+        ${renderShortcutsPanel()}
       </div>
     </div>
   `, `
@@ -1196,6 +1558,9 @@ async function showSettingsModal(initialTab = 'general') {
       document.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`)?.classList.add('active');
     };
   });
+
+  // Setup shortcuts panel handlers
+  setupShortcutsPanelHandlers();
 
   // Execution mode cards
   document.querySelectorAll('.execution-mode-card').forEach(card => {
@@ -1218,63 +1583,53 @@ async function showSettingsModal(initialTab = 'general') {
   async function setupGitHubAuth() {
     const connectBtn = document.getElementById('btn-github-connect');
     const disconnectBtn = document.getElementById('btn-github-disconnect');
-    const deviceFlowEl = document.getElementById('github-device-flow');
-    const accountCard = document.getElementById('github-account-card');
+    const tokenInput = document.getElementById('github-token-input');
+    const helpLink = document.getElementById('github-token-help-link');
 
-    if (connectBtn) {
+    if (connectBtn && tokenInput) {
       connectBtn.onclick = async () => {
+        const token = tokenInput.value.trim();
+        if (!token) {
+          tokenInput.focus();
+          tokenInput.classList.add('error');
+          setTimeout(() => tokenInput.classList.remove('error'), 1000);
+          return;
+        }
+
         connectBtn.disabled = true;
-        connectBtn.innerHTML = '<span class="btn-spinner"></span> Connexion...';
+        connectBtn.innerHTML = '<span class="btn-spinner"></span>';
 
         try {
-          const result = await ipcRenderer.invoke('github-start-auth');
-          if (!result.success) {
-            connectBtn.disabled = false;
-            connectBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> Connecter GitHub';
-            return;
-          }
-
-          // Show device flow UI
-          deviceFlowEl.style.display = 'block';
-          deviceFlowEl.innerHTML = `
-            <div class="github-device-flow">
-              <div class="device-code-section">
-                <div class="device-code-label">Copiez ce code :</div>
-                <div class="device-code">${result.user_code}</div>
-              </div>
-              <div class="device-flow-steps">
-                <a href="#" class="device-flow-link" id="open-github-link">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
-                  Ouvrir GitHub et coller le code
-                </a>
-              </div>
-              <div class="github-waiting">
-                <span class="btn-spinner"></span> En attente d'autorisation...
-              </div>
-            </div>
-          `;
-
-          document.getElementById('open-github-link').onclick = (e) => {
-            e.preventDefault();
-            ipcRenderer.invoke('github-open-auth-url', result.verification_uri);
-          };
-
-          // Poll for token
-          const pollResult = await ipcRenderer.invoke('github-poll-token', {
-            deviceCode: result.device_code,
-            interval: result.interval || 5
-          });
-
-          if (pollResult.success) {
-            // Refresh the whole modal to show connected state
+          const result = await ipcRenderer.invoke('github-set-token', token);
+          if (result.success && result.authenticated) {
             showSettingsModal('github');
           } else {
-            deviceFlowEl.innerHTML = `<div class="github-error">${pollResult.error}</div>`;
+            tokenInput.classList.add('error');
+            tokenInput.value = '';
+            tokenInput.placeholder = 'Token invalide';
+            setTimeout(() => {
+              tokenInput.classList.remove('error');
+              tokenInput.placeholder = 'ghp_xxxxxxxxxxxx';
+            }, 2000);
+            connectBtn.disabled = false;
+            connectBtn.innerHTML = 'Connecter';
           }
         } catch (e) {
           connectBtn.disabled = false;
-          connectBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> Connecter GitHub';
+          connectBtn.innerHTML = 'Connecter';
         }
+      };
+
+      // Allow Enter key to submit
+      tokenInput.onkeydown = (e) => {
+        if (e.key === 'Enter') connectBtn.click();
+      };
+    }
+
+    if (helpLink) {
+      helpLink.onclick = (e) => {
+        e.preventDefault();
+        ipcRenderer.invoke('github-open-auth-url', 'https://github.com/settings/tokens/new?scopes=repo&description=Claude%20Terminal');
       };
     }
 
@@ -1291,15 +1646,24 @@ async function showSettingsModal(initialTab = 'general') {
   document.getElementById('btn-save-settings').onclick = async () => {
     const selectedMode = document.querySelector('.execution-mode-card.selected');
     const closeActionSelect = document.getElementById('close-action-select');
+    const terminalThemeSelect = document.getElementById('terminal-theme-select');
+    const newTerminalTheme = terminalThemeSelect?.value || 'claude';
+
     const newSettings = {
       editor: settings.editor || 'code',
       skipPermissions: selectedMode?.dataset.mode === 'dangerous',
       accentColor: document.querySelector('.color-swatch.selected')?.dataset.color || settings.accentColor,
-      closeAction: closeActionSelect?.value || 'ask'
+      closeAction: closeActionSelect?.value || 'ask',
+      terminalTheme: newTerminalTheme
     };
     settingsState.set(newSettings);
     saveSettings();
     applyAccentColor(newSettings.accentColor);
+
+    // Update terminal themes if changed
+    if (newTerminalTheme !== settings.terminalTheme) {
+      TerminalManager.updateAllTerminalsTheme(newTerminalTheme);
+    }
 
     // Save launch at startup setting
     const launchAtStartupToggle = document.getElementById('launch-at-startup-toggle');
@@ -2336,49 +2700,11 @@ setupContextMenuHandlers();
 checkAllProjectsGitStatus();
 ProjectList.render();
 
-// Initialize keyboard shortcuts
-initKeyboardShortcuts();
-
+// Initialize keyboard shortcuts with customizable settings
 // Ctrl+Arrow shortcuts are handled directly in TerminalManager.js
 // They only work when focused on a terminal (which is the only context where they make sense)
-
-// Settings shortcut
-registerShortcut('Ctrl+,', () => showSettingsModal(), { global: true });
-
-// Close current terminal with Ctrl+W
-registerShortcut('Ctrl+W', () => {
-  const currentId = terminalsState.get().activeTerminal;
-  if (currentId) {
-    TerminalManager.closeTerminal(currentId);
-  }
-}, { global: true });
-
 // Ctrl+Shift+T is handled by globalShortcut in main.js which sends 'open-terminal-current-project' IPC event
-// No need to register it here to avoid double terminal creation
-
-// Ctrl+Shift+E: Show sessions panel
-registerShortcut('Ctrl+Shift+E', () => {
-  const selectedFilter = projectsState.get().selectedProjectFilter;
-  const projects = projectsState.get().projects;
-  if (selectedFilter !== null && projects[selectedFilter]) {
-    showSessionsModal(projects[selectedFilter]);
-  } else if (projects.length > 0) {
-    setSelectedProjectFilter(0);
-    ProjectList.render();
-    showSessionsModal(projects[0]);
-  }
-}, { global: true });
-
-// Ctrl+Shift+P: Quick picker (project search)
-registerShortcut('Ctrl+Shift+P', () => {
-  openQuickPicker(document.body, (project) => {
-    const projectIndex = getProjectIndex(project.id);
-    setSelectedProjectFilter(projectIndex);
-    ProjectList.render();
-    TerminalManager.filterByProject(projectIndex);
-    createTerminalForProject(project);
-  });
-}, { global: true });
+registerAllShortcuts();
 
 // ========== UPDATE SYSTEM (GitHub Desktop style) ==========
 const updateBanner = document.getElementById('update-banner');
@@ -2607,7 +2933,13 @@ const timeElements = {
  * @returns {string}
  */
 function formatTimeDisplay(ms) {
-  if (!ms || ms < 60000) return '0h';
+  if (!ms) return '0h';
+
+  // Show seconds for very short durations (< 1 minute)
+  if (ms < 60000) {
+    const seconds = Math.floor(ms / 1000);
+    return seconds > 0 ? `${seconds}s` : '0h';
+  }
 
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);
@@ -2632,14 +2964,14 @@ function updateTimeDisplay() {
     timeElements.week.textContent = formatTimeDisplay(times.week);
     timeElements.month.textContent = formatTimeDisplay(times.month);
   } catch (e) {
-    // State not initialized yet
+    console.error('[TimeTracking] Error updating display:', e);
   }
 }
 
 // Initialize time tracking display
 if (timeElements.container) {
-  // Update every 30 seconds
-  setInterval(updateTimeDisplay, 30000);
+  // Update every 10 seconds for more responsive display
+  setInterval(updateTimeDisplay, 10000);
 
   // Initial update after state is initialized
   setTimeout(updateTimeDisplay, 1000);
