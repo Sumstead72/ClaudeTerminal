@@ -29,6 +29,7 @@ let saveProjectsRef = null;
 function initTimeTracking(projectsState, saveProjects) {
   projectsStateRef = projectsState;
   saveProjectsRef = saveProjects;
+  console.log('[TimeTracking] Initialized with projectsState:', !!projectsState, 'saveProjects:', !!saveProjects);
 }
 
 /**
@@ -94,15 +95,24 @@ function generateSessionId() {
  * @param {string} projectId
  */
 function startTracking(projectId) {
+  console.log('[TimeTracking] startTracking called with projectId:', projectId);
+
+  if (!projectId) {
+    console.warn('[TimeTracking] startTracking called with undefined/null projectId');
+    return;
+  }
+
   const state = trackingState.get();
 
   // Already tracking this project
   if (state.activeProjectId === projectId && state.sessionStartTime) {
+    console.log('[TimeTracking] Already tracking this project');
     return;
   }
 
   // If tracking a different project, stop it first
   if (state.activeProjectId && state.activeProjectId !== projectId) {
+    console.log('[TimeTracking] Switching from project:', state.activeProjectId);
     stopTracking(state.activeProjectId);
   }
 
@@ -114,6 +124,8 @@ function startTracking(projectId) {
     lastActivityTime: now,
     isIdle: false
   });
+
+  console.log('[TimeTracking] Started tracking, sessionStartTime:', now);
 
   // Start idle timer
   clearTimeout(idleTimer);
@@ -158,7 +170,12 @@ function stopTracking(projectId) {
  * @param {number} duration
  */
 function saveSession(projectId, startTime, endTime, duration) {
-  if (!projectsStateRef || !saveProjectsRef) return;
+  console.log('[TimeTracking] saveSession called:', { projectId, duration: Math.round(duration / 1000) + 's' });
+
+  if (!projectsStateRef || !saveProjectsRef) {
+    console.error('[TimeTracking] Cannot save session - refs not initialized');
+    return;
+  }
 
   const project = getProjectById(projectId);
   if (!project) return;
@@ -204,6 +221,8 @@ function recordActivity() {
   // Resume if was idle
   if (state.isIdle) {
     resumeTracking();
+    // Don't update state further - resumeTracking already set the correct state
+    return;
   }
 
   // Reset idle timer
@@ -212,8 +231,7 @@ function recordActivity() {
 
   trackingState.set({
     ...state,
-    lastActivityTime: Date.now(),
-    isIdle: false
+    lastActivityTime: Date.now()
   });
 }
 
@@ -401,6 +419,7 @@ function isInCurrentMonth(date) {
  */
 function getGlobalTimes() {
   if (!projectsStateRef) {
+    console.warn('[TimeTracking] getGlobalTimes called but projectsStateRef is null');
     return { today: 0, week: 0, month: 0 };
   }
 
@@ -445,6 +464,16 @@ function getGlobalTimes() {
     todayTotal += currentSessionTime;
     weekTotal += currentSessionTime;
     monthTotal += currentSessionTime;
+  }
+
+  // Debug log only when there's active tracking
+  if (state.activeProjectId) {
+    console.log('[TimeTracking] getGlobalTimes:', {
+      activeProject: state.activeProjectId,
+      sessionStartTime: state.sessionStartTime,
+      isIdle: state.isIdle,
+      today: Math.round(todayTotal / 1000) + 's'
+    });
   }
 
   return { today: todayTotal, week: weekTotal, month: monthTotal };

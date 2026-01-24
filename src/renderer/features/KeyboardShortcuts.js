@@ -143,10 +143,21 @@ function clearAllShortcuts() {
   shortcuts.clear();
 }
 
+/**
+ * Get all registered shortcuts
+ * @returns {Map} Map of registered shortcuts
+ */
+function getRegisteredShortcuts() {
+  return new Map(shortcuts);
+}
+
 module.exports = {
   registerShortcut,
   unregisterShortcut,
   initKeyboardShortcuts,
   registerCommonShortcuts,
-  clearAllShortcuts
+  clearAllShortcuts,
+  getRegisteredShortcuts,
+  getKeyFromEvent,
+  normalizeKey
 };

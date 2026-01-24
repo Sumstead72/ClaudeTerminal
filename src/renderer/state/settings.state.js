@@ -14,7 +14,8 @@ const defaultSettings = {
   skipPermissions: false,
   accentColor: '#d97706',
   notificationsEnabled: true,
-  closeAction: 'ask' // 'ask', 'minimize', 'quit'
+  closeAction: 'ask', // 'ask', 'minimize', 'quit'
+  shortcuts: {} // Custom keyboard shortcuts overrides
 };
 
 const settingsState = new State({ ...defaultSettings });
