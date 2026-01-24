@@ -16,7 +16,10 @@ const path = require('path');
  */
 function execGit(cwd, args, timeout = 10000) {
   return new Promise((resolve) => {
-    exec(`git ${args}`, { cwd, encoding: 'utf8', maxBuffer: 1024 * 1024, timeout }, (error, stdout) => {
+    // Add safe.directory config to handle "dubious ownership" errors on Windows
+    // This occurs when the repo is owned by a different user
+    const safeDirectoryConfig = `-c safe.directory="${cwd.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDirectoryConfig} ${args}`, { cwd, encoding: 'utf8', maxBuffer: 1024 * 1024, timeout }, (error, stdout) => {
       resolve(error ? null : stdout.trim());
     });
   });
@@ -139,8 +142,8 @@ async function getCurrentBranch(projectPath) {
  */
 function checkoutBranch(projectPath, branch) {
   return new Promise((resolve) => {
-    const { exec } = require('child_process');
-    exec(`git checkout "${branch}"`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} checkout "${branch}"`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         resolve({ success: false, error: stderr || error.message });
       } else {
@@ -316,7 +319,8 @@ async function getGitInfoFull(projectPath, options = {}) {
  */
 async function getGitStatusQuick(projectPath) {
   return new Promise((resolve) => {
-    exec('git status --porcelain', { cwd: projectPath, encoding: 'utf8' }, (error, stdout) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} status --porcelain`, { cwd: projectPath, encoding: 'utf8' }, (error, stdout) => {
       if (error) {
         resolve({ isGitRepo: false });
       } else {
@@ -338,7 +342,8 @@ async function getGitStatusQuick(projectPath) {
  */
 function gitPull(projectPath) {
   return new Promise((resolve) => {
-    exec('git pull', { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} pull`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
       if (error) {
         // Check if there are merge conflicts
         const conflicts = await getMergeConflicts(projectPath);
@@ -366,7 +371,8 @@ function gitPull(projectPath) {
  */
 function gitPush(projectPath) {
   return new Promise((resolve) => {
-    exec('git push', { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} push`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         // Check if it's just a "nothing to push" situation
         if (stderr && stderr.includes('Everything up-to-date')) {
@@ -389,7 +395,8 @@ function gitPush(projectPath) {
  */
 function gitMerge(projectPath, branch) {
   return new Promise((resolve) => {
-    exec(`git merge "${branch}"`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} merge "${branch}"`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, async (error, stdout, stderr) => {
       if (error) {
         // Check if there are merge conflicts
         const conflicts = await getMergeConflicts(projectPath);
@@ -417,7 +424,8 @@ function gitMerge(projectPath, branch) {
  */
 function gitMergeAbort(projectPath) {
   return new Promise((resolve) => {
-    exec('git merge --abort', { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} merge --abort`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         resolve({ success: false, error: stderr || error.message });
       } else {
@@ -434,7 +442,8 @@ function gitMergeAbort(projectPath) {
  */
 function gitMergeContinue(projectPath) {
   return new Promise((resolve) => {
-    exec('git merge --continue', { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} merge --continue`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         resolve({ success: false, error: stderr || error.message });
       } else {
