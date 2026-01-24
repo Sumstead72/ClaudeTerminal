@@ -24,16 +24,19 @@ const idleTimers = new Map(); // projectId -> timerId
 let globalIdleTimer = null;
 let projectsStateRef = null;
 let saveProjectsRef = null;
+let saveProjectsImmediateRef = null;
 
 /**
  * Initialize with references to projects state functions
  * @param {Object} projectsState - Reference to projectsState
- * @param {Function} saveProjects - Reference to saveProjects function
+ * @param {Function} saveProjects - Reference to saveProjects function (debounced)
+ * @param {Function} saveProjectsImmediate - Reference to saveProjectsImmediate function (sync)
  */
-function initTimeTracking(projectsState, saveProjects) {
+function initTimeTracking(projectsState, saveProjects, saveProjectsImmediate) {
   projectsStateRef = projectsState;
   saveProjectsRef = saveProjects;
-  console.log('[TimeTracking] Initialized with projectsState:', !!projectsState, 'saveProjects:', !!saveProjects);
+  saveProjectsImmediateRef = saveProjectsImmediate;
+  console.log('[TimeTracking] Initialized with projectsState:', !!projectsState, 'saveProjects:', !!saveProjects, 'saveProjectsImmediate:', !!saveProjectsImmediate);
 }
 
 /**
@@ -632,6 +635,12 @@ function saveAllActiveSessions() {
     globalLastActivityTime: null,
     globalIsIdle: false
   });
+
+  // Force immediate save (bypass debounce) for app close
+  if (saveProjectsImmediateRef) {
+    saveProjectsImmediateRef();
+    console.log('[TimeTracking] Forced immediate save on quit');
+  }
 }
 
 /**

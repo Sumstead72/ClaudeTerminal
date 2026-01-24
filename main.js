@@ -73,6 +73,11 @@ app.whenReady().then(initializeApp);
 app.on('will-quit', cleanup);
 app.on('before-quit', () => {
   setQuitting(true);
+  // Notify renderer to save active time tracking sessions
+  const mainWindow = getMainWindow();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('app-will-quit');
+  }
   cleanupServices();
 });
 app.on('window-all-closed', () => {

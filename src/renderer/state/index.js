@@ -47,7 +47,8 @@ function initializeState() {
   // Initialize time tracking with project state references
   timeTrackingState.initTimeTracking(
     projectsState.projectsState,
-    projectsState.saveProjects
+    projectsState.saveProjects,
+    projectsState.saveProjectsImmediate
   );
   // Lazy require to avoid circular dependency
   const { loadSkills } = require('../services/SkillService');
