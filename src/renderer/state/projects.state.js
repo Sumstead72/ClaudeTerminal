@@ -179,7 +179,7 @@ function loadProjects() {
       }
 
       let needsSave = false;
-      let projects, folders, rootOrder;
+      let projects, folders, rootOrder, globalTimeTracking;
 
       if (Array.isArray(data)) {
         // Old format: migrate
@@ -222,6 +222,7 @@ function loadProjects() {
         });
         folders = data.folders || [];
         rootOrder = data.rootOrder || [];
+        globalTimeTracking = data.globalTimeTracking || null;
 
         // Ensure all root-level items are in rootOrder
         const rootItems = new Set(rootOrder);
@@ -251,7 +252,11 @@ function loadProjects() {
         });
       }
 
-      projectsState.set({ projects, folders, rootOrder });
+      const stateToSet = { projects, folders, rootOrder };
+      if (globalTimeTracking) {
+        stateToSet.globalTimeTracking = globalTimeTracking;
+      }
+      projectsState.set(stateToSet);
 
       if (needsSave) {
         saveProjects();
@@ -289,8 +294,13 @@ function saveProjects() {
  * Save projects immediately (atomic write pattern)
  */
 function saveProjectsImmediate() {
-  const { folders, projects, rootOrder } = projectsState.get();
+  const { folders, projects, rootOrder, globalTimeTracking } = projectsState.get();
   const data = { folders, projects, rootOrder };
+
+  // Include global time tracking if present
+  if (globalTimeTracking) {
+    data.globalTimeTracking = globalTimeTracking;
+  }
   const tempFile = `${projectsFile}.tmp`;
 
   try {
@@ -762,6 +772,7 @@ module.exports = {
   isDescendantOf,
   loadProjects,
   saveProjects,
+  saveProjectsImmediate,
   createFolder,
   deleteFolder,
   renameFolder,
