@@ -6,6 +6,7 @@
 const { ipcRenderer } = require('electron');
 const { projectsState, setGitPulling, setGitPushing, setGitMerging, setMergeInProgress, getGitOperation, getProjectTimes } = require('../state');
 const { escapeHtml } = require('../utils');
+const { t } = require('../i18n');
 
 /**
  * Format duration in milliseconds to human-readable string
@@ -296,23 +297,23 @@ function buildSyncBadges(aheadBehind) {
   let badges = '';
 
   if (!aheadBehind.hasRemote) {
-    badges += `<span class="sync-badge no-remote"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> Pas de remote</span>`;
+    badges += `<span class="sync-badge no-remote"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> ${t('git.noRemote')}</span>`;
     return badges;
   }
 
   if (aheadBehind.notTracking) {
-    badges += `<span class="sync-badge not-tracking"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> Branche non trackee</span>`;
+    badges += `<span class="sync-badge not-tracking"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> ${t('git.notTracking')}</span>`;
     return badges;
   }
 
   if (aheadBehind.behind > 0) {
-    badges += `<span class="sync-badge pull"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8z"/></svg> ${aheadBehind.behind} a pull</span>`;
+    badges += `<span class="sync-badge pull"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8z"/></svg> ${aheadBehind.behind} ${t('git.toPull')}</span>`;
   }
   if (aheadBehind.ahead > 0) {
-    badges += `<span class="sync-badge push"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4v2h14V4H5zm0 10h4v6h6v-6h4l-7-7-7 7z"/></svg> ${aheadBehind.ahead} a push</span>`;
+    badges += `<span class="sync-badge push"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4v2h14V4H5zm0 10h4v6h6v-6h4l-7-7-7 7z"/></svg> ${aheadBehind.ahead} ${t('git.toPush')}</span>`;
   }
   if (aheadBehind.ahead === 0 && aheadBehind.behind === 0) {
-    badges += `<span class="sync-badge synced"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Synchronise</span>`;
+    badges += `<span class="sync-badge synced"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> ${t('git.synced')}</span>`;
   }
 
   return badges;
@@ -336,7 +337,7 @@ function buildFileListHtml(fileList, title, badgeClass) {
   `).join('');
 
   const moreHtml = fileList.length > 10
-    ? `<div class="file-item more">... et ${fileList.length - 10} autres</div>`
+    ? `<div class="file-item more">${t('git.andMore', { count: fileList.length - 10 })}</div>`
     : '';
 
   return `
@@ -357,7 +358,7 @@ function buildCommitsHtml(commits) {
 
   return `
     <div class="dashboard-section">
-      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg> Commits recents</h3>
+      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg> ${t('git.recentCommits')}</h3>
       <div class="commits-list">
         ${commits.map(c => `
           <div class="commit-item">
@@ -386,11 +387,11 @@ function buildChangedFilesHtml(files) {
 
   return `
     <div class="dashboard-section">
-      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg> Fichiers modifies <span class="section-count">${totalChanges}</span></h3>
+      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg> ${t('git.changedFiles')} <span class="section-count">${totalChanges}</span></h3>
       <div class="changed-files">
-        ${buildFileListHtml(files.staged, 'Staged (prets a commit)', 'staged')}
-        ${buildFileListHtml(files.unstaged, 'Modifies (non staged)', 'unstaged')}
-        ${buildFileListHtml(files.untracked, 'Non suivis', 'untracked')}
+        ${buildFileListHtml(files.staged, t('git.staged'), 'staged')}
+        ${buildFileListHtml(files.unstaged, t('git.unstaged'), 'unstaged')}
+        ${buildFileListHtml(files.untracked, t('git.untracked'), 'untracked')}
       </div>
     </div>
   `;
@@ -406,7 +407,7 @@ function buildGitStatusHtml(gitInfo) {
     return `
       <div class="dashboard-no-git">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <p>Ce projet n'est pas un depot Git</p>
+        <p>${t('git.notGitRepo')}</p>
       </div>
     `;
   }
@@ -483,20 +484,20 @@ function buildStatsHtml(stats, gitInfo) {
 
   return `
     <div class="dashboard-section">
-      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg> Statistiques du code</h3>
+      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg> ${t('dashboard.codeStats')}</h3>
       <div class="code-stats-grid">
         <div class="code-stat">
           <div class="code-stat-value">${formatNumber(stats.lines)}</div>
-          <div class="code-stat-label">Lignes de code</div>
+          <div class="code-stat-label">${t('dashboard.linesOfCode')}</div>
         </div>
         <div class="code-stat">
           <div class="code-stat-value">${formatNumber(stats.files)}</div>
-          <div class="code-stat-label">Fichiers source</div>
+          <div class="code-stat-label">${t('dashboard.sourceFiles')}</div>
         </div>
         ${gitInfo.isGitRepo ? `
         <div class="code-stat">
           <div class="code-stat-value">${formatNumber(gitInfo.totalCommits)}</div>
-          <div class="code-stat-label">Total commits</div>
+          <div class="code-stat-label">${t('dashboard.totalCommits')}</div>
         </div>
         ` : ''}
       </div>
@@ -515,7 +516,7 @@ function buildContributorsHtml(contributors) {
 
   return `
     <div class="dashboard-section">
-      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> Contributeurs</h3>
+      <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg> ${t('dashboard.contributors')}</h3>
       <div class="contributors-list">
         ${contributors.map(c => `
           <div class="contributor-item">
@@ -556,29 +557,29 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
 
   // Build HTML
   container.innerHTML = `
-    ${isRefreshing ? '<div class="dashboard-refresh-indicator"><span class="refresh-spinner"></span> Actualisation...</div>' : ''}
+    ${isRefreshing ? `<div class="dashboard-refresh-indicator"><span class="refresh-spinner"></span> ${t('dashboard.refreshing')}</div>` : ''}
     ${hasMergeConflict ? `
     <div class="dashboard-merge-alert">
       <div class="merge-alert-header">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-        <strong>Merge en conflit</strong> - ${gitOps.conflicts.length} fichier${gitOps.conflicts.length > 1 ? 's' : ''} en conflit
+        <strong>${t('git.mergeConflict')}</strong> - ${t('git.filesInConflict', { count: gitOps.conflicts.length })}
       </div>
       <div class="merge-alert-files">
         ${gitOps.conflicts.slice(0, 5).map(f => `<code>${escapeHtml(f)}</code>`).join('')}
         ${gitOps.conflicts.length > 5 ? `<span class="more-files">+${gitOps.conflicts.length - 5} autres</span>` : ''}
       </div>
-      <div class="merge-alert-hint">Résolvez les conflits manuellement puis commitez, ou cliquez sur "Abort Merge" pour annuler.</div>
+      <div class="merge-alert-hint">${t('git.resolveConflicts')}</div>
     </div>
     ` : ''}
     <div class="dashboard-project-header">
       <div class="dashboard-project-title">
         <h2>${escapeHtml(project.name)}</h2>
-        <span class="dashboard-project-type ${isFivem ? 'fivem' : ''}">${isFivem ? 'FiveM Server' : 'Standalone'}</span>
+        <span class="dashboard-project-type ${isFivem ? 'fivem' : ''}">${isFivem ? t('dashboard.fivemServer') : t('dashboard.standalone')}</span>
       </div>
       <div class="dashboard-project-actions">
         <button class="btn-secondary" id="dash-btn-open-folder">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7l2 2h5v12zm0-12h-5l-2-2H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2z"/></svg>
-          Ouvrir dossier
+          ${t('dashboard.openFolder')}
         </button>
         ${gitInfo.isGitRepo && gitInfo.aheadBehind?.hasRemote ? `
         <button class="btn-secondary" id="dash-btn-git-pull" ${!gitInfo.aheadBehind?.notTracking && gitInfo.aheadBehind?.behind === 0 ? 'disabled' : ''}>
@@ -598,7 +599,7 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
         ` : ''}
         <button class="btn-primary" id="dash-btn-claude">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.89 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
-          Ouvrir Claude
+          ${t('dashboard.openClaude')}
         </button>
       </div>
     </div>
@@ -617,7 +618,7 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
       ${isFivem ? `
       <div class="quick-stat ${fivemStatus}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16V4H3v12h18m0-14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7v2h2v2H8v-2h2v-2H3a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2h18"/></svg>
-        <span>${fivemStatus === 'running' ? 'En ligne' : fivemStatus === 'starting' ? 'Demarrage...' : 'Arrete'}</span>
+        <span>${fivemStatus === 'running' ? t('fivem.online') : fivemStatus === 'starting' ? t('fivem.starting') : t('fivem.stopped')}</span>
       </div>
       ` : ''}
       ${gitInfo.isGitRepo && gitInfo.remoteUrl ? `
@@ -739,7 +740,7 @@ async function renderDashboard(container, project, options = {}) {
   container.innerHTML = `
     <div class="dashboard-loading">
       <div class="loading-spinner"></div>
-      <p>Chargement des informations...</p>
+      <p>${t('dashboard.loadingInfo')}</p>
     </div>
   `;
 
@@ -754,8 +755,8 @@ async function renderDashboard(container, project, options = {}) {
     setCacheLoading(projectId, false);
     container.innerHTML = `
       <div class="dashboard-error">
-        <p>Erreur lors du chargement</p>
-        <button class="btn-secondary" onclick="location.reload()">Reessayer</button>
+        <p>${t('dashboard.loadError')}</p>
+        <button class="btn-secondary" onclick="location.reload()">${t('dashboard.retry')}</button>
       </div>
     `;
   }

@@ -18,6 +18,9 @@ const ui = require('./ui');
 // Features
 const features = require('./features');
 
+// Internationalization
+const i18n = require('./i18n');
+
 /**
  * Initialize all renderer modules
  */
@@ -27,6 +30,10 @@ function initialize() {
 
   // Initialize state
   state.initializeState();
+
+  // Initialize i18n with saved language or auto-detect
+  const savedLanguage = state.getSetting('language');
+  i18n.initI18n(savedLanguage);
 
   // Initialize settings (applies accent color, etc.)
   services.SettingsService.initializeSettings();
@@ -100,6 +107,10 @@ module.exports = {
   // Features
   features,
   ...features,
+
+  // i18n
+  i18n,
+  ...i18n,
 
   // Initialize function
   initialize

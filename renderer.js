@@ -57,7 +57,14 @@ const {
   clearAllShortcuts,
   getKeyFromEvent,
   normalizeKey,
-  openQuickPicker
+  openQuickPicker,
+
+  // i18n
+  t,
+  setLanguage,
+  getCurrentLanguage,
+  getAvailableLanguages,
+  onLanguageChange
 } = require('./src/renderer');
 
 // ========== LOCAL MODAL FUNCTIONS ==========
@@ -91,14 +98,23 @@ const localState = {
 };
 
 // ========== DEFAULT KEYBOARD SHORTCUTS ==========
+// Labels will be resolved using t() when needed
 const DEFAULT_SHORTCUTS = {
-  openSettings: { key: 'Ctrl+,', label: 'Ouvrir les parametres' },
-  closeTerminal: { key: 'Ctrl+W', label: 'Fermer le terminal' },
-  showSessionsPanel: { key: 'Ctrl+Shift+E', label: 'Panneau sessions' },
-  openQuickPicker: { key: 'Ctrl+Shift+P', label: 'Selecteur rapide' },
-  nextTerminal: { key: 'Ctrl+Tab', label: 'Terminal suivant' },
-  prevTerminal: { key: 'Ctrl+Shift+Tab', label: 'Terminal precedent' }
+  openSettings: { key: 'Ctrl+,', labelKey: 'shortcuts.openSettings' },
+  closeTerminal: { key: 'Ctrl+W', labelKey: 'shortcuts.closeTerminal' },
+  showSessionsPanel: { key: 'Ctrl+Shift+E', labelKey: 'shortcuts.sessionsPanel' },
+  openQuickPicker: { key: 'Ctrl+Shift+P', labelKey: 'shortcuts.quickPicker' },
+  nextTerminal: { key: 'Ctrl+Tab', labelKey: 'shortcuts.nextTerminal' },
+  prevTerminal: { key: 'Ctrl+Shift+Tab', labelKey: 'shortcuts.prevTerminal' }
 };
+
+/**
+ * Get label for a shortcut (translated)
+ */
+function getShortcutLabel(id) {
+  const shortcut = DEFAULT_SHORTCUTS[id];
+  return shortcut ? t(shortcut.labelKey) : id;
+}
 
 // Shortcut capture state
 let shortcutCaptureState = {
@@ -124,7 +140,7 @@ function checkShortcutConflict(key, excludeId) {
     if (id === excludeId) continue;
     const currentKey = getShortcutKey(id);
     if (normalizeKey(currentKey) === normalizedKey) {
-      return { id, label: shortcut.label };
+      return { id, label: getShortcutLabel(id) };
     }
   }
   return null;
@@ -196,9 +212,9 @@ function startShortcutCapture(id) {
   overlay.className = 'shortcut-capture-overlay';
   overlay.innerHTML = `
     <div class="shortcut-capture-box">
-      <div class="shortcut-capture-title">Appuyez sur une combinaison de touches</div>
-      <div class="shortcut-capture-preview">En attente...</div>
-      <div class="shortcut-capture-hint">Appuyez sur Echap pour annuler</div>
+      <div class="shortcut-capture-title">${t('shortcuts.pressKeys')}</div>
+      <div class="shortcut-capture-preview">${t('shortcuts.waiting')}</div>
+      <div class="shortcut-capture-hint">${t('shortcuts.pressEscapeToCancel')}</div>
       <div class="shortcut-capture-conflict" style="display: none;"></div>
     </div>
   `;
@@ -227,7 +243,7 @@ function startShortcutCapture(id) {
     if (!hasModifier && !isFunctionKey) {
       preview.textContent = formatKeyForDisplay(key);
       conflictDiv.style.display = 'block';
-      conflictDiv.textContent = 'Un modificateur (Ctrl, Alt, Shift) est requis';
+      conflictDiv.textContent = t('shortcuts.modifierRequired');
       conflictDiv.className = 'shortcut-capture-conflict warning';
       return;
     }
@@ -244,7 +260,7 @@ function startShortcutCapture(id) {
     const conflict = checkShortcutConflict(key, id);
     if (conflict) {
       conflictDiv.style.display = 'block';
-      conflictDiv.textContent = `Conflit avec: ${conflict.label}`;
+      conflictDiv.textContent = t('shortcuts.conflictWith', { label: conflict.label });
       conflictDiv.className = 'shortcut-capture-conflict error';
       return;
     }
@@ -286,7 +302,7 @@ function renderShortcutsPanel() {
 
   let html = `
     <div class="settings-section">
-      <div class="settings-title">Raccourcis clavier</div>
+      <div class="settings-title">${t('shortcuts.title')}</div>
       <div class="shortcuts-list">
   `;
 
@@ -296,12 +312,12 @@ function renderShortcutsPanel() {
 
     html += `
       <div class="shortcut-row" data-shortcut-id="${id}">
-        <div class="shortcut-label">${shortcut.label}</div>
+        <div class="shortcut-label">${getShortcutLabel(id)}</div>
         <div class="shortcut-controls">
-          <button type="button" class="shortcut-key-btn ${isCustom ? 'custom' : ''}" title="Cliquez pour modifier">
+          <button type="button" class="shortcut-key-btn ${isCustom ? 'custom' : ''}" title="${t('shortcuts.clickToEdit')}">
             ${formatKeyForDisplay(currentKey)}
           </button>
-          ${isCustom ? `<button type="button" class="shortcut-reset-btn" title="Reinitialiser">
+          ${isCustom ? `<button type="button" class="shortcut-reset-btn" title="${t('shortcuts.reset')}">
             <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
           </button>` : ''}
         </div>
@@ -317,7 +333,7 @@ function renderShortcutsPanel() {
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
             <path d="M3 3v5h5"/>
           </svg>
-          Réinitialiser tous les raccourcis
+          ${t('shortcuts.resetAll')}
         </button>
       </div>
     </div>
@@ -500,12 +516,14 @@ function showToast({ type = 'info', title, message, duration = 5000 }) {
   toast.className = `toast toast-${type}`;
 
   const displayMessage = message && message.length > 200 ? message.substring(0, 200) + '...' : message;
+  // Escape HTML then convert newlines to <br> for proper display
+  const formattedMessage = displayMessage ? escapeHtml(displayMessage).replace(/\n/g, '<br>') : '';
 
   toast.innerHTML = `
     <span class="toast-icon">${icons[type] || icons.info}</span>
     <div class="toast-content">
       <div class="toast-title">${escapeHtml(title)}</div>
-      ${displayMessage ? `<div class="toast-message">${escapeHtml(displayMessage)}</div>` : ''}
+      ${formattedMessage ? `<div class="toast-message">${formattedMessage}</div>` : ''}
     </div>
     <button class="toast-close" aria-label="Fermer">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -540,10 +558,17 @@ function showToast({ type = 'info', title, message, duration = 5000 }) {
 
 // Backward compatible wrapper for showGitToast
 function showGitToast({ success, title, message, details = [], duration = 5000 }) {
+  // Format details into the message if available
+  let fullMessage = message || '';
+  if (details && details.length > 0) {
+    const detailsText = details.map(d => `${d.icon} ${d.text}`).join('  •  ');
+    fullMessage = fullMessage ? `${fullMessage}\n${detailsText}` : detailsText;
+  }
+
   return showToast({
     type: success ? 'success' : 'error',
     title,
-    message,
+    message: fullMessage,
     duration
   });
 }
@@ -1394,7 +1419,10 @@ async function showSettingsModal(initialTab = 'general') {
     console.error('Error getting GitHub status:', e);
   }
 
-  showModal('Parametres', `
+  const availableLanguages = getAvailableLanguages();
+  const currentLang = getCurrentLanguage();
+
+  showModal(t('settings.title'), `
     <div class="settings-tabs">
       <button class="settings-tab ${initialTab === 'general' ? 'active' : ''}" data-tab="general">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
@@ -1418,6 +1446,17 @@ async function showSettingsModal(initialTab = 'general') {
       <div class="settings-panel ${initialTab === 'general' ? 'active' : ''}" data-panel="general">
         <div class="settings-section">
           <div class="settings-title">Apparence</div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <div>${t('settings.language')}</div>
+              <div class="settings-desc">Change the interface language</div>
+            </div>
+            <select id="language-select" class="settings-select">
+              ${availableLanguages.map(lang =>
+                `<option value="${lang.code}" ${currentLang === lang.code ? 'selected' : ''}>${lang.name}</option>`
+              ).join('')}
+            </select>
+          </div>
           <div class="settings-row">
             <div class="settings-label">
               <div>Couleur d'accent</div>
@@ -1675,7 +1714,9 @@ async function showSettingsModal(initialTab = 'general') {
     const selectedMode = document.querySelector('.execution-mode-card.selected');
     const closeActionSelect = document.getElementById('close-action-select');
     const terminalThemeSelect = document.getElementById('terminal-theme-select');
+    const languageSelect = document.getElementById('language-select');
     const newTerminalTheme = terminalThemeSelect?.value || 'claude';
+    const newLanguage = languageSelect?.value || getCurrentLanguage();
 
     // Get accent color from preset swatch or custom picker
     let accentColor = settings.accentColor;
@@ -1692,10 +1733,18 @@ async function showSettingsModal(initialTab = 'general') {
       skipPermissions: selectedMode?.dataset.mode === 'dangerous',
       accentColor,
       closeAction: closeActionSelect?.value || 'ask',
-      terminalTheme: newTerminalTheme
+      terminalTheme: newTerminalTheme,
+      language: newLanguage
     };
     settingsState.set(newSettings);
     saveSettings();
+
+    // Update language if changed
+    if (newLanguage !== getCurrentLanguage()) {
+      setLanguage(newLanguage);
+      // Reload to apply translations
+      location.reload();
+    }
     applyAccentColor(newSettings.accentColor);
 
     // Update terminal themes if changed

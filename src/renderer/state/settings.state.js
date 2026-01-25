@@ -15,7 +15,8 @@ const defaultSettings = {
   accentColor: '#d97706',
   notificationsEnabled: true,
   closeAction: 'ask', // 'ask', 'minimize', 'quit'
-  shortcuts: {} // Custom keyboard shortcuts overrides
+  shortcuts: {}, // Custom keyboard shortcuts overrides
+  language: null // null = auto-detect, 'fr' = French, 'en' = English
 };
 
 const settingsState = new State({ ...defaultSettings });

@@ -25,6 +25,7 @@ const {
   getProjectTimes
 } = require('../../state');
 const { escapeHtml } = require('../../utils');
+const { t } = require('../../i18n');
 const CustomizePicker = require('./CustomizePicker');
 
 /**
@@ -146,7 +147,7 @@ function renderFolderHtml(folder, depth) {
         ${folderIconHtml}
         <span class="folder-name">${escapeHtml(folder.name)}</span>
         <span class="folder-count">${projectCount}</span>
-        <button class="btn-folder-color" data-folder-id="${folder.id}" title="Personnaliser">
+        <button class="btn-folder-color" data-folder-id="${folder.id}" title="${t('projects.customize')}">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
         </button>
       </div>
@@ -173,21 +174,21 @@ function renderProjectHtml(project, depth) {
   if (isFivem) {
     if (isRunning || isStarting) {
       primaryActionsHtml = `
-        <button class="btn-action-icon btn-fivem-console" data-project-id="${project.id}" title="Console serveur">
+        <button class="btn-action-icon btn-fivem-console" data-project-id="${project.id}" title="${t('fivem.serverConsole')}">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
         </button>
-        <button class="btn-action-primary btn-fivem-stop" data-project-id="${project.id}" title="Arreter le serveur">
+        <button class="btn-action-primary btn-fivem-stop" data-project-id="${project.id}" title="${t('fivem.stopServer')}">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
         </button>`;
     } else {
       primaryActionsHtml = `
-        <button class="btn-action-primary btn-fivem-start" data-project-id="${project.id}" title="Demarrer le serveur">
+        <button class="btn-action-primary btn-fivem-start" data-project-id="${project.id}" title="${t('fivem.startServer')}">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         </button>`;
     }
   } else {
     primaryActionsHtml = `
-      <button class="btn-action-icon btn-claude" data-project-id="${project.id}" title="Ouvrir Claude Code">
+      <button class="btn-action-icon btn-claude" data-project-id="${project.id}" title="${t('projects.openClaude')}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
       </button>`;
   }
@@ -220,28 +221,28 @@ function renderProjectHtml(project, depth) {
   menuItemsHtml += `
     <button class="more-actions-item btn-basic-terminal" data-project-id="${project.id}">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 19V7H4v12h16m0-16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16m-7 14v-2h5v2h-5m-3.42-4L5.57 9H8.4l3.3 3.3c.39.39.39 1.03 0 1.42L8.42 17H5.59l4-4z"/></svg>
-      Terminal basique
+      ${t('projects.basicTerminal')}
     </button>
     <button class="more-actions-item btn-open-folder" data-project-id="${project.id}">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7l2 2h5v12zm0-12h-5l-2-2H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2z"/></svg>
-      Ouvrir le dossier
+      ${t('projects.openFolder')}
     </button>
     <div class="more-actions-divider"></div>
     <button class="more-actions-item btn-customize-project" data-project-id="${project.id}">
       <span class="customize-btn-preview">${customizePreview}${customizeColorDot}</span>
-      Personnaliser
+      ${t('projects.customize')}
     </button>
     <button class="more-actions-item btn-rename-project" data-project-id="${project.id}">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-      Renommer
+      ${t('common.rename')}
     </button>
     <div class="more-actions-divider"></div>
     <button class="more-actions-item danger btn-delete-project" data-project-id="${project.id}">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-      Supprimer
+      ${t('common.delete')}
     </button>`;
 
-  const statusIndicator = isFivem ? `<span class="fivem-status-dot ${fivemStatus}" title="${fivemStatus === 'stopped' ? 'Arrete' : fivemStatus === 'starting' ? 'Demarrage...' : 'En cours'}"></span>` : '';
+  const statusIndicator = isFivem ? `<span class="fivem-status-dot ${fivemStatus}" title="${fivemStatus === 'stopped' ? t('fivem.stopped') : fivemStatus === 'starting' ? t('fivem.starting') : t('fivem.running')}"></span>` : '';
   const colorIndicator = projectColor ? `<span class="color-indicator" style="background: ${projectColor}"></span>` : '';
 
   // Get time tracking data
@@ -272,15 +273,15 @@ function renderProjectHtml(project, depth) {
         </div>
         <div class="project-path">${escapeHtml(project.path)}</div>
         ${hasTime ? `<div class="project-time">
-          <span class="time-today" title="Aujourd'hui">${formatDuration(times.today)}</span>
+          <span class="time-today" title="${t('common.today')}">${formatDuration(times.today)}</span>
           <span class="time-separator">\u2022</span>
-          <span class="time-total" title="Total">${formatDuration(times.total)}</span>
+          <span class="time-total" title="${t('common.total')}">${formatDuration(times.total)}</span>
         </div>` : ''}
       </div>
       <div class="project-actions">
         ${primaryActionsHtml}
         <div class="more-actions">
-          <button class="btn-more-actions" title="Plus d'actions">
+          <button class="btn-more-actions" title="${t('projects.moreActions')}">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
           </button>
           <div class="more-actions-menu">${menuItemsHtml}</div>
@@ -694,8 +695,8 @@ function render() {
     list.innerHTML = `
       <div class="empty-state small">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>
-        <p>Aucun projet</p>
-        <p class="hint">Cliquez sur + pour ajouter</p>
+        <p>${t('projects.noProjects')}</p>
+        <p class="hint">${t('projects.addHint')}</p>
       </div>`;
     return;
   }

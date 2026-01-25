@@ -4,6 +4,7 @@
  */
 
 const { escapeHtml } = require('../../utils/dom');
+const { t } = require('../../i18n');
 
 /**
  * Create a modal element
@@ -37,7 +38,7 @@ function createModal({ id, title, content, buttons = [], size = 'medium', onClos
     <div class="modal ${sizeClass}">
       <div class="modal-header">
         <h3>${escapeHtml(title)}</h3>
-        <button class="modal-close" aria-label="Fermer">
+        <button class="modal-close" aria-label="${t('common.close')}">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </div>
@@ -140,7 +141,9 @@ function closeModalById(id) {
  * @param {boolean} options.danger
  * @returns {Promise<boolean>}
  */
-function showConfirm({ title, message, confirmLabel = 'Confirmer', cancelLabel = 'Annuler', danger = false }) {
+function showConfirm({ title, message, confirmLabel = null, cancelLabel = null, danger = false }) {
+  confirmLabel = confirmLabel || t('common.confirm');
+  cancelLabel = cancelLabel || t('common.cancel');
   return new Promise((resolve) => {
     const modal = createModal({
       id: 'confirm-modal',
@@ -199,7 +202,7 @@ function showPrompt({ title, message = '', defaultValue = '', placeholder = '' }
       `,
       buttons: [
         {
-          label: 'Annuler',
+          label: t('common.cancel'),
           action: 'cancel',
           onClick: (m) => {
             closeModal(m);
@@ -207,7 +210,7 @@ function showPrompt({ title, message = '', defaultValue = '', placeholder = '' }
           }
         },
         {
-          label: 'OK',
+          label: t('common.ok'),
           action: 'confirm',
           primary: true,
           onClick: (m) => {

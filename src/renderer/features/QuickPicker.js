@@ -5,6 +5,7 @@
 
 const { escapeHtml } = require('../utils/dom');
 const { projectsState } = require('../state');
+const { t } = require('../i18n');
 
 const quickPickerState = {
   isOpen: false,
@@ -29,7 +30,7 @@ function openQuickPicker(container, onSelect) {
   picker.innerHTML = `
     <div class="quick-picker">
       <div class="quick-picker-header">
-        <input type="text" class="quick-picker-input" placeholder="Rechercher un projet..." autofocus>
+        <input type="text" class="quick-picker-input" placeholder="${t('quickPicker.searchProjects')}" autofocus>
       </div>
       <div class="quick-picker-list"></div>
     </div>
@@ -96,7 +97,7 @@ function openQuickPicker(container, onSelect) {
 
 function renderQuickPickerList(list, onSelect, picker) {
   if (quickPickerState.filteredProjects.length === 0) {
-    list.innerHTML = '<div class="quick-picker-empty">Aucun projet trouvé</div>';
+    list.innerHTML = `<div class="quick-picker-empty">${t('quickPicker.noProjectFound')}</div>`;
     return;
   }
 

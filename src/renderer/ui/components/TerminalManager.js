@@ -29,6 +29,7 @@ const {
   hasTerminalsForProject
 } = require('../../state');
 const { escapeHtml } = require('../../utils');
+const { t } = require('../../i18n');
 const {
   CLAUDE_TERMINAL_THEME,
   FIVEM_TERMINAL_THEME,
@@ -306,7 +307,7 @@ function updateTerminalStatus(id, status) {
     }
     if (status === 'ready' && previousStatus === 'working') {
       if (callbacks.onNotification) {
-        callbacks.onNotification(`✅ ${termData.name}`, 'Claude attend votre reponse', id);
+        callbacks.onNotification(`✅ ${termData.name}`, t('terminals.claudeAwaits'), id);
       }
     }
     // Re-render project list to update terminal stats
@@ -688,11 +689,11 @@ function createFivemConsole(project, projectIndex, options = {}) {
     <div class="fivem-view-switcher">
       <button class="fivem-view-tab active" data-view="console">
         <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
-        Console
+        ${t('fivem.console')}
       </button>
       <button class="fivem-view-tab" data-view="errors">
         <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        Erreurs
+        ${t('fivem.errors')}
         <span class="fivem-error-badge" style="display: none;">0</span>
       </button>
     </div>
@@ -700,7 +701,7 @@ function createFivemConsole(project, projectIndex, options = {}) {
       <div class="fivem-console-view"></div>
       <div class="fivem-errors-view" style="display: none;">
         <div class="fivem-errors-header">
-          <span>Erreurs detectees</span>
+          <span>${t('fivem.errorDetected')}</span>
           <button class="fivem-clear-errors" title="Effacer les erreurs">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
           </button>
@@ -708,7 +709,7 @@ function createFivemConsole(project, projectIndex, options = {}) {
         <div class="fivem-errors-list"></div>
         <div class="fivem-errors-empty">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-          <span>Aucune erreur detectee</span>
+          <span>${t('fivem.noErrors')}</span>
         </div>
       </div>
     </div>
@@ -875,7 +876,7 @@ function renderFivemErrorsList(wrapper, projectIndex, project) {
       <div class="fivem-error-item" data-index="${index}">
         <div class="fivem-error-item-header">
           <span class="fivem-error-time">${time}</span>
-          <button class="fivem-error-debug-btn" data-index="${index}" title="Debugger avec Claude">
+          <button class="fivem-error-debug-btn" data-index="${index}" title="${t('fivem.debugWithClaude')}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
@@ -1065,17 +1066,17 @@ function filterByProject(projectIndex) {
       } else {
         emptyState.innerHTML = `
           <div class="sessions-empty-state">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
-            <p>Aucun terminal pour ce projet</p>
-            <p class="hint">Cliquez sur "Claude" pour en creer un</p>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.89 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
+            <p>${t('terminals.noTerminals')}</p>
+            <p class="hint">${t('terminals.createHint')}</p>
           </div>`;
       }
     } else {
       emptyState.innerHTML = `
         <div class="sessions-empty-state">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
-          <p>Selectionnez un projet et cliquez sur "Claude"</p>
-          <p class="hint">Le terminal s'ouvrira ici</p>
+          <p>${t('terminals.selectProject')}</p>
+          <p class="hint">${t('terminals.terminalOpensHere')}</p>
         </div>`;
     }
     setActiveTerminalState(null);
@@ -1169,8 +1170,8 @@ async function renderSessionsPanel(project, emptyState) {
       emptyState.innerHTML = `
         <div class="sessions-empty-state">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
-          <p>Aucun terminal pour "${escapeHtml(project.name)}"</p>
-          <p class="hint">Cliquez sur "Claude" pour en creer un</p>
+          <p>${t('terminals.noTerminals')}</p>
+          <p class="hint">${t('terminals.createHint')}</p>
         </div>`;
       return;
     }
@@ -1193,12 +1194,12 @@ async function renderSessionsPanel(project, emptyState) {
     emptyState.innerHTML = `
       <div class="sessions-panel">
         <div class="sessions-header">
-          <span class="sessions-title">Reprendre une conversation</span>
-          <button class="sessions-new-btn" title="Nouvelle conversation">
+          <span class="sessions-title">${t('terminals.resumeConversation')}</span>
+          <button class="sessions-new-btn" title="${t('common.new')}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 5v14M5 12h14"/>
             </svg>
-            Nouveau
+            ${t('common.new')}
           </button>
         </div>
         <div class="sessions-list">
@@ -1227,8 +1228,8 @@ async function renderSessionsPanel(project, emptyState) {
     emptyState.innerHTML = `
       <div class="sessions-empty-state">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
-        <p>Aucun terminal pour "${escapeHtml(project.name)}"</p>
-        <p class="hint">Cliquez sur "Claude" pour en creer un</p>
+        <p>${t('terminals.noTerminals')}</p>
+        <p class="hint">${t('terminals.createHint')}</p>
       </div>`;
   }
 }
@@ -1277,7 +1278,7 @@ async function resumeSession(project, sessionId, options = {}) {
     fitAddon,
     project,
     projectIndex,
-    name: 'Reprise...',
+    name: t('terminals.resuming'),
     status: 'working',
     inputBuffer: '',
     isBasic: false
@@ -1295,7 +1296,7 @@ async function resumeSession(project, sessionId, options = {}) {
   tab.dataset.id = id;
   tab.innerHTML = `
     <span class="status-dot"></span>
-    <span class="tab-name">${escapeHtml('Reprise...')}</span>
+    <span class="tab-name">${escapeHtml(t('terminals.resuming'))}</span>
     <button class="tab-close"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>`;
   tabsContainer.appendChild(tab);
 
@@ -1419,14 +1420,14 @@ function showFivemErrorOverlay(projectIndex, error) {
   overlay.innerHTML = `
     <div class="fivem-error-content">
       <span class="fivem-error-icon">⚠️</span>
-      <span class="fivem-error-text">Erreur detectee</span>
-      <button class="fivem-debug-btn" title="Debugger avec Claude">
+      <span class="fivem-error-text">${t('fivem.errorDetected')}</span>
+      <button class="fivem-debug-btn" title="${t('fivem.debugWithClaude')}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        Debug avec Claude
+        ${t('fivem.debugWithClaude')}
       </button>
-      <button class="fivem-error-dismiss" title="Fermer">
+      <button class="fivem-error-dismiss" title="${t('common.close')}">
         <svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
       </button>
     </div>
@@ -1541,7 +1542,7 @@ async function createTerminalWithPrompt(project, prompt) {
     fitAddon,
     project,
     projectIndex,
-    name: '🐛 Debug',
+    name: `🐛 ${t('terminals.debug')}`,
     status: 'working',
     inputBuffer: '',
     isBasic: false,
@@ -1557,7 +1558,7 @@ async function createTerminalWithPrompt(project, prompt) {
   tab.dataset.id = id;
   tab.innerHTML = `
     <span class="status-dot"></span>
-    <span class="tab-name">${escapeHtml('🐛 Debug')}</span>
+    <span class="tab-name">${escapeHtml(`🐛 ${t('terminals.debug')}`)}</span>
     <button class="tab-close"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>`;
   tabsContainer.appendChild(tab);
 

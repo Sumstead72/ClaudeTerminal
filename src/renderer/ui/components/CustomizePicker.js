@@ -3,105 +3,107 @@
  * Elegant popover for customizing project/folder colors and icons
  */
 
-// Extended color palette with semantic groupings
+const { t } = require('../../i18n');
+
+// Extended color palette with semantic groupings - keys for translation
 const COLOR_PALETTE = {
   neutral: [
-    { name: 'Par défaut', value: null },
-    { name: 'Gris', value: '#6b7280' },
-    { name: 'Ardoise', value: '#64748b' },
+    { nameKey: 'customize.default', value: null },
+    { nameKey: 'customize.colors.gray', value: '#6b7280' },
+    { nameKey: 'customize.colors.slate', value: '#64748b' },
   ],
   warm: [
-    { name: 'Rouge', value: '#ef4444' },
-    { name: 'Rose', value: '#f43f5e' },
-    { name: 'Orange', value: '#f97316' },
-    { name: 'Ambre', value: '#f59e0b' },
-    { name: 'Jaune', value: '#eab308' },
+    { nameKey: 'customize.colors.red', value: '#ef4444' },
+    { nameKey: 'customize.colors.pink', value: '#f43f5e' },
+    { nameKey: 'customize.colors.orange', value: '#f97316' },
+    { nameKey: 'customize.colors.amber', value: '#f59e0b' },
+    { nameKey: 'customize.colors.yellow', value: '#eab308' },
   ],
   cool: [
-    { name: 'Lime', value: '#84cc16' },
-    { name: 'Vert', value: '#22c55e' },
-    { name: 'Émeraude', value: '#10b981' },
-    { name: 'Cyan', value: '#06b6d4' },
-    { name: 'Bleu', value: '#3b82f6' },
+    { nameKey: 'customize.colors.lime', value: '#84cc16' },
+    { nameKey: 'customize.colors.green', value: '#22c55e' },
+    { nameKey: 'customize.colors.emerald', value: '#10b981' },
+    { nameKey: 'customize.colors.cyan', value: '#06b6d4' },
+    { nameKey: 'customize.colors.blue', value: '#3b82f6' },
   ],
   vibrant: [
-    { name: 'Indigo', value: '#6366f1' },
-    { name: 'Violet', value: '#8b5cf6' },
-    { name: 'Fuchsia', value: '#d946ef' },
-    { name: 'Rose vif', value: '#ec4899' },
+    { nameKey: 'customize.colors.indigo', value: '#6366f1' },
+    { nameKey: 'customize.colors.violet', value: '#8b5cf6' },
+    { nameKey: 'customize.colors.fuchsia', value: '#d946ef' },
+    { nameKey: 'customize.colors.hotPink', value: '#ec4899' },
   ]
 };
 
-// Extended icon library with categories
+// Extended icon library with categories - use translation keys
 const ICON_LIBRARY = {
   development: {
-    label: 'Développement',
+    labelKey: 'customize.iconCategories.development',
     icons: [
-      { name: 'Code', value: '💻' },
-      { name: 'Terminal', value: '⌨️' },
-      { name: 'Bug', value: '🐛' },
-      { name: 'Git', value: '🔀' },
-      { name: 'API', value: '🔌' },
-      { name: 'Database', value: '🗄️' },
-      { name: 'Serveur', value: '🖥️' },
-      { name: 'Package', value: '📦' },
+      { nameKey: 'customize.icons.code', value: '💻' },
+      { nameKey: 'customize.icons.terminal', value: '⌨️' },
+      { nameKey: 'customize.icons.bug', value: '🐛' },
+      { nameKey: 'customize.icons.git', value: '🔀' },
+      { nameKey: 'customize.icons.api', value: '🔌' },
+      { nameKey: 'customize.icons.database', value: '🗄️' },
+      { nameKey: 'customize.icons.server', value: '🖥️' },
+      { nameKey: 'customize.icons.package', value: '📦' },
     ]
   },
   web: {
-    label: 'Web & Mobile',
+    labelKey: 'customize.iconCategories.webMobile',
     icons: [
-      { name: 'Web', value: '🌐' },
-      { name: 'Mobile', value: '📱' },
-      { name: 'Responsive', value: '📲' },
-      { name: 'Browser', value: '🖼️' },
-      { name: 'Link', value: '🔗' },
-      { name: 'Cloud', value: '☁️' },
+      { nameKey: 'customize.icons.web', value: '🌐' },
+      { nameKey: 'customize.icons.mobile', value: '📱' },
+      { nameKey: 'customize.icons.responsive', value: '📲' },
+      { nameKey: 'customize.icons.browser', value: '🖼️' },
+      { nameKey: 'customize.icons.link', value: '🔗' },
+      { nameKey: 'customize.icons.cloud', value: '☁️' },
     ]
   },
   creative: {
-    label: 'Créatif',
+    labelKey: 'customize.iconCategories.creative',
     icons: [
-      { name: 'Design', value: '🎨' },
-      { name: 'Photo', value: '📷' },
-      { name: 'Video', value: '🎬' },
-      { name: 'Music', value: '🎵' },
-      { name: 'Game', value: '🎮' },
-      { name: '3D', value: '🧊' },
+      { nameKey: 'customize.icons.design', value: '🎨' },
+      { nameKey: 'customize.icons.photo', value: '📷' },
+      { nameKey: 'customize.icons.video', value: '🎬' },
+      { nameKey: 'customize.icons.music', value: '🎵' },
+      { nameKey: 'customize.icons.game', value: '🎮' },
+      { nameKey: 'customize.icons.3d', value: '🧊' },
     ]
   },
   business: {
-    label: 'Business',
+    labelKey: 'customize.iconCategories.business',
     icons: [
-      { name: 'Chart', value: '📊' },
-      { name: 'Money', value: '💰' },
-      { name: 'Shop', value: '🛒' },
-      { name: 'Mail', value: '📧' },
-      { name: 'Calendar', value: '📅' },
-      { name: 'Task', value: '✅' },
+      { nameKey: 'customize.icons.chart', value: '📊' },
+      { nameKey: 'customize.icons.money', value: '💰' },
+      { nameKey: 'customize.icons.shop', value: '🛒' },
+      { nameKey: 'customize.icons.mail', value: '📧' },
+      { nameKey: 'customize.icons.calendar', value: '📅' },
+      { nameKey: 'customize.icons.task', value: '✅' },
     ]
   },
   tech: {
-    label: 'Tech & AI',
+    labelKey: 'customize.iconCategories.techAi',
     icons: [
-      { name: 'AI', value: '🤖' },
-      { name: 'Chip', value: '🔲' },
-      { name: 'Security', value: '🔒' },
-      { name: 'Network', value: '🌍' },
-      { name: 'Speed', value: '⚡' },
-      { name: 'Lab', value: '🧪' },
+      { nameKey: 'customize.icons.ai', value: '🤖' },
+      { nameKey: 'customize.icons.chip', value: '🔲' },
+      { nameKey: 'customize.icons.security', value: '🔒' },
+      { nameKey: 'customize.icons.network', value: '🌍' },
+      { nameKey: 'customize.icons.speed', value: '⚡' },
+      { nameKey: 'customize.icons.lab', value: '🧪' },
     ]
   },
   symbols: {
-    label: 'Symboles',
+    labelKey: 'customize.iconCategories.symbols',
     icons: [
-      { name: 'Star', value: '⭐' },
-      { name: 'Heart', value: '❤️' },
-      { name: 'Fire', value: '🔥' },
-      { name: 'Diamond', value: '💎' },
-      { name: 'Crown', value: '👑' },
-      { name: 'Rocket', value: '🚀' },
-      { name: 'Target', value: '🎯' },
-      { name: 'Trophy', value: '🏆' },
+      { nameKey: 'customize.icons.star', value: '⭐' },
+      { nameKey: 'customize.icons.heart', value: '❤️' },
+      { nameKey: 'customize.icons.fire', value: '🔥' },
+      { nameKey: 'customize.icons.diamond', value: '💎' },
+      { nameKey: 'customize.icons.crown', value: '👑' },
+      { nameKey: 'customize.icons.rocket', value: '🚀' },
+      { nameKey: 'customize.icons.target', value: '🎯' },
+      { nameKey: 'customize.icons.trophy', value: '🏆' },
     ]
   }
 };
@@ -147,9 +149,9 @@ function createPickerHtml(itemType, item) {
         </div>
         <div class="customize-picker-title">
           <span class="customize-picker-name">${escapeHtml(itemName)}</span>
-          <span class="customize-picker-subtitle">Personnaliser l'apparence</span>
+          <span class="customize-picker-subtitle">${t('customize.title')}</span>
         </div>
-        <button class="customize-picker-close" aria-label="Fermer">
+        <button class="customize-picker-close" aria-label="${t('common.close')}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
@@ -162,13 +164,13 @@ function createPickerHtml(itemType, item) {
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
           </svg>
-          Couleur
+          ${t('customize.color')}
         </button>
         <button class="customize-picker-tab" data-tab="icons">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
           </svg>
-          Icône
+          ${t('customize.icon')}
         </button>
       </div>
 
@@ -182,7 +184,7 @@ function createPickerHtml(itemType, item) {
                 ${colors.map(c => `
                   <button class="customize-color-btn ${c.value === currentColor ? 'selected' : ''} ${!c.value ? 'default' : ''}"
                           data-color="${c.value || ''}"
-                          title="${c.name}"
+                          title="${t(c.nameKey)}"
                           ${c.value ? `style="--swatch-color: ${c.value}"` : ''}>
                     ${c.value === currentColor ? '<svg class="check-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}
                   </button>
@@ -195,11 +197,11 @@ function createPickerHtml(itemType, item) {
             <div class="customize-picker-custom-row">
               <div class="customize-color-custom ${currentColor && !isPresetColor(currentColor) ? 'selected' : ''}"
                    style="--swatch-color: ${currentColor && !isPresetColor(currentColor) ? currentColor : '#808080'}">
-                <input type="color" class="customize-color-input" value="${currentColor || '#808080'}" title="Choisir une couleur">
+                <input type="color" class="customize-color-input" value="${currentColor || '#808080'}" title="${t('customize.chooseColor')}">
                 <svg class="plus-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 ${currentColor && !isPresetColor(currentColor) ? '<svg class="check-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}
               </div>
-              <span class="customize-picker-custom-label">Personnalise</span>
+              <span class="customize-picker-custom-label">${t('customize.custom')}</span>
             </div>
           </div>
         </div>
@@ -210,13 +212,13 @@ function createPickerHtml(itemType, item) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
             </svg>
-            <input type="text" placeholder="Rechercher une icône..." class="customize-icon-search-input">
+            <input type="text" placeholder="${t('customize.searchIcon')}" class="customize-icon-search-input">
           </div>
 
           <div class="customize-picker-icon-categories">
             <!-- Default/Reset option -->
             <div class="customize-picker-icon-category">
-              <button class="customize-icon-btn reset-icon ${!currentIcon ? 'selected' : ''}" data-icon="" title="Par défaut">
+              <button class="customize-icon-btn reset-icon ${!currentIcon ? 'selected' : ''}" data-icon="" title="${t('customize.default')}">
                 <span class="customize-icon-emoji">${itemType === 'folder' ? '📁' : '📄'}</span>
                 ${!currentIcon ? '<span class="check-badge">✓</span>' : ''}
               </button>
@@ -224,12 +226,12 @@ function createPickerHtml(itemType, item) {
 
             ${Object.entries(ICON_LIBRARY).map(([key, category]) => `
               <div class="customize-picker-icon-category" data-category="${key}">
-                <div class="customize-picker-icon-category-label">${category.label}</div>
+                <div class="customize-picker-icon-category-label">${t(category.labelKey)}</div>
                 <div class="customize-picker-icon-grid">
                   ${category.icons.map(icon => `
                     <button class="customize-icon-btn ${icon.value === currentIcon ? 'selected' : ''}"
                             data-icon="${icon.value}"
-                            title="${icon.name}">
+                            title="${t(icon.nameKey)}">
                       <span class="customize-icon-emoji">${icon.value}</span>
                       ${icon.value === currentIcon ? '<span class="check-badge">✓</span>' : ''}
                     </button>
