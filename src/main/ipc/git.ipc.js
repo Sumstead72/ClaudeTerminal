@@ -4,7 +4,7 @@
  */
 
 const { ipcMain } = require('electron');
-const { getGitInfo, getGitInfoFull, getGitStatusQuick, gitPull, gitPush, gitMerge, gitMergeAbort, gitMergeContinue, getMergeConflicts, isMergeInProgress, gitClone, getProjectStats, getBranches, getCurrentBranch, checkoutBranch } = require('../utils/git');
+const { getGitInfo, getGitInfoFull, getGitStatusQuick, getGitStatusDetailed, gitPull, gitPush, gitMerge, gitMergeAbort, gitMergeContinue, getMergeConflicts, isMergeInProgress, gitClone, gitStageFiles, gitCommit, getProjectStats, getBranches, getCurrentBranch, checkoutBranch } = require('../utils/git');
 const GitHubAuthService = require('../services/GitHubAuthService');
 
 /**
@@ -86,6 +86,21 @@ function registerGitHandlers() {
     // Get GitHub token if available
     const token = await GitHubAuthService.getTokenForGit();
     return gitClone(repoUrl, targetPath, { token });
+  });
+
+  // Git status detailed (for changes panel)
+  ipcMain.handle('git-status-detailed', async (event, { projectPath }) => {
+    return getGitStatusDetailed(projectPath);
+  });
+
+  // Stage specific files
+  ipcMain.handle('git-stage-files', async (event, { projectPath, files }) => {
+    return gitStageFiles(projectPath, files);
+  });
+
+  // Create commit
+  ipcMain.handle('git-commit', async (event, { projectPath, message }) => {
+    return gitCommit(projectPath, message);
   });
 }
 

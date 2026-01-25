@@ -477,77 +477,75 @@ async function checkAllProjectsGitStatus() {
   }
 }
 
-// ========== GIT NOTIFICATIONS ==========
-function showGitToast({ success, title, message, details = [], duration = 5000 }) {
-  // Remove any existing toast
-  const existingToast = document.querySelector('.git-toast');
-  if (existingToast) {
-    existingToast.classList.remove('visible');
-    setTimeout(() => existingToast.remove(), 150);
-  }
+// ========== TOAST NOTIFICATIONS ==========
+const toastContainer = document.getElementById('toast-container');
+
+/**
+ * Show a toast notification
+ * @param {Object} options - Toast options
+ * @param {string} options.type - 'success' | 'error' | 'warning' | 'info'
+ * @param {string} options.title - Toast title
+ * @param {string} options.message - Toast message
+ * @param {number} options.duration - Duration in ms (0 for no auto-hide)
+ */
+function showToast({ type = 'info', title, message, duration = 5000 }) {
+  const icons = {
+    success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+  };
 
   const toast = document.createElement('div');
-  toast.className = `git-toast ${success ? 'git-toast-success' : 'git-toast-error'}`;
+  toast.className = `toast toast-${type}`;
 
-  // Icônes plus modernes
-  const icon = success
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-
-  // Truncate message if too long
-  const displayMessage = message && message.length > 150 ? message.substring(0, 150) + '...' : message;
-
-  // Build details HTML if provided
-  let detailsHtml = '';
-  if (details && details.length > 0) {
-    detailsHtml = '<div class="git-toast-details">' +
-      details.map(d => `<span class="git-toast-detail"><span class="git-toast-detail-icon">${d.icon || ''}</span>${escapeHtml(d.text)}</span>`).join('') +
-      '</div>';
-  }
+  const displayMessage = message && message.length > 200 ? message.substring(0, 200) + '...' : message;
 
   toast.innerHTML = `
-    <span class="git-toast-icon">${icon}</span>
-    <div class="git-toast-content">
-      <div class="git-toast-title">${escapeHtml(title)}</div>
-      ${displayMessage ? `<div class="git-toast-message">${escapeHtml(displayMessage)}</div>` : ''}
-      ${detailsHtml}
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <div class="toast-content">
+      <div class="toast-title">${escapeHtml(title)}</div>
+      ${displayMessage ? `<div class="toast-message">${escapeHtml(displayMessage)}</div>` : ''}
     </div>
-    <button class="git-toast-close" aria-label="Fermer">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <button class="toast-close" aria-label="Fermer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   `;
 
   // Progress bar for auto-hide
   if (duration > 0) {
     const progressBar = document.createElement('div');
-    progressBar.className = 'git-toast-progress';
+    progressBar.className = 'toast-progress';
     progressBar.style.animationDuration = `${duration}ms`;
     toast.appendChild(progressBar);
   }
 
-  document.body.appendChild(toast);
+  toastContainer.appendChild(toast);
 
   // Close button handler
-  toast.querySelector('.git-toast-close').onclick = () => {
-    toast.classList.remove('visible');
+  const closeToast = () => {
+    toast.classList.add('toast-exit');
     setTimeout(() => toast.remove(), 300);
   };
 
-  // Animate in
-  requestAnimationFrame(() => {
-    toast.classList.add('visible');
-  });
+  toast.querySelector('.toast-close').onclick = closeToast;
 
   // Auto hide
   if (duration > 0) {
-    setTimeout(() => {
-      toast.classList.remove('visible');
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
+    setTimeout(closeToast, duration);
   }
 
   return toast;
+}
 
+// Backward compatible wrapper for showGitToast
+function showGitToast({ success, title, message, details = [], duration = 5000 }) {
+  return showToast({
+    type: success ? 'success' : 'error',
+    title,
+    message,
+    duration
+  });
 }
 
 // Parse git output to extract useful info
@@ -1208,6 +1206,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     if (tabId === 'agents') loadAgents();
     if (tabId === 'mcp') loadMcps();
     if (tabId === 'dashboard') populateDashboardProjects();
+    if (tabId === 'memory') loadMemory();
     if (tabId === 'claude') {
       const activeId = terminalsState.get().activeTerminal;
       if (activeId) {
@@ -2181,6 +2180,651 @@ async function renderDashboardContent(projectIndex) {
   });
 }
 
+// ========== MEMORY ==========
+const memoryState = {
+  currentSource: 'global',
+  currentProject: null,
+  content: '',
+  isEditing: false,
+  listenersAttached: false,
+  fileExists: false,
+  searchQuery: ''
+};
+
+// Templates for CLAUDE.md files
+const MEMORY_TEMPLATES = {
+  minimal: {
+    name: 'Minimal',
+    icon: '📝',
+    content: `# {PROJECT_NAME}
+
+## Description
+Decrivez votre projet ici.
+
+## Instructions
+- Preferez TypeScript a JavaScript
+- Utilisez des noms de variables explicites
+`
+  },
+  fullstack: {
+    name: 'Fullstack',
+    icon: '🚀',
+    content: `# {PROJECT_NAME}
+
+## Architecture
+- Frontend: React/Vue/Svelte
+- Backend: Node.js/Express
+- Database: PostgreSQL/MongoDB
+
+## Conventions de code
+- Utilisez ESLint et Prettier
+- Commits en francais avec emojis
+- Tests unitaires obligatoires
+
+## Structure des dossiers
+\`\`\`
+src/
+  components/   # Composants UI
+  services/     # Logique metier
+  utils/        # Fonctions utilitaires
+  types/        # Types TypeScript
+\`\`\`
+
+## Commandes utiles
+\`\`\`bash
+npm run dev     # Developpement
+npm run build   # Production
+npm run test    # Tests
+\`\`\`
+`
+  },
+  fivem: {
+    name: 'FiveM Resource',
+    icon: '🎮',
+    content: `# {PROJECT_NAME}
+
+## Type de Resource
+Resource FiveM (client/server/shared)
+
+## Framework
+- ESX / QBCore / Standalone
+
+## Structure
+\`\`\`
+client/     # Code client (NUI, events)
+server/     # Code serveur (database, callbacks)
+shared/     # Code partage (config, utils)
+html/       # Interface NUI (HTML/CSS/JS)
+\`\`\`
+
+## Conventions FiveM
+- Prefixer les events: \`{resource}:{event}\`
+- Utiliser les callbacks pour les requetes serveur
+- Optimiser les threads (pas de Wait(0) sans raison)
+- Nettoyer les entities au stop de la resource
+
+## Database
+- Utiliser oxmysql pour les requetes async
+- Preparer les statements pour eviter les injections
+`
+  },
+  api: {
+    name: 'API REST',
+    icon: '🔌',
+    content: `# {PROJECT_NAME}
+
+## Type
+API REST
+
+## Endpoints
+Document your endpoints here:
+- \`GET /api/v1/...\`
+- \`POST /api/v1/...\`
+
+## Authentication
+- JWT / API Keys / OAuth2
+
+## Conventions
+- Versionning des endpoints (/v1/, /v2/)
+- Reponses JSON standardisees
+- Gestion des erreurs coherente
+- Rate limiting
+
+## Documentation
+Generer la doc Swagger/OpenAPI
+`
+  },
+  library: {
+    name: 'Librairie/Package',
+    icon: '📦',
+    content: `# {PROJECT_NAME}
+
+## Type
+Package NPM / Librairie
+
+## Installation
+\`\`\`bash
+npm install {PROJECT_NAME}
+\`\`\`
+
+## API publique
+Documentez les fonctions exportees ici.
+
+## Conventions
+- Exports nommes preferes aux exports default
+- Types TypeScript inclus
+- Tests avec couverture > 80%
+- Changelog maintenu
+- Semver respecte
+`
+  }
+};
+
+function getClaudeDir() {
+  return path.join(process.env.USERPROFILE || process.env.HOME, '.claude');
+}
+
+function getGlobalClaudeMd() {
+  return path.join(getClaudeDir(), 'CLAUDE.md');
+}
+
+function getClaudeSettingsJson() {
+  return path.join(getClaudeDir(), 'settings.json');
+}
+
+function getClaudeCommandsJson() {
+  return path.join(getClaudeDir(), 'settings.json');
+}
+
+function loadMemory() {
+  renderMemorySources();
+  loadMemoryContent('global');
+  setupMemoryEventListeners();
+}
+
+function renderMemorySources(filter = '') {
+  const projectsList = document.getElementById('memory-projects-list');
+  const projects = projectsState.get().projects;
+  const searchQuery = filter.toLowerCase();
+
+  if (projects.length === 0) {
+    projectsList.innerHTML = `<div class="memory-no-projects">Aucun projet</div>`;
+    return;
+  }
+
+  const filteredProjects = projects.map((p, i) => ({ ...p, index: i }))
+    .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery));
+
+  if (filteredProjects.length === 0) {
+    projectsList.innerHTML = `<div class="memory-no-projects">Aucun resultat pour "${escapeHtml(filter)}"</div>`;
+    return;
+  }
+
+  projectsList.innerHTML = filteredProjects.map(p => {
+    const claudeMdPath = path.join(p.path, 'CLAUDE.md');
+    const hasClaudeMd = fs.existsSync(claudeMdPath);
+    const claudeIgnorePath = path.join(p.path, '.claudeignore');
+    const hasClaudeIgnore = fs.existsSync(claudeIgnorePath);
+    const localClaudeDir = path.join(p.path, '.claude');
+    const hasLocalSettings = fs.existsSync(path.join(localClaudeDir, 'settings.json'));
+
+    return `
+      <div class="memory-source-item ${memoryState.currentSource === 'project' && memoryState.currentProject === p.index ? 'active' : ''}"
+           data-source="project" data-project="${p.index}">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+        </svg>
+        <span>${escapeHtml(p.name)}</span>
+        <div class="memory-source-badges">
+          ${hasClaudeMd ? '<span class="memory-badge" title="CLAUDE.md">MD</span>' : ''}
+          ${hasClaudeIgnore ? '<span class="memory-badge ignore" title=".claudeignore">IG</span>' : ''}
+          ${hasLocalSettings ? '<span class="memory-badge settings" title="Settings locaux">⚙</span>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Update active states for global, settings, and commands
+  document.querySelectorAll('#memory-sources-list > .memory-source-item').forEach(item => {
+    const source = item.dataset.source;
+    const isActive = source === memoryState.currentSource &&
+      (memoryState.currentSource !== 'project' || parseInt(item.dataset.project) === memoryState.currentProject);
+    item.classList.toggle('active', isActive);
+  });
+}
+
+function loadMemoryContent(source, projectIndex = null) {
+  memoryState.currentSource = source;
+  memoryState.currentProject = projectIndex;
+  memoryState.isEditing = false;
+
+  const titleEl = document.getElementById('memory-title');
+  const pathEl = document.getElementById('memory-path');
+  const contentEl = document.getElementById('memory-content');
+  const statsEl = document.getElementById('memory-stats');
+  const editBtn = document.getElementById('btn-memory-edit');
+  const createBtn = document.getElementById('btn-memory-create');
+  const templateBtn = document.getElementById('btn-memory-template');
+
+  let filePath = '';
+  let title = '';
+  let content = '';
+  let fileExists = false;
+
+  try {
+    if (source === 'global') {
+      filePath = getGlobalClaudeMd();
+      title = 'Memoire Globale';
+      fileExists = fs.existsSync(filePath);
+      if (fileExists) {
+        content = fs.readFileSync(filePath, 'utf8');
+      } else {
+        content = '';
+      }
+    } else if (source === 'settings') {
+      filePath = getClaudeSettingsJson();
+      title = 'Settings Claude';
+      fileExists = fs.existsSync(filePath);
+      if (fileExists) {
+        const jsonContent = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        content = JSON.stringify(jsonContent, null, 2);
+      } else {
+        content = '{}';
+      }
+    } else if (source === 'commands') {
+      filePath = getClaudeSettingsJson();
+      title = 'Commandes Autorisees';
+      fileExists = fs.existsSync(filePath);
+      if (fileExists) {
+        const jsonContent = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        content = JSON.stringify(jsonContent.allowedCommands || jsonContent.permissions || {}, null, 2);
+      } else {
+        content = '{}';
+      }
+    } else if (source === 'project' && projectIndex !== null) {
+      const project = projectsState.get().projects[projectIndex];
+      if (project) {
+        filePath = path.join(project.path, 'CLAUDE.md');
+        title = project.name;
+        fileExists = fs.existsSync(filePath);
+        if (fileExists) {
+          content = fs.readFileSync(filePath, 'utf8');
+        } else {
+          content = '';
+        }
+      }
+    }
+  } catch (e) {
+    content = `Erreur lors du chargement: ${e.message}`;
+  }
+
+  memoryState.content = content;
+  memoryState.fileExists = fileExists;
+
+  titleEl.textContent = title;
+  pathEl.textContent = filePath.replace(process.env.USERPROFILE || process.env.HOME, '~');
+
+  // Show/hide buttons based on context
+  const isMarkdownSource = source === 'global' || source === 'project';
+  editBtn.style.display = (isMarkdownSource && fileExists) ? 'flex' : 'none';
+  createBtn.style.display = (isMarkdownSource && !fileExists) ? 'flex' : 'none';
+  templateBtn.style.display = (isMarkdownSource && memoryState.isEditing) ? 'flex' : 'none';
+
+  if (isMarkdownSource) {
+    editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> Editer`;
+  }
+
+  // Render stats
+  if (fileExists && content) {
+    const stats = calculateMemoryStats(content, source);
+    statsEl.innerHTML = stats;
+    statsEl.style.display = 'flex';
+  } else {
+    statsEl.style.display = 'none';
+  }
+
+  renderMemoryContent(content, source, fileExists);
+  renderMemorySources(memoryState.searchQuery);
+}
+
+function calculateMemoryStats(content, source) {
+  if (source === 'settings' || source === 'commands') {
+    try {
+      const json = JSON.parse(content);
+      const keys = Object.keys(json).length;
+      return `<span class="memory-stat"><span class="stat-value">${keys}</span> cles</span>`;
+    } catch {
+      return '';
+    }
+  }
+
+  const lines = content.split('\n').length;
+  const words = content.split(/\s+/).filter(w => w.length > 0).length;
+  const sections = (content.match(/^##\s/gm) || []).length;
+  const codeBlocks = (content.match(/```/g) || []).length / 2;
+
+  let html = `
+    <span class="memory-stat"><span class="stat-value">${lines}</span> lignes</span>
+    <span class="memory-stat"><span class="stat-value">${words}</span> mots</span>
+  `;
+
+  if (sections > 0) {
+    html += `<span class="memory-stat"><span class="stat-value">${sections}</span> sections</span>`;
+  }
+  if (codeBlocks > 0) {
+    html += `<span class="memory-stat"><span class="stat-value">${Math.floor(codeBlocks)}</span> blocs code</span>`;
+  }
+
+  return html;
+}
+
+function renderMemoryContent(content, source, fileExists = true) {
+  const contentEl = document.getElementById('memory-content');
+
+  if (!fileExists) {
+    const isProject = source === 'project';
+    const projectName = isProject && memoryState.currentProject !== null
+      ? projectsState.get().projects[memoryState.currentProject]?.name || 'Projet'
+      : 'Global';
+
+    contentEl.innerHTML = `
+      <div class="memory-empty-state">
+        <div class="memory-empty-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+        </div>
+        <h3>Aucun fichier CLAUDE.md</h3>
+        <p>Creez un fichier memoire pour ${escapeHtml(projectName)} afin de personnaliser le comportement de Claude.</p>
+        <div class="memory-empty-templates">
+          <p class="template-hint">Choisissez un template pour commencer :</p>
+          <div class="template-grid">
+            ${Object.entries(MEMORY_TEMPLATES).map(([key, tpl]) => `
+              <button class="template-card" data-template="${key}">
+                <span class="template-icon">${tpl.icon}</span>
+                <span class="template-name">${tpl.name}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Attach template click handlers
+    contentEl.querySelectorAll('.template-card').forEach(card => {
+      card.onclick = () => createMemoryFromTemplate(card.dataset.template);
+    });
+    return;
+  }
+
+  if (source === 'settings' || source === 'commands') {
+    contentEl.innerHTML = `<pre class="memory-json">${escapeHtml(content)}</pre>`;
+    return;
+  }
+
+  // Parse markdown and render with search highlighting
+  let html = parseMarkdownToHtml(content);
+
+  // Highlight search terms if any
+  if (memoryState.searchQuery) {
+    const regex = new RegExp(`(${escapeHtml(memoryState.searchQuery)})`, 'gi');
+    html = html.replace(regex, '<mark class="search-highlight">$1</mark>');
+  }
+
+  contentEl.innerHTML = `<div class="memory-markdown">${html}</div>`;
+}
+
+function parseMarkdownToHtml(md) {
+  // Simple markdown parser
+  let html = escapeHtml(md);
+
+  // Code blocks
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="code-block"><code class="lang-$1">$2</code></pre>');
+
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+
+  // Headers
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Bold and italic
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  // Lists
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+  // Numbered lists
+  html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+
+  // Paragraphs
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = `<p>${html}</p>`;
+
+  // Clean up empty paragraphs
+  html = html.replace(/<p>\s*<\/p>/g, '');
+  html = html.replace(/<p>(<h[1-4]>)/g, '$1');
+  html = html.replace(/(<\/h[1-4]>)<\/p>/g, '$1');
+  html = html.replace(/<p>(<pre)/g, '$1');
+  html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+  html = html.replace(/<p>(<ul>)/g, '$1');
+  html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+
+  return html;
+}
+
+function createMemoryFromTemplate(templateKey) {
+  const template = MEMORY_TEMPLATES[templateKey];
+  if (!template) return;
+
+  let projectName = 'Mon Projet';
+  if (memoryState.currentSource === 'project' && memoryState.currentProject !== null) {
+    const project = projectsState.get().projects[memoryState.currentProject];
+    if (project) projectName = project.name;
+  } else if (memoryState.currentSource === 'global') {
+    projectName = 'Instructions Globales Claude';
+  }
+
+  const content = template.content.replace(/\{PROJECT_NAME\}/g, projectName);
+
+  // Determine file path
+  let filePath = '';
+  if (memoryState.currentSource === 'global') {
+    filePath = getGlobalClaudeMd();
+    const claudeDir = getClaudeDir();
+    if (!fs.existsSync(claudeDir)) {
+      fs.mkdirSync(claudeDir, { recursive: true });
+    }
+  } else if (memoryState.currentSource === 'project' && memoryState.currentProject !== null) {
+    const project = projectsState.get().projects[memoryState.currentProject];
+    if (project) filePath = path.join(project.path, 'CLAUDE.md');
+  }
+
+  if (filePath) {
+    try {
+      fs.writeFileSync(filePath, content, 'utf8');
+      loadMemoryContent(memoryState.currentSource, memoryState.currentProject);
+    } catch (e) {
+      alert(`Erreur lors de la creation: ${e.message}`);
+    }
+  }
+}
+
+function setupMemoryEventListeners() {
+  if (memoryState.listenersAttached) return;
+  memoryState.listenersAttached = true;
+
+  // Search input
+  const searchInput = document.getElementById('memory-search-input');
+  if (searchInput) {
+    searchInput.oninput = (e) => {
+      memoryState.searchQuery = e.target.value;
+      renderMemorySources(e.target.value);
+      // Also re-render content to highlight matches
+      if (memoryState.fileExists) {
+        renderMemoryContent(memoryState.content, memoryState.currentSource, memoryState.fileExists);
+      }
+    };
+  }
+
+  // Source navigation
+  document.getElementById('memory-sources-list').onclick = (e) => {
+    const item = e.target.closest('.memory-source-item');
+    if (!item) return;
+
+    const source = item.dataset.source;
+    const projectIndex = item.dataset.project !== undefined ? parseInt(item.dataset.project) : null;
+    loadMemoryContent(source, projectIndex);
+  };
+
+  // Refresh button
+  document.getElementById('btn-memory-refresh').onclick = () => {
+    loadMemoryContent(memoryState.currentSource, memoryState.currentProject);
+  };
+
+  // Open in explorer
+  document.getElementById('btn-memory-open').onclick = () => {
+    let filePath = '';
+    if (memoryState.currentSource === 'global') {
+      filePath = getGlobalClaudeMd();
+    } else if (memoryState.currentSource === 'settings' || memoryState.currentSource === 'commands') {
+      filePath = getClaudeSettingsJson();
+    } else if (memoryState.currentSource === 'project' && memoryState.currentProject !== null) {
+      const project = projectsState.get().projects[memoryState.currentProject];
+      if (project) filePath = path.join(project.path, 'CLAUDE.md');
+    }
+
+    if (filePath) {
+      // If file doesn't exist, open parent directory
+      if (!fs.existsSync(filePath)) {
+        filePath = path.dirname(filePath);
+      }
+      ipcRenderer.send('open-in-explorer', filePath);
+    }
+  };
+
+  // Create button
+  document.getElementById('btn-memory-create').onclick = () => {
+    // Show template selection via modal or directly create with minimal template
+    createMemoryFromTemplate('minimal');
+  };
+
+  // Template button (shown in edit mode)
+  document.getElementById('btn-memory-template').onclick = () => {
+    showTemplateModal();
+  };
+
+  // Edit button
+  document.getElementById('btn-memory-edit').onclick = () => {
+    if (memoryState.currentSource === 'settings' || memoryState.currentSource === 'commands') {
+      // For settings, just open in explorer
+      const filePath = getClaudeSettingsJson();
+      if (fs.existsSync(filePath)) {
+        ipcRenderer.send('open-in-explorer', filePath);
+      }
+      return;
+    }
+
+    if (memoryState.isEditing) {
+      saveMemoryEdit();
+    } else {
+      enterMemoryEditMode();
+    }
+  };
+}
+
+function showTemplateModal() {
+  const templatesHtml = Object.entries(MEMORY_TEMPLATES).map(([key, tpl]) => `
+    <div class="template-option" data-template="${key}">
+      <span class="template-icon">${tpl.icon}</span>
+      <div class="template-info">
+        <div class="template-name">${tpl.name}</div>
+        <div class="template-preview">${tpl.content.split('\n').slice(0, 3).join(' ').substring(0, 80)}...</div>
+      </div>
+    </div>
+  `).join('');
+
+  showModal('Inserer un Template', `
+    <p style="margin-bottom: 16px; color: var(--text-secondary);">Le template sera insere a la position du curseur.</p>
+    <div class="template-list">${templatesHtml}</div>
+  `);
+
+  document.querySelectorAll('.template-option').forEach(opt => {
+    opt.onclick = () => {
+      const template = MEMORY_TEMPLATES[opt.dataset.template];
+      if (template) {
+        const editor = document.getElementById('memory-editor');
+        if (editor) {
+          const pos = editor.selectionStart;
+          const before = editor.value.substring(0, pos);
+          const after = editor.value.substring(pos);
+          editor.value = before + template.content + after;
+          editor.focus();
+        }
+      }
+      closeModal();
+    };
+  });
+}
+
+function enterMemoryEditMode() {
+  memoryState.isEditing = true;
+  const contentEl = document.getElementById('memory-content');
+  const editBtn = document.getElementById('btn-memory-edit');
+
+  contentEl.innerHTML = `
+    <textarea class="memory-editor" id="memory-editor">${escapeHtml(memoryState.content)}</textarea>
+  `;
+
+  editBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+    Sauvegarder
+  `;
+
+  document.getElementById('memory-editor').focus();
+}
+
+function saveMemoryEdit() {
+  const editor = document.getElementById('memory-editor');
+  if (!editor) return;
+
+  const newContent = editor.value;
+  let filePath = '';
+
+  if (memoryState.currentSource === 'global') {
+    filePath = getGlobalClaudeMd();
+    // Ensure .claude directory exists
+    const claudeDir = getClaudeDir();
+    if (!fs.existsSync(claudeDir)) {
+      fs.mkdirSync(claudeDir, { recursive: true });
+    }
+  } else if (memoryState.currentSource === 'project' && memoryState.currentProject !== null) {
+    const project = projectsState.get().projects[memoryState.currentProject];
+    if (project) filePath = path.join(project.path, 'CLAUDE.md');
+  }
+
+  if (filePath) {
+    try {
+      fs.writeFileSync(filePath, newContent, 'utf8');
+      memoryState.content = newContent;
+    } catch (e) {
+      alert(`Erreur lors de la sauvegarde: ${e.message}`);
+      return;
+    }
+  }
+
+  memoryState.isEditing = false;
+  const editBtn = document.getElementById('btn-memory-edit');
+  editBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    Editer
+  `;
+
+  renderMemoryContent(newContent, memoryState.currentSource);
+}
+
 // ========== NEW PROJECT ==========
 document.getElementById('btn-new-project').onclick = () => {
   showModal('Nouveau Projet', `
@@ -2564,6 +3208,415 @@ projectsState.subscribe(() => {
     hideFilterGitActions();
   }
 });
+
+// ========== GIT CHANGES PANEL ==========
+const gitChangesPanel = document.getElementById('git-changes-panel');
+const gitChangesList = document.getElementById('git-changes-list');
+const gitChangesStats = document.getElementById('git-changes-stats');
+const gitChangesProject = document.getElementById('git-changes-project');
+const gitSelectAll = document.getElementById('git-select-all');
+const gitCommitMessage = document.getElementById('git-commit-message');
+const gitCommitSkill = document.getElementById('git-commit-skill');
+const btnCommitSelected = document.getElementById('btn-commit-selected');
+const btnStageSelected = document.getElementById('btn-stage-selected');
+const btnGenerateCommit = document.getElementById('btn-generate-commit');
+const commitCountSpan = document.getElementById('commit-count');
+const changesCountBadge = document.getElementById('changes-count');
+const filterBtnChanges = document.getElementById('filter-btn-changes');
+
+const gitChangesState = {
+  files: [],
+  selectedFiles: new Set(),
+  projectId: null,
+  projectPath: null
+};
+
+// Toggle changes panel
+filterBtnChanges.onclick = (e) => {
+  e.stopPropagation();
+  const isOpen = gitChangesPanel.classList.contains('active');
+
+  // Close branch dropdown if open
+  branchDropdown.classList.remove('active');
+  filterBtnBranch.classList.remove('open');
+
+  if (isOpen) {
+    gitChangesPanel.classList.remove('active');
+  } else {
+    gitChangesPanel.classList.add('active');
+    loadGitChanges();
+  }
+};
+
+// Close panel
+document.getElementById('btn-close-changes').onclick = () => {
+  gitChangesPanel.classList.remove('active');
+};
+
+// Refresh changes
+document.getElementById('btn-refresh-changes').onclick = () => {
+  loadGitChanges();
+};
+
+// Close panel when clicking outside
+document.addEventListener('click', (e) => {
+  if (!gitChangesPanel.contains(e.target) && !filterBtnChanges.contains(e.target)) {
+    gitChangesPanel.classList.remove('active');
+  }
+});
+
+async function loadGitChanges() {
+  if (!currentFilterProjectId) return;
+
+  const project = getProject(currentFilterProjectId);
+  if (!project) return;
+
+  gitChangesState.projectId = currentFilterProjectId;
+  gitChangesState.projectPath = project.path;
+  gitChangesProject.textContent = `- ${project.name}`;
+
+  gitChangesList.innerHTML = '<div class="git-changes-loading">Chargement des changements...</div>';
+
+  try {
+    const status = await ipcRenderer.invoke('git-status-detailed', { projectPath: project.path });
+
+    if (!status.success) {
+      gitChangesList.innerHTML = `<div class="git-changes-empty"><p>Erreur: ${status.error}</p></div>`;
+      return;
+    }
+
+    gitChangesState.files = status.files || [];
+    gitChangesState.selectedFiles.clear();
+
+    renderGitChanges();
+    updateChangesCount();
+    loadCommitSkills();
+  } catch (e) {
+    gitChangesList.innerHTML = `<div class="git-changes-empty"><p>Erreur: ${e.message}</p></div>`;
+  }
+}
+
+function renderGitChanges() {
+  const files = gitChangesState.files;
+
+  if (files.length === 0) {
+    gitChangesList.innerHTML = `
+      <div class="git-changes-empty">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        <p>Aucun changement detecte</p>
+      </div>
+    `;
+    gitChangesStats.innerHTML = '';
+    return;
+  }
+
+  // Calculate stats
+  const stats = { added: 0, modified: 0, deleted: 0, untracked: 0 };
+  files.forEach(f => {
+    if (f.status === 'A' || f.status === '?') stats.untracked++;
+    else if (f.status === 'M') stats.modified++;
+    else if (f.status === 'D') stats.deleted++;
+    else if (f.status === 'A') stats.added++;
+  });
+
+  gitChangesStats.innerHTML = `
+    ${stats.modified ? `<span class="git-stat modified">M ${stats.modified}</span>` : ''}
+    ${stats.added ? `<span class="git-stat added">A ${stats.added}</span>` : ''}
+    ${stats.deleted ? `<span class="git-stat deleted">D ${stats.deleted}</span>` : ''}
+    ${stats.untracked ? `<span class="git-stat untracked">? ${stats.untracked}</span>` : ''}
+  `;
+
+  gitChangesList.innerHTML = files.map((file, index) => {
+    const fileName = file.path.split('/').pop();
+    const filePath = file.path.split('/').slice(0, -1).join('/');
+    const isSelected = gitChangesState.selectedFiles.has(index);
+
+    return `
+      <div class="git-file-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+        <input type="checkbox" ${isSelected ? 'checked' : ''}>
+        <span class="git-file-status ${file.status}">${file.status}</span>
+        <div class="git-file-info">
+          <div class="git-file-name">${escapeHtml(fileName)}</div>
+          ${filePath ? `<div class="git-file-path">${escapeHtml(filePath)}</div>` : ''}
+        </div>
+        <div class="git-file-diff">
+          ${file.additions ? `<span class="additions">+${file.additions}</span>` : ''}
+          ${file.deletions ? `<span class="deletions">-${file.deletions}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Attach click handlers
+  gitChangesList.querySelectorAll('.git-file-item').forEach(item => {
+    const checkbox = item.querySelector('input[type="checkbox"]');
+    const index = parseInt(item.dataset.index);
+
+    item.onclick = (e) => {
+      if (e.target === checkbox) return;
+      checkbox.checked = !checkbox.checked;
+      toggleFileSelection(index, checkbox.checked);
+    };
+
+    checkbox.onchange = () => {
+      toggleFileSelection(index, checkbox.checked);
+    };
+  });
+
+  updateSelectAllState();
+}
+
+function toggleFileSelection(index, selected) {
+  if (selected) {
+    gitChangesState.selectedFiles.add(index);
+  } else {
+    gitChangesState.selectedFiles.delete(index);
+  }
+
+  const item = gitChangesList.querySelector(`[data-index="${index}"]`);
+  if (item) {
+    item.classList.toggle('selected', selected);
+  }
+
+  updateCommitButton();
+  updateSelectAllState();
+}
+
+function updateSelectAllState() {
+  const total = gitChangesState.files.length;
+  const selected = gitChangesState.selectedFiles.size;
+  gitSelectAll.checked = total > 0 && selected === total;
+  gitSelectAll.indeterminate = selected > 0 && selected < total;
+}
+
+function updateCommitButton() {
+  const count = gitChangesState.selectedFiles.size;
+  commitCountSpan.textContent = count;
+  btnCommitSelected.disabled = count === 0 || !gitCommitMessage.value.trim();
+}
+
+function updateChangesCount() {
+  const count = gitChangesState.files.length;
+  if (count > 0) {
+    changesCountBadge.textContent = count;
+    changesCountBadge.style.display = 'inline';
+    filterBtnChanges.classList.add('has-changes');
+  } else {
+    changesCountBadge.style.display = 'none';
+    filterBtnChanges.classList.remove('has-changes');
+  }
+}
+
+// Select all checkbox
+gitSelectAll.onchange = () => {
+  const shouldSelect = gitSelectAll.checked;
+  gitChangesState.files.forEach((_, index) => {
+    if (shouldSelect) {
+      gitChangesState.selectedFiles.add(index);
+    } else {
+      gitChangesState.selectedFiles.delete(index);
+    }
+  });
+
+  gitChangesList.querySelectorAll('.git-file-item').forEach(item => {
+    const checkbox = item.querySelector('input[type="checkbox"]');
+    checkbox.checked = shouldSelect;
+    item.classList.toggle('selected', shouldSelect);
+  });
+
+  updateCommitButton();
+};
+
+// Commit message input
+gitCommitMessage.oninput = () => {
+  updateCommitButton();
+};
+
+// Load available skills for commit generation
+function loadCommitSkills() {
+  gitCommitSkill.innerHTML = '<option value="">-- Skill --</option>';
+
+  // Add local skills that might be relevant for commit
+  localState.skills.forEach(skill => {
+    const name = skill.name.toLowerCase();
+    // Filter skills that seem related to commits
+    if (name.includes('commit') || name.includes('changelog') || name.includes('smart')) {
+      gitCommitSkill.innerHTML += `<option value="${escapeHtml(skill.id)}">${escapeHtml(skill.name)}</option>`;
+    }
+  });
+
+  // Always add a default option for all skills
+  gitCommitSkill.innerHTML += '<optgroup label="Tous les skills">';
+  localState.skills.forEach(skill => {
+    gitCommitSkill.innerHTML += `<option value="${escapeHtml(skill.id)}">${escapeHtml(skill.name)}</option>`;
+  });
+  gitCommitSkill.innerHTML += '</optgroup>';
+}
+
+// Generate commit message with skill
+btnGenerateCommit.onclick = async () => {
+  const skillId = gitCommitSkill.value;
+  if (!skillId) {
+    showToast({ type: 'warning', title: 'Skill requis', message: 'Selectionnez un skill pour generer le message', duration: 3000 });
+    return;
+  }
+
+  if (gitChangesState.selectedFiles.size === 0) {
+    showToast({ type: 'warning', title: 'Fichiers requis', message: 'Selectionnez au moins un fichier', duration: 3000 });
+    return;
+  }
+
+  // Get selected file paths
+  const selectedPaths = Array.from(gitChangesState.selectedFiles)
+    .map(i => gitChangesState.files[i]?.path)
+    .filter(Boolean);
+
+  // Find active terminal for this project (compare project.id, not projectId)
+  const terminals = terminalsState.get().terminals;
+  let targetTerminal = null;
+
+  for (const [id, term] of terminals) {
+    // Check if terminal belongs to this project by comparing project.id or project.path
+    if (term.project?.id === gitChangesState.projectId ||
+        term.project?.path === gitChangesState.projectPath) {
+      targetTerminal = { id, term };
+      break;
+    }
+  }
+
+  if (!targetTerminal) {
+    showToast({ type: 'error', title: 'Terminal requis', message: 'Ouvrez un terminal Claude pour ce projet', duration: 4000 });
+    return;
+  }
+
+  // Build the command to send to terminal
+  const filesStr = selectedPaths.join(', ');
+  const command = `/${skillId} ${filesStr}`;
+
+  // Switch to claude tab and focus terminal
+  document.querySelector('[data-tab="claude"]')?.click();
+  TerminalManager.setActiveTerminal(targetTerminal.id);
+
+  // Close the panel first
+  gitChangesPanel.classList.remove('active');
+
+  // Send command to terminal via IPC (the correct way)
+  setTimeout(() => {
+    ipcRenderer.send('terminal-input', { id: targetTerminal.id, data: command + '\r' });
+  }, 300);
+
+  showToast({ type: 'info', title: 'Commande envoyee', message: `Skill /${skillId} avec ${selectedPaths.length} fichier(s)`, duration: 3000 });
+};
+
+// Stage selected files
+btnStageSelected.onclick = async () => {
+  if (gitChangesState.selectedFiles.size === 0) return;
+
+  const selectedPaths = Array.from(gitChangesState.selectedFiles)
+    .map(i => gitChangesState.files[i]?.path)
+    .filter(Boolean);
+
+  try {
+    const result = await ipcRenderer.invoke('git-stage-files', {
+      projectPath: gitChangesState.projectPath,
+      files: selectedPaths
+    });
+
+    if (result.success) {
+      showGitToast({
+        success: true,
+        title: 'Fichiers stages',
+        message: `${selectedPaths.length} fichier(s) ajoute(s)`,
+        duration: 3000
+      });
+      loadGitChanges();
+    } else {
+      showGitToast({
+        success: false,
+        title: 'Erreur',
+        message: result.error,
+        duration: 5000
+      });
+    }
+  } catch (e) {
+    showGitToast({
+      success: false,
+      title: 'Erreur',
+      message: e.message,
+      duration: 5000
+    });
+  }
+};
+
+// Commit selected files
+btnCommitSelected.onclick = async () => {
+  const message = gitCommitMessage.value.trim();
+  if (!message) {
+    showToast({ type: 'warning', title: 'Message requis', message: 'Entrez un message de commit', duration: 3000 });
+    return;
+  }
+
+  if (gitChangesState.selectedFiles.size === 0) {
+    showToast({ type: 'warning', title: 'Fichiers requis', message: 'Selectionnez au moins un fichier', duration: 3000 });
+    return;
+  }
+
+  const selectedPaths = Array.from(gitChangesState.selectedFiles)
+    .map(i => gitChangesState.files[i]?.path)
+    .filter(Boolean);
+
+  btnCommitSelected.disabled = true;
+  btnCommitSelected.innerHTML = '<span class="loading-spinner"></span> Commit...';
+
+  try {
+    // First stage the files
+    const stageResult = await ipcRenderer.invoke('git-stage-files', {
+      projectPath: gitChangesState.projectPath,
+      files: selectedPaths
+    });
+
+    if (!stageResult.success) {
+      throw new Error(stageResult.error);
+    }
+
+    // Then commit
+    const commitResult = await ipcRenderer.invoke('git-commit', {
+      projectPath: gitChangesState.projectPath,
+      message: message
+    });
+
+    if (commitResult.success) {
+      showGitToast({
+        success: true,
+        title: 'Commit cree',
+        message: `${selectedPaths.length} fichier(s) commites`,
+        duration: 3000
+      });
+      gitCommitMessage.value = '';
+      loadGitChanges();
+      refreshDashboardAsync(gitChangesState.projectId);
+    } else {
+      throw new Error(commitResult.error);
+    }
+  } catch (e) {
+    showGitToast({
+      success: false,
+      title: 'Erreur de commit',
+      message: e.message,
+      duration: 5000
+    });
+  } finally {
+    btnCommitSelected.disabled = false;
+    btnCommitSelected.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Commit (<span id="commit-count">${gitChangesState.selectedFiles.size}</span>)`;
+  }
+};
+
+// Auto-refresh changes when panel is opened after git operations
+async function refreshGitChangesIfOpen() {
+  if (gitChangesPanel.classList.contains('active')) {
+    await loadGitChanges();
+  }
+}
 
 // ========== BUNDLED SKILLS INSTALLATION ==========
 function installBundledSkills() {

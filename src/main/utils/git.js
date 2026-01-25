@@ -633,11 +633,142 @@ async function getProjectStats(projectPath) {
   };
 }
 
+/**
+ * Get detailed git status with file additions/deletions
+ * @param {string} projectPath - Path to the project
+ * @returns {Promise<Object>} - Detailed status with files
+ */
+async function getGitStatusDetailed(projectPath) {
+  try {
+    // Get status with porcelain format
+    const statusOutput = await execGit(projectPath, 'status --porcelain');
+    if (statusOutput === null) {
+      return { success: false, error: 'Not a git repository' };
+    }
+
+    const files = [];
+
+    if (statusOutput.trim()) {
+      const lines = statusOutput.split('\n').filter(l => l.trim());
+
+      for (const line of lines) {
+        const indexStatus = line[0];
+        const workTreeStatus = line[1];
+        const filePath = line.slice(3);
+
+        // Determine the status code to show
+        let status = 'M';
+        if (indexStatus === '?' || workTreeStatus === '?') status = '?';
+        else if (indexStatus === 'A' || workTreeStatus === 'A') status = 'A';
+        else if (indexStatus === 'D' || workTreeStatus === 'D') status = 'D';
+        else if (indexStatus === 'R' || workTreeStatus === 'R') status = 'R';
+        else if (indexStatus === 'M' || workTreeStatus === 'M') status = 'M';
+
+        // Get diff stats for tracked files
+        let additions = 0;
+        let deletions = 0;
+
+        if (status !== '?') {
+          const diffStat = await execGit(projectPath, `diff --numstat -- "${filePath}"`);
+          if (diffStat) {
+            const match = diffStat.match(/^(\d+)\s+(\d+)/);
+            if (match) {
+              additions = parseInt(match[1], 10) || 0;
+              deletions = parseInt(match[2], 10) || 0;
+            }
+          }
+
+          // Also check staged changes
+          const stagedDiff = await execGit(projectPath, `diff --cached --numstat -- "${filePath}"`);
+          if (stagedDiff) {
+            const match = stagedDiff.match(/^(\d+)\s+(\d+)/);
+            if (match) {
+              additions += parseInt(match[1], 10) || 0;
+              deletions += parseInt(match[2], 10) || 0;
+            }
+          }
+        }
+
+        files.push({
+          path: filePath,
+          status,
+          staged: indexStatus !== ' ' && indexStatus !== '?',
+          additions,
+          deletions
+        });
+      }
+    }
+
+    return { success: true, files };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Stage specific files
+ * @param {string} projectPath - Path to the project
+ * @param {string[]} files - List of file paths to stage
+ * @returns {Promise<Object>} - Result object
+ */
+function gitStageFiles(projectPath, files) {
+  return new Promise((resolve) => {
+    if (!files || files.length === 0) {
+      resolve({ success: false, error: 'No files specified' });
+      return;
+    }
+
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    const fileArgs = files.map(f => `"${f}"`).join(' ');
+
+    exec(`git ${safeDir} add ${fileArgs}`, { cwd: projectPath, encoding: 'utf8' }, (error, stdout, stderr) => {
+      if (error) {
+        resolve({ success: false, error: stderr || error.message });
+      } else {
+        resolve({ success: true, output: `Staged ${files.length} file(s)` });
+      }
+    });
+  });
+}
+
+/**
+ * Create a commit
+ * @param {string} projectPath - Path to the project
+ * @param {string} message - Commit message
+ * @returns {Promise<Object>} - Result object
+ */
+function gitCommit(projectPath, message) {
+  return new Promise((resolve) => {
+    if (!message || !message.trim()) {
+      resolve({ success: false, error: 'Commit message is required' });
+      return;
+    }
+
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    // Escape the message for shell
+    const escapedMessage = message.replace(/"/g, '\\"');
+
+    exec(`git ${safeDir} commit -m "${escapedMessage}"`, { cwd: projectPath, encoding: 'utf8' }, (error, stdout, stderr) => {
+      if (error) {
+        // Check if it's just "nothing to commit"
+        if (stderr && stderr.includes('nothing to commit')) {
+          resolve({ success: false, error: 'Nothing to commit (no staged files)' });
+        } else {
+          resolve({ success: false, error: stderr || error.message });
+        }
+      } else {
+        resolve({ success: true, output: stdout || 'Commit created' });
+      }
+    });
+  });
+}
+
 module.exports = {
   execGit,
   getGitInfo,
   getGitInfoFull,
   getGitStatusQuick,
+  getGitStatusDetailed,
   gitPull,
   gitPush,
   gitMerge,
@@ -646,6 +777,8 @@ module.exports = {
   getMergeConflicts,
   isMergeInProgress,
   gitClone,
+  gitStageFiles,
+  gitCommit,
   countLinesOfCode,
   getProjectStats,
   getBranches,
