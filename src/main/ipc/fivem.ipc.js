@@ -29,6 +29,16 @@ function registerFivemHandlers() {
   ipcMain.on('fivem-resize', (event, { projectIndex, cols, rows }) => {
     fivemService.resize(projectIndex, cols, rows);
   });
+
+  // Scan resources
+  ipcMain.handle('fivem-scan-resources', async (event, { projectPath }) => {
+    return fivemService.scanResources(projectPath);
+  });
+
+  // Send command to FiveM server (ensure, stop, start, restart resource)
+  ipcMain.handle('fivem-resource-command', async (event, { projectIndex, command }) => {
+    return fivemService.sendCommand(projectIndex, command);
+  });
 }
 
 module.exports = { registerFivemHandlers };

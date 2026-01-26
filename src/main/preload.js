@@ -100,6 +100,8 @@ contextBridge.exposeInMainWorld('electron_api', {
     stop: (params) => ipcRenderer.invoke('fivem-stop', params),
     input: (params) => ipcRenderer.send('fivem-input', params),
     resize: (params) => ipcRenderer.send('fivem-resize', params),
+    scanResources: (params) => ipcRenderer.invoke('fivem-scan-resources', params),
+    resourceCommand: (params) => ipcRenderer.invoke('fivem-resource-command', params),
     onData: createListener('fivem-data'),
     onExit: createListener('fivem-exit')
   },

@@ -9,6 +9,8 @@ const { State } = require('./State');
 const initialState = {
   fivemServers: new Map(), // projectIndex -> { status, logs[] }
   fivemErrors: new Map(), // projectIndex -> { errors: [{ timestamp, message, context }], lastError: null }
+  fivemResources: new Map(), // projectIndex -> { resources: [], loading: boolean, lastScan: timestamp }
+  fivemResourceShortcuts: new Map(), // "projectIndex:resourceName" -> shortcut (e.g., "F5", "Ctrl+1")
   gitOperations: new Map(), // projectId -> { pulling, pushing, lastResult }
   gitRepoStatus: new Map() // projectId -> { isGitRepo }
 };
@@ -194,6 +196,164 @@ function dismissLastError(projectIndex) {
   }
 }
 
+// ========== FiveM Resources ==========
+
+/**
+ * Get FiveM resources for a project
+ * @param {number} projectIndex
+ * @returns {Object}
+ */
+function getFivemResources(projectIndex) {
+  return fivemState.get().fivemResources.get(projectIndex) || {
+    resources: [],
+    loading: false,
+    lastScan: null
+  };
+}
+
+/**
+ * Set FiveM resources loading state
+ * @param {number} projectIndex
+ * @param {boolean} loading
+ */
+function setFivemResourcesLoading(projectIndex, loading) {
+  const resourcesMap = fivemState.get().fivemResources;
+  const current = resourcesMap.get(projectIndex) || { resources: [], loading: false, lastScan: null };
+  resourcesMap.set(projectIndex, { ...current, loading });
+  fivemState.setProp('fivemResources', resourcesMap);
+}
+
+/**
+ * Set FiveM resources list
+ * @param {number} projectIndex
+ * @param {Array} resources
+ */
+function setFivemResources(projectIndex, resources) {
+  const resourcesMap = fivemState.get().fivemResources;
+  resourcesMap.set(projectIndex, {
+    resources,
+    loading: false,
+    lastScan: Date.now()
+  });
+  fivemState.setProp('fivemResources', resourcesMap);
+}
+
+/**
+ * Clear FiveM resources for a project
+ * @param {number} projectIndex
+ */
+function clearFivemResources(projectIndex) {
+  const resourcesMap = fivemState.get().fivemResources;
+  resourcesMap.set(projectIndex, { resources: [], loading: false, lastScan: null });
+  fivemState.setProp('fivemResources', resourcesMap);
+}
+
+// ========== FiveM Resource Shortcuts ==========
+
+/**
+ * Get shortcut for a resource
+ * @param {number} projectIndex
+ * @param {string} resourceName
+ * @returns {string|null}
+ */
+function getResourceShortcut(projectIndex, resourceName) {
+  const key = `${projectIndex}:${resourceName}`;
+  return fivemState.get().fivemResourceShortcuts.get(key) || null;
+}
+
+/**
+ * Set shortcut for a resource
+ * @param {number} projectIndex
+ * @param {string} resourceName
+ * @param {string|null} shortcut - null to remove
+ */
+function setResourceShortcut(projectIndex, resourceName, shortcut) {
+  const shortcuts = fivemState.get().fivemResourceShortcuts;
+  const key = `${projectIndex}:${resourceName}`;
+
+  if (shortcut) {
+    // Remove any existing resource with this shortcut (for this project)
+    shortcuts.forEach((s, k) => {
+      if (k.startsWith(`${projectIndex}:`) && s === shortcut) {
+        shortcuts.delete(k);
+      }
+    });
+    shortcuts.set(key, shortcut);
+  } else {
+    shortcuts.delete(key);
+  }
+
+  fivemState.setProp('fivemResourceShortcuts', shortcuts);
+
+  // Save to localStorage for persistence
+  saveResourceShortcuts();
+}
+
+/**
+ * Get all shortcuts for a project
+ * @param {number} projectIndex
+ * @returns {Map<string, string>} resourceName -> shortcut
+ */
+function getProjectResourceShortcuts(projectIndex) {
+  const shortcuts = fivemState.get().fivemResourceShortcuts;
+  const result = new Map();
+  const prefix = `${projectIndex}:`;
+
+  shortcuts.forEach((shortcut, key) => {
+    if (key.startsWith(prefix)) {
+      const resourceName = key.substring(prefix.length);
+      result.set(resourceName, shortcut);
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Find resource by shortcut
+ * @param {number} projectIndex
+ * @param {string} shortcut
+ * @returns {string|null} resourceName or null
+ */
+function findResourceByShortcut(projectIndex, shortcut) {
+  const shortcuts = fivemState.get().fivemResourceShortcuts;
+  const prefix = `${projectIndex}:`;
+
+  for (const [key, s] of shortcuts.entries()) {
+    if (key.startsWith(prefix) && s === shortcut) {
+      return key.substring(prefix.length);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Save resource shortcuts to localStorage
+ */
+function saveResourceShortcuts() {
+  const shortcuts = fivemState.get().fivemResourceShortcuts;
+  const obj = {};
+  shortcuts.forEach((v, k) => { obj[k] = v; });
+  localStorage.setItem('fivem-resource-shortcuts', JSON.stringify(obj));
+}
+
+/**
+ * Load resource shortcuts from localStorage
+ */
+function loadResourceShortcuts() {
+  try {
+    const data = localStorage.getItem('fivem-resource-shortcuts');
+    if (data) {
+      const obj = JSON.parse(data);
+      const shortcuts = new Map(Object.entries(obj));
+      fivemState.setProp('fivemResourceShortcuts', shortcuts);
+    }
+  } catch (e) {
+    console.error('Failed to load resource shortcuts:', e);
+  }
+}
+
 // ========== Git Operations ==========
 
 /**
@@ -334,6 +494,17 @@ module.exports = {
   addFivemError,
   clearFivemErrors,
   dismissLastError,
+  // FiveM resources
+  getFivemResources,
+  setFivemResourcesLoading,
+  setFivemResources,
+  clearFivemResources,
+  // FiveM resource shortcuts
+  getResourceShortcut,
+  setResourceShortcut,
+  getProjectResourceShortcuts,
+  findResourceByShortcut,
+  loadResourceShortcuts,
   // Git operations
   getGitOperation,
   setGitPulling,
