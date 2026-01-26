@@ -7,7 +7,7 @@
 const { State } = require('./State');
 
 // Constants
-const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 
 // Runtime state (not persisted)
 // activeSessions: Map<projectId, { sessionStartTime, lastActivityTime, isIdle }>
@@ -112,11 +112,12 @@ function migrateGlobalTimeTracking() {
 }
 
 /**
- * Get today's date string for comparison
+ * Get today's date string for comparison (ISO format YYYY-MM-DD)
  * @returns {string}
  */
 function getTodayString() {
-  return new Date().toDateString();
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 /**
@@ -397,8 +398,9 @@ function saveGlobalSession(startTime, endTime, duration) {
     duration
   });
 
-  if (globalTracking.sessions.length > 100) {
-    globalTracking.sessions = globalTracking.sessions.slice(-100);
+  // Keep more global sessions for streak calculation (365 days coverage)
+  if (globalTracking.sessions.length > 500) {
+    globalTracking.sessions = globalTracking.sessions.slice(-500);
   }
 
   // Save
@@ -783,7 +785,7 @@ function getTrackingState() {
 
 /**
  * Get global time tracking stats (real time, not sum of projects)
- * Uses persistent counters for accuracy (not limited by 100 sessions)
+ * Always calculates from sessions to ensure accuracy
  * @returns {{ today: number, week: number, month: number }}
  */
 function getGlobalTimes() {
@@ -794,9 +796,6 @@ function getGlobalTimes() {
 
   const currentState = projectsStateRef.get();
   const globalTracking = currentState.globalTimeTracking;
-  const today = getTodayString();
-  const weekStart = getWeekStartString();
-  const monthStart = getMonthString();
   const state = trackingState.get();
 
   let todayTotal = 0;
@@ -804,19 +803,49 @@ function getGlobalTimes() {
   let monthTotal = 0;
 
   if (globalTracking) {
-    // Today's time (from counter if date matches)
-    if (globalTracking.lastActiveDate === today) {
-      todayTotal = globalTracking.todayTime || 0;
-    }
+    const sessions = globalTracking.sessions || [];
 
-    // Week's time (from counter if week matches)
-    if (globalTracking.weekStart === weekStart) {
-      weekTotal = globalTracking.weekTime || 0;
-    }
+    // Calculate date boundaries
+    const now = new Date();
 
-    // Month's time (from counter if month matches)
-    if (globalTracking.monthStart === monthStart) {
-      monthTotal = globalTracking.monthTime || 0;
+    // Today boundaries
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    // Week boundaries (Monday to Sunday)
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    const weekStartDate = new Date(now);
+    weekStartDate.setDate(weekStartDate.getDate() - diffToMonday);
+    weekStartDate.setHours(0, 0, 0, 0);
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setDate(weekEndDate.getDate() + 7);
+
+    // Month boundaries
+    const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // Calculate totals from sessions
+    for (const session of sessions) {
+      const sessionDate = new Date(session.startTime);
+      const duration = session.duration || 0;
+
+      // Today
+      if (sessionDate >= todayStart && sessionDate < todayEnd) {
+        todayTotal += duration;
+      }
+
+      // This week
+      if (sessionDate >= weekStartDate && sessionDate < weekEndDate) {
+        weekTotal += duration;
+      }
+
+      // This month
+      if (sessionDate >= monthStartDate && sessionDate < monthEndDate) {
+        monthTotal += duration;
+      }
     }
   }
 
