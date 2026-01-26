@@ -7,6 +7,7 @@
 const { fs, path } = window.electron_nodeModules;
 const { State } = require('./State');
 const { projectsFile, dataDir } = require('../utils/paths');
+const { t } = require('../i18n');
 
 // Initial state
 const initialState = {
@@ -163,10 +164,10 @@ function loadProjects() {
         // Show notification to user via preload API (if available)
         try {
           window.electron_api.notification.show({
-            title: 'Fichier projets corrompu',
+            title: t('errors.corruptedFile'),
             body: backupPath
-              ? `Un backup a été créé: ${path.basename(backupPath)}`
-              : 'Impossible de créer un backup. Vos projets ont été réinitialisés.'
+              ? t('errors.backupCreated', { filename: path.basename(backupPath) })
+              : t('errors.backupFailed')
           });
         } catch (apiError) {
           // API not available, just log
@@ -325,8 +326,8 @@ function saveProjectsImmediate() {
     // Try to notify user
     try {
       window.electron_api.notification.show({
-        title: 'Erreur de sauvegarde',
-        body: `Impossible de sauvegarder les projets: ${error.message}`
+        title: t('errors.saveError'),
+        body: t('errors.saveErrorDetail', { message: error.message })
       });
     } catch (apiError) {
       // API not available

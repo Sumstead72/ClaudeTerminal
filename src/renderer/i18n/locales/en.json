@@ -21,7 +21,8 @@
     "search": "Search",
     "new": "New",
     "today": "Today",
-    "total": "Total"
+    "total": "Total",
+    "noDescription": "No description"
   },
   "projects": {
     "noProjects": "No projects",
@@ -55,9 +56,20 @@
     "online": "Online",
     "console": "Console",
     "errors": "Errors",
+    "resources": "Resources",
     "noErrors": "No errors detected",
     "errorDetected": "Error detected",
-    "debugWithClaude": "Debug with Claude"
+    "debugWithClaude": "Debug with Claude",
+    "noResources": "No resources found",
+    "resourcesFound": "{count} resources",
+    "ensuredInCfg": "In server.cfg",
+    "notEnsured": "Not started",
+    "ensure": "Ensure",
+    "stop": "Stop",
+    "restart": "Restart",
+    "searchResources": "Search resources...",
+    "refreshResources": "Refresh",
+    "openFolder": "Open folder"
   },
   "git": {
     "noRemote": "No remote",
@@ -216,5 +228,12 @@
     "theme": "Terminal theme",
     "notifications": "Notifications",
     "closeAction": "Close action"
+  },
+  "errors": {
+    "corruptedFile": "Projects file corrupted",
+    "backupCreated": "A backup was created: {filename}",
+    "backupFailed": "Could not create backup. Your projects have been reset.",
+    "saveError": "Save error",
+    "saveErrorDetail": "Could not save projects: {message}"
   }
 }

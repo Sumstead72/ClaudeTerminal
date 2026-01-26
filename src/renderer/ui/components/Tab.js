@@ -4,6 +4,7 @@
  */
 
 const { escapeHtml } = require('../../utils/dom');
+const { t } = require('../../i18n');
 
 /**
  * Create a tab container
@@ -26,7 +27,7 @@ function createTabs({ id, tabs, activeTab, onTabChange }) {
       <span class="tab-label">${escapeHtml(tab.label)}</span>
       ${tab.badge !== undefined ? `<span class="tab-badge">${tab.badge}</span>` : ''}
       ${tab.closable ? `
-        <button class="tab-close" data-tab="${tab.id}" aria-label="Fermer">
+        <button class="tab-close" data-tab="${tab.id}" aria-label="${t('common.close')}">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       ` : ''}
@@ -108,7 +109,7 @@ function addTab(container, tab) {
     <span class="tab-label">${escapeHtml(tab.label)}</span>
     ${tab.badge !== undefined ? `<span class="tab-badge">${tab.badge}</span>` : ''}
     ${tab.closable ? `
-      <button class="tab-close" data-tab="${tab.id}" aria-label="Fermer">
+      <button class="tab-close" data-tab="${tab.id}" aria-label="${t('common.close')}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>
     ` : ''}

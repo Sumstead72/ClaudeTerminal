@@ -7,6 +7,7 @@
 const { fs, path, os } = window.electron_nodeModules;
 const { skillsDir } = require('../utils/paths');
 const { skillsAgentsState } = require('../state');
+const { t } = require('../i18n');
 
 // Plugins directory
 const pluginsDir = path.join(os.homedir(), '.claude', 'plugins');
@@ -72,7 +73,7 @@ function loadSkillsFromDir(dir, source = 'local', sourceLabel = 'Local') {
           skills.push({
             id: `${source}:${item}`,
             name: metadata.name || (nameMatch ? nameMatch[1] : item),
-            description: metadata.description || 'Aucune description',
+            description: metadata.description || t('common.noDescription'),
             userInvocable: metadata['user-invocable'] === 'true',
             path: itemPath,
             source,

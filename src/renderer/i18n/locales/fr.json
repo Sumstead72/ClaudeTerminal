@@ -1,6 +1,6 @@
 {
   "language": {
-    "name": "Francais",
+    "name": "Français",
     "code": "fr"
   },
   "common": {
@@ -15,13 +15,14 @@
     "copy": "Copier",
     "loading": "Chargement...",
     "error": "Erreur",
-    "success": "Succes",
+    "success": "Succès",
     "refresh": "Actualiser",
-    "reset": "Reinitialiser",
+    "reset": "Réinitialiser",
     "search": "Rechercher",
     "new": "Nouveau",
     "today": "Aujourd'hui",
-    "total": "Total"
+    "total": "Total",
+    "noDescription": "Aucune description"
   },
   "projects": {
     "noProjects": "Aucun projet",
@@ -55,9 +56,20 @@
     "online": "En ligne",
     "console": "Console",
     "errors": "Erreurs",
+    "resources": "Resources",
     "noErrors": "Aucune erreur detectee",
     "errorDetected": "Erreur detectee",
-    "debugWithClaude": "Debugger avec Claude"
+    "debugWithClaude": "Debugger avec Claude",
+    "noResources": "Aucune resource trouvee",
+    "resourcesFound": "{count} resources",
+    "ensuredInCfg": "Dans server.cfg",
+    "notEnsured": "Non demarre",
+    "ensure": "Ensure",
+    "stop": "Stop",
+    "restart": "Restart",
+    "searchResources": "Rechercher une resource...",
+    "refreshResources": "Actualiser",
+    "openFolder": "Ouvrir le dossier"
   },
   "git": {
     "noRemote": "Pas de remote",
@@ -128,9 +140,9 @@
       "hotPink": "Rose vif"
     },
     "iconCategories": {
-      "development": "Developpement",
+      "development": "Développement",
       "webMobile": "Web & Mobile",
-      "creative": "Creatif",
+      "creative": "Créatif",
       "business": "Business",
       "techAi": "Tech & AI",
       "symbols": "Symboles"
@@ -141,7 +153,7 @@
       "bug": "Bug",
       "git": "Git",
       "api": "API",
-      "database": "Base de donnees",
+      "database": "Base de données",
       "server": "Serveur",
       "package": "Package",
       "web": "Web",
@@ -152,7 +164,7 @@
       "cloud": "Cloud",
       "design": "Design",
       "photo": "Photo",
-      "video": "Video",
+      "video": "Vidéo",
       "music": "Musique",
       "game": "Jeu",
       "3d": "3D",
@@ -161,43 +173,43 @@
       "shop": "Boutique",
       "mail": "Email",
       "calendar": "Calendrier",
-      "task": "Tache",
+      "task": "Tâche",
       "ai": "IA",
       "chip": "Puce",
-      "security": "Securite",
-      "network": "Reseau",
+      "security": "Sécurité",
+      "network": "Réseau",
       "speed": "Vitesse",
       "lab": "Labo",
-      "star": "Etoile",
+      "star": "Étoile",
       "heart": "Coeur",
       "fire": "Feu",
       "diamond": "Diamant",
       "crown": "Couronne",
-      "rocket": "Fusee",
+      "rocket": "Fusée",
       "target": "Cible",
-      "trophy": "Trophee"
+      "trophy": "Trophée"
     }
   },
   "shortcuts": {
     "title": "Raccourcis clavier",
-    "resetAll": "Reinitialiser tous les raccourcis",
+    "resetAll": "Réinitialiser tous les raccourcis",
     "clickToEdit": "Cliquez pour modifier",
-    "reset": "Reinitialiser",
+    "reset": "Réinitialiser",
     "pressKeys": "Appuyez sur une combinaison de touches",
     "waiting": "En attente...",
-    "pressEscapeToCancel": "Appuyez sur Echap pour annuler",
+    "pressEscapeToCancel": "Appuyez sur Échap pour annuler",
     "modifierRequired": "Un modificateur (Ctrl, Alt, Shift) est requis",
     "conflictWith": "Conflit avec: {label}",
-    "openSettings": "Ouvrir les parametres",
+    "openSettings": "Ouvrir les paramètres",
     "closeTerminal": "Fermer le terminal",
     "sessionsPanel": "Panneau sessions",
-    "quickPicker": "Selecteur rapide",
+    "quickPicker": "Sélecteur rapide",
     "nextTerminal": "Terminal suivant",
-    "prevTerminal": "Terminal precedent"
+    "prevTerminal": "Terminal précédent"
   },
   "quickPicker": {
     "searchProjects": "Rechercher un projet...",
-    "noProjectFound": "Aucun projet trouve"
+    "noProjectFound": "Aucun projet trouvé"
   },
   "modal": {
     "confirm": "Confirmer",
@@ -210,11 +222,18 @@
     "daysAgo": "il y a {count}j"
   },
   "settings": {
-    "title": "Parametres",
+    "title": "Paramètres",
     "language": "Langue",
-    "editor": "Editeur par defaut",
-    "theme": "Theme du terminal",
+    "editor": "Éditeur par défaut",
+    "theme": "Thème du terminal",
     "notifications": "Notifications",
-    "closeAction": "Action a la fermeture"
+    "closeAction": "Action à la fermeture"
+  },
+  "errors": {
+    "corruptedFile": "Fichier projets corrompu",
+    "backupCreated": "Un backup a été créé: {filename}",
+    "backupFailed": "Impossible de créer un backup. Vos projets ont été réinitialisés.",
+    "saveError": "Erreur de sauvegarde",
+    "saveErrorDetail": "Impossible de sauvegarder les projets: {message}"
   }
 }

@@ -7,6 +7,7 @@
 const { fs, path } = window.electron_nodeModules;
 const { agentsDir } = require('../utils/paths');
 const { skillsAgentsState } = require('../state');
+const { t } = require('../i18n');
 
 /**
  * Parse YAML frontmatter from markdown content
@@ -63,7 +64,7 @@ function loadAgents() {
           agents.push({
             id,
             name: metadata.name || id,
-            description: metadata.description || 'Aucune description',
+            description: metadata.description || t('common.noDescription'),
             tools: metadata.tools || '',
             model: metadata.model || 'sonnet',
             path: itemPath
@@ -80,7 +81,7 @@ function loadAgents() {
             agents.push({
               id: item,
               name: metadata.name || (nameMatch ? nameMatch[1] : item),
-              description: metadata.description || 'Aucune description',
+              description: metadata.description || t('common.noDescription'),
               tools: metadata.tools || '',
               model: metadata.model || 'sonnet',
               path: itemPath
