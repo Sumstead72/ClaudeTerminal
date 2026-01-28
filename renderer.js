@@ -2952,6 +2952,10 @@ document.getElementById('btn-new-project').onclick = () => {
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>
             <span>Dossier existant</span>
           </div>
+          <div class="source-option" data-source="create">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3H9v-2h3V9h2v3h3v2z"/></svg>
+            <span>Creer un nouveau</span>
+          </div>
           <div class="source-option" data-source="clone">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>
             <span>Cloner un repo</span>
@@ -2988,6 +2992,12 @@ document.getElementById('btn-new-project').onclick = () => {
             <div class="type-card-content"><div class="type-card-title">FiveM Server</div><div class="type-card-desc">Demarrer/arreter FXServer</div></div>
           </div>
         </div>
+      </div>
+      <div class="form-group create-git-config" style="display: none;">
+        <label class="checkbox-label">
+          <input type="checkbox" id="chk-init-git" checked>
+          <span>Initialiser un repo Git</span>
+        </label>
       </div>
       <div class="form-group fivem-config" style="display: none;">
         <label>Script de lancement</label>
@@ -3043,10 +3053,20 @@ document.getElementById('btn-new-project').onclick = () => {
       opt.classList.add('selected');
       selectedSource = opt.dataset.source;
       const isClone = selectedSource === 'clone';
+      const isCreate = selectedSource === 'create';
       document.querySelector('.clone-config').style.display = isClone ? 'block' : 'none';
-      document.getElementById('label-path').textContent = isClone ? 'Dossier de destination' : 'Chemin du projet';
-      document.getElementById('inp-path').placeholder = isClone ? 'C:\\chemin\\destination' : 'C:\\chemin\\projet';
-      if (isClone) updateGitHubHint();
+      document.querySelector('.create-git-config').style.display = isCreate ? 'block' : 'none';
+      if (isClone) {
+        document.getElementById('label-path').textContent = 'Dossier de destination';
+        document.getElementById('inp-path').placeholder = 'C:\\chemin\\destination';
+        updateGitHubHint();
+      } else if (isCreate) {
+        document.getElementById('label-path').textContent = 'Dossier parent';
+        document.getElementById('inp-path').placeholder = 'C:\\chemin\\parent';
+      } else {
+        document.getElementById('label-path').textContent = 'Chemin du projet';
+        document.getElementById('inp-path').placeholder = 'C:\\chemin\\projet';
+      }
     };
   });
 
@@ -3091,6 +3111,43 @@ document.getElementById('btn-new-project').onclick = () => {
     const repoUrl = document.getElementById('inp-repo-url')?.value.trim();
 
     if (!name || !projPath) return;
+
+    // If creating new, create the directory
+    if (selectedSource === 'create') {
+      projPath = path.join(projPath, name);
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(projPath)) {
+          showToast('Ce dossier existe deja', 'error');
+          return;
+        }
+        fs.mkdirSync(projPath, { recursive: true });
+
+        // Init git repo if checked
+        if (document.getElementById('chk-init-git')?.checked) {
+          const { execSync } = require('child_process');
+          try {
+            execSync('git init', { cwd: projPath, stdio: 'ignore' });
+            fs.writeFileSync(path.join(projPath, '.gitignore'), [
+              'node_modules/',
+              'dist/',
+              'build/',
+              '.env',
+              '.env.local',
+              '*.log',
+              '.DS_Store',
+              'Thumbs.db',
+              ''
+            ].join('\n'));
+          } catch (gitErr) {
+            showToast('Dossier cree mais erreur git init: ' + gitErr.message, 'error');
+          }
+        }
+      } catch (err) {
+        showToast('Impossible de creer le dossier: ' + err.message, 'error');
+        return;
+      }
+    }
 
     // If cloning, append project name to path and clone
     if (selectedSource === 'clone' && repoUrl) {
