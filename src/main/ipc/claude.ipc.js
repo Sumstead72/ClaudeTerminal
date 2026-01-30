@@ -38,11 +38,14 @@ async function getClaudeSessions(projectPath) {
   try {
     const indexPath = getSessionsIndexPath(projectPath);
 
-    if (!fs.existsSync(indexPath)) {
+    let rawData;
+    try {
+      rawData = await fs.promises.readFile(indexPath, 'utf8');
+    } catch {
       return [];
     }
 
-    const data = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    const data = JSON.parse(rawData);
 
     if (!data.entries || !Array.isArray(data.entries)) {
       return [];

@@ -17,28 +17,29 @@ function registerProjectHandlers() {
     const extensions = ['.js', '.ts', '.jsx', '.tsx', '.vue', '.py', '.lua', '.go', '.rs', '.java', '.cpp', '.c', '.h'];
     const ignoreDirs = ['node_modules', '.git', 'dist', 'build', '__pycache__', '.next', 'vendor'];
 
-    function scanDir(dir, depth = 0) {
-      if (depth > 5) return; // Depth limit
+    async function scanDir(dir, depth = 0) {
+      if (depth > 5 || todos.length >= 50) return;
       try {
-        const items = fs.readdirSync(dir);
+        const items = await fs.promises.readdir(dir);
         for (const item of items) {
+          if (todos.length >= 50) return;
           if (ignoreDirs.includes(item)) continue;
           const fullPath = path.join(dir, item);
           try {
-            const stat = fs.statSync(fullPath);
+            const stat = await fs.promises.stat(fullPath);
             if (stat.isDirectory()) {
-              scanDir(fullPath, depth + 1);
+              await scanDir(fullPath, depth + 1);
             } else if (stat.isFile() && extensions.some(ext => item.endsWith(ext))) {
-              scanFile(fullPath, projectPath);
+              await scanFile(fullPath, projectPath);
             }
           } catch (e) {}
         }
       } catch (e) {}
     }
 
-    function scanFile(filePath, basePath) {
+    async function scanFile(filePath, basePath) {
       try {
-        const content = fs.readFileSync(filePath, 'utf8');
+        const content = await fs.promises.readFile(filePath, 'utf8');
         const lines = content.split('\n');
         const relativePath = path.relative(basePath, filePath);
 
@@ -58,7 +59,7 @@ function registerProjectHandlers() {
       } catch (e) {}
     }
 
-    scanDir(projectPath);
+    await scanDir(projectPath);
     return todos;
   });
 }
