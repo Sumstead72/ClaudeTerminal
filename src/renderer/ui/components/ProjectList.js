@@ -279,7 +279,7 @@ function renderProjectHtml(project, depth) {
           ${colorIndicator}
           ${projectIconHtml}
           <span>${escapeHtml(project.name)}</span>
-          ${!isFivem && terminalStats.total > 0 ? `<span class="terminal-count"><span class="working-count">${terminalStats.working}</span><span class="count-separator">/</span><span class="total-count">${terminalStats.total}</span></span>` : ''}
+          ${terminalStats.total > 0 ? `<span class="terminal-count"><span class="working-count">${terminalStats.working}</span><span class="count-separator">/</span><span class="total-count">${terminalStats.total}</span></span>` : ''}
         </div>
         <div class="project-path">${escapeHtml(project.path)}</div>
         ${hasTime ? `<div class="project-time">
@@ -715,6 +715,16 @@ function attachListeners(list) {
 
   list.querySelectorAll('.more-actions-item').forEach(item => {
     item.addEventListener('click', () => closeAllMoreActionsMenus());
+  });
+
+  // Right-click on project → open more-actions menu
+  list.querySelectorAll('.project-item').forEach(item => {
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const moreBtn = item.querySelector('.btn-more-actions');
+      if (moreBtn) moreBtn.click();
+    });
   });
 
   // Folder color button (opens CustomizePicker)

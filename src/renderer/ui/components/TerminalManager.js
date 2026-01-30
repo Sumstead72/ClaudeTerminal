@@ -1511,7 +1511,7 @@ function getTerminalStatsForProject(projectIndex) {
   let working = 0;
   const terminals = terminalsState.get().terminals;
   terminals.forEach(termData => {
-    if (termData.project && termData.project.path === project.path) {
+    if (termData.project && termData.project.path === project.path && termData.type !== 'fivem' && !termData.isBasic) {
       total++;
       if (termData.status === 'working') working++;
     }
