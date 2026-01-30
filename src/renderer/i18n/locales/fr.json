@@ -351,7 +351,14 @@
     "topProject": "projet #1",
     "noActivity": "Aucune activité sur cette période",
     "noSession": "Aucune session sur cette période",
-    "of8h": "de 8h"
+    "of8h": "de 8h",
+    "customRange": "Période personnalisée",
+    "last7days": "7 derniers jours",
+    "last30days": "30 derniers jours",
+    "apply": "Appliquer",
+    "selectRange": "Sélectionner une période",
+    "startDate": "Date de début",
+    "endDate": "Date de fin"
   },
   "errors": {
     "corruptedFile": "Fichier projets corrompu",

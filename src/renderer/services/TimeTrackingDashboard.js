@@ -8,9 +8,12 @@ const { escapeHtml } = require('../utils');
 const { t } = require('../i18n');
 
 // Current state
-let currentPeriod = 'week'; // 'day', 'week', 'month'
+let currentPeriod = 'week'; // 'day', 'week', 'month', 'custom'
 let currentOffset = 0; // 0 = current period, -1 = previous, etc.
+let customStartDate = null;
+let customEndDate = null;
 let updateInterval = null;
+let calendarPopup = null;
 
 /**
  * Format duration in milliseconds to human-readable string
@@ -63,6 +66,14 @@ function getPeriodLabel() {
   const now = new Date();
   const locale = t('language.code') === 'fr' ? 'fr-FR' : 'en-US';
 
+  if (currentPeriod === 'custom' && customStartDate && customEndDate) {
+    const startLabel = customStartDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+    const endDate = new Date(customEndDate);
+    endDate.setDate(endDate.getDate() - 1);
+    const endLabel = endDate.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+    return `${startLabel} - ${endLabel}`;
+  }
+
   if (currentPeriod === 'day') {
     const date = new Date(now);
     date.setDate(date.getDate() + currentOffset);
@@ -109,6 +120,10 @@ function getWeekStart(offset = 0) {
 function getPeriodBoundaries() {
   const now = new Date();
   let periodStart, periodEnd;
+
+  if (currentPeriod === 'custom' && customStartDate && customEndDate) {
+    return { periodStart: new Date(customStartDate), periodEnd: new Date(customEndDate) };
+  }
 
   if (currentPeriod === 'day') {
     periodStart = new Date(now);
@@ -271,6 +286,33 @@ function getDailyData() {
       });
       current.setDate(current.getDate() + 1);
     }
+  } else if (currentPeriod === 'custom') {
+    const totalDays = Math.ceil((periodEnd - periodStart) / (24 * 60 * 60 * 1000));
+    if (totalDays <= 31) {
+      // One bar per day
+      const current = new Date(periodStart);
+      while (current < periodEnd) {
+        days.push({
+          date: new Date(current),
+          label: current.getDate().toString(),
+          time: 0
+        });
+        current.setDate(current.getDate() + 1);
+      }
+    } else {
+      // One bar per week
+      const current = new Date(periodStart);
+      while (current < periodEnd) {
+        const weekEnd = new Date(current);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        days.push({
+          date: new Date(current),
+          label: current.toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+          time: 0
+        });
+        current.setDate(current.getDate() + 7);
+      }
+    }
   } else {
     // Month view - show each day
     const current = new Date(periodStart);
@@ -291,6 +333,8 @@ function getDailyData() {
 
     if (currentPeriod === 'day') {
       dayIndex = Math.floor(sessionDate.getHours() / 2);
+    } else if (currentPeriod === 'custom' && Math.ceil((periodEnd - periodStart) / (24 * 60 * 60 * 1000)) > 31) {
+      dayIndex = Math.floor((sessionDate - periodStart) / (7 * 24 * 60 * 60 * 1000));
     } else {
       dayIndex = Math.floor((sessionDate - periodStart) / (24 * 60 * 60 * 1000));
     }
@@ -452,12 +496,12 @@ function render(container) {
           </h1>
         </div>
 
-        <div class="tt-period-nav">
-          <button class="tt-nav-btn tt-nav-prev" id="tt-prev">
+        <div class="tt-period-nav" style="position: relative;">
+          <button class="tt-nav-btn tt-nav-prev" id="tt-prev" ${currentPeriod === 'custom' ? 'disabled' : ''}>
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
           </button>
           <div class="tt-period-label" id="tt-period-label">${getPeriodLabel()}</div>
-          <button class="tt-nav-btn tt-nav-next" id="tt-next" ${currentOffset >= 0 ? 'disabled' : ''}>
+          <button class="tt-nav-btn tt-nav-next" id="tt-next" ${currentPeriod === 'custom' || currentOffset >= 0 ? 'disabled' : ''}>
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
           </button>
         </div>
@@ -683,6 +727,250 @@ function render(container) {
 }
 
 /**
+ * Close the calendar popup
+ */
+function closeCalendarPopup() {
+  if (calendarPopup) {
+    calendarPopup.classList.add('closing');
+    setTimeout(() => {
+      calendarPopup?.remove();
+      calendarPopup = null;
+    }, 150);
+  }
+}
+
+/**
+ * Build and show the calendar popup
+ */
+function showCalendarPopup(container, anchorEl) {
+  if (calendarPopup) {
+    closeCalendarPopup();
+    return;
+  }
+
+  const locale = t('language.code') === 'fr' ? 'fr-FR' : 'en-US';
+  const isFr = locale === 'fr-FR';
+  let calendarMonth = new Date();
+  calendarMonth.setDate(1);
+
+  let rangeStart = null;
+  let rangeEnd = null;
+
+  const popup = document.createElement('div');
+  popup.className = 'tt-calendar-popup';
+  calendarPopup = popup;
+
+  function renderCalendarContent() {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const monthLabel = calendarMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+
+    // Weekday headers
+    const weekdays = [];
+    const baseDate = new Date(2024, 0, 1); // Monday
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + i);
+      weekdays.push(d.toLocaleDateString(locale, { weekday: 'narrow' }));
+    }
+
+    // Days grid
+    const firstDay = new Date(year, month, 1);
+    let startDow = firstDay.getDay() - 1;
+    if (startDow < 0) startDow = 6; // Sunday = 6
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let daysHtml = '';
+    // Empty cells before first day
+    for (let i = 0; i < startDow; i++) {
+      daysHtml += '<button class="tt-calendar-day empty" disabled></button>';
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const cellDate = new Date(year, month, d);
+      cellDate.setHours(0, 0, 0, 0);
+      const isToday = cellDate.getTime() === today.getTime();
+      const isStart = rangeStart && cellDate.getTime() === rangeStart.getTime();
+      const isEnd = rangeEnd && cellDate.getTime() === rangeEnd.getTime();
+      const inRange = rangeStart && rangeEnd && cellDate > rangeStart && cellDate < rangeEnd;
+
+      let cls = 'tt-calendar-day';
+      if (isToday) cls += ' today';
+      if (isStart && isEnd) cls += ' selected range-start range-end';
+      else if (isStart) cls += ' selected range-start';
+      else if (isEnd) cls += ' selected range-end';
+      else if (inRange) cls += ' in-range';
+
+      daysHtml += `<button class="${cls}" data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}">${d}</button>`;
+    }
+
+    // Range info
+    let rangeInfoHtml = '';
+    if (rangeStart || rangeEnd) {
+      const startStr = rangeStart ? rangeStart.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : '...';
+      const endStr = rangeEnd ? rangeEnd.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : '...';
+      rangeInfoHtml = `
+        <div class="tt-calendar-range-info">
+          <span>${startStr}</span> → <span>${endStr}</span>
+        </div>
+      `;
+    }
+
+    // Shortcuts
+    const shortcuts = [
+      { label: t('timetracking.today'), period: 'day', offset: 0 },
+      { label: t('timetracking.yesterday'), period: 'day', offset: -1 },
+      { label: t('timetracking.thisWeek'), period: 'week', offset: 0 },
+      { label: t('timetracking.lastWeek'), period: 'week', offset: -1 },
+      { label: t('timetracking.thisMonth'), period: 'month', offset: 0 },
+      { label: t('timetracking.lastMonth'), period: 'month', offset: -1 },
+      { label: t('timetracking.last7days'), period: 'custom', days: 7 },
+      { label: t('timetracking.last30days'), period: 'custom', days: 30 },
+    ];
+
+    const isActiveShortcut = (s) => {
+      if (s.period === 'custom') return false;
+      return currentPeriod === s.period && currentOffset === s.offset;
+    };
+
+    popup.innerHTML = `
+      <div class="tt-calendar-shortcuts">
+        ${shortcuts.map(s => `
+          <button class="tt-calendar-shortcut-btn ${isActiveShortcut(s) ? 'active' : ''}"
+            data-period="${s.period}" data-offset="${s.offset ?? ''}" data-days="${s.days ?? ''}"
+          >${s.label}</button>
+        `).join('')}
+      </div>
+      <div class="tt-calendar-main">
+        <div class="tt-calendar-header">
+          <button class="tt-calendar-nav-btn" id="tt-cal-prev">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+          </button>
+          <span class="tt-calendar-header-label">${monthLabel}</span>
+          <button class="tt-calendar-nav-btn" id="tt-cal-next">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </button>
+        </div>
+        <div class="tt-calendar-weekdays">
+          ${weekdays.map(wd => `<div class="tt-calendar-weekday">${wd}</div>`).join('')}
+        </div>
+        <div class="tt-calendar-grid">
+          ${daysHtml}
+        </div>
+        ${rangeInfoHtml}
+        <button class="tt-calendar-apply-btn" id="tt-cal-apply" ${(!rangeStart || !rangeEnd) ? 'disabled' : ''}>
+          ${t('timetracking.apply')}
+        </button>
+      </div>
+    `;
+
+    // Bind events inside popup
+    popup.querySelector('#tt-cal-prev')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+      renderCalendarContent();
+    });
+
+    popup.querySelector('#tt-cal-next')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calendarMonth.setMonth(calendarMonth.getMonth() + 1);
+      renderCalendarContent();
+    });
+
+    // Shortcut buttons
+    popup.querySelectorAll('.tt-calendar-shortcut-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const period = btn.dataset.period;
+        const offset = btn.dataset.offset !== '' ? parseInt(btn.dataset.offset) : 0;
+        const days = btn.dataset.days !== '' ? parseInt(btn.dataset.days) : 0;
+
+        if (period === 'custom' && days > 0) {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          customStartDate = new Date(now);
+          customStartDate.setDate(customStartDate.getDate() - (days - 1));
+          customEndDate = new Date(now);
+          customEndDate.setDate(customEndDate.getDate() + 1);
+          currentPeriod = 'custom';
+          currentOffset = 0;
+        } else {
+          currentPeriod = period;
+          currentOffset = offset;
+          customStartDate = null;
+          customEndDate = null;
+        }
+
+        closeCalendarPopup();
+        render(container);
+      });
+    });
+
+    // Day click
+    popup.querySelectorAll('.tt-calendar-day:not(.empty)').forEach(dayBtn => {
+      dayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dateStr = dayBtn.dataset.date;
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const clickedDate = new Date(y, m - 1, d);
+        clickedDate.setHours(0, 0, 0, 0);
+
+        if (!rangeStart || (rangeStart && rangeEnd)) {
+          // Start new range
+          rangeStart = clickedDate;
+          rangeEnd = null;
+        } else {
+          // Set end date
+          if (clickedDate < rangeStart) {
+            rangeEnd = new Date(rangeStart);
+            rangeStart = clickedDate;
+          } else {
+            rangeEnd = clickedDate;
+          }
+        }
+        renderCalendarContent();
+      });
+    });
+
+    // Apply button
+    popup.querySelector('#tt-cal-apply')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (rangeStart && rangeEnd) {
+        customStartDate = new Date(rangeStart);
+        customEndDate = new Date(rangeEnd);
+        customEndDate.setDate(customEndDate.getDate() + 1); // end is exclusive
+        currentPeriod = 'custom';
+        currentOffset = 0;
+        closeCalendarPopup();
+        render(container);
+      }
+    });
+  }
+
+  renderCalendarContent();
+  anchorEl.appendChild(popup);
+
+  // Close on outside click
+  const outsideClickHandler = (e) => {
+    if (calendarPopup && !calendarPopup.contains(e.target) && e.target !== anchorEl.querySelector('.tt-period-label')) {
+      closeCalendarPopup();
+      document.removeEventListener('mousedown', outsideClickHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('mousedown', outsideClickHandler), 0);
+
+  // Close on Escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeCalendarPopup();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
+/**
  * Attach event listeners to the dashboard
  */
 function attachEventListeners(container) {
@@ -691,17 +979,34 @@ function attachEventListeners(container) {
     btn.addEventListener('click', () => {
       currentPeriod = btn.dataset.period;
       currentOffset = 0;
+      customStartDate = null;
+      customEndDate = null;
+      closeCalendarPopup();
       render(container);
     });
   });
 
+  // Period label click → open calendar popup
+  container.querySelector('#tt-period-label')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const periodNav = container.querySelector('.tt-period-nav');
+    showCalendarPopup(container, periodNav);
+  });
+
   // Navigation buttons
   container.querySelector('#tt-prev')?.addEventListener('click', () => {
+    if (currentPeriod === 'custom') {
+      currentPeriod = 'day';
+      customStartDate = null;
+      customEndDate = null;
+      currentOffset = 0;
+    }
     currentOffset--;
     render(container);
   });
 
   container.querySelector('#tt-next')?.addEventListener('click', () => {
+    if (currentPeriod === 'custom') return;
     if (currentOffset < 0) {
       currentOffset++;
       render(container);
@@ -737,6 +1042,7 @@ function cleanup() {
     clearInterval(updateInterval);
     updateInterval = null;
   }
+  closeCalendarPopup();
 }
 
 module.exports = {

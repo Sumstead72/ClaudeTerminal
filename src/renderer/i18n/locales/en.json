@@ -351,7 +351,14 @@
     "topProject": "top project",
     "noActivity": "No activity for this period",
     "noSession": "No session for this period",
-    "of8h": "of 8h"
+    "of8h": "of 8h",
+    "customRange": "Custom range",
+    "last7days": "Last 7 days",
+    "last30days": "Last 30 days",
+    "apply": "Apply",
+    "selectRange": "Select a period",
+    "startDate": "Start date",
+    "endDate": "End date"
   },
   "errors": {
     "corruptedFile": "Projects file corrupted",

@@ -9898,6 +9898,258 @@ body {
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.tt-period-label:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+/* Calendar Popup */
+.tt-calendar-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: flex;
+  overflow: hidden;
+  animation: ttCalendarOpen 0.2s ease;
+}
+
+@keyframes ttCalendarOpen {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.tt-calendar-popup.closing {
+  animation: ttCalendarClose 0.15s ease forwards;
+}
+
+@keyframes ttCalendarClose {
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.96);
+  }
+}
+
+/* Shortcuts column */
+.tt-calendar-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-right: 1px solid var(--border-color);
+  min-width: 170px;
+}
+
+.tt-calendar-shortcut-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.8125rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tt-calendar-shortcut-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tt-calendar-shortcut-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Calendar grid column */
+.tt-calendar-main {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 280px;
+}
+
+.tt-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tt-calendar-header-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.tt-calendar-nav-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.tt-calendar-nav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.tt-calendar-nav-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tt-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+}
+
+.tt-calendar-weekday {
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  padding: 4px 0;
+}
+
+.tt-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.tt-calendar-day {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.tt-calendar-day:hover:not(.empty):not(.disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tt-calendar-day.today {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.tt-calendar-day.selected {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.tt-calendar-day.in-range {
+  background: rgba(var(--accent-rgb, 217, 119, 6), 0.15);
+  color: var(--text-primary);
+  border-radius: 0;
+}
+
+.tt-calendar-day.range-start {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 8px 0 0 8px;
+}
+
+.tt-calendar-day.range-end {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0 8px 8px 0;
+}
+
+.tt-calendar-day.range-start.range-end {
+  border-radius: 8px;
+}
+
+.tt-calendar-day.empty {
+  cursor: default;
+}
+
+.tt-calendar-day.other-month {
+  color: var(--text-muted);
+  opacity: 0.4;
+}
+
+/* Range info */
+.tt-calendar-range-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.tt-calendar-range-info span {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Apply button */
+.tt-calendar-apply-btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  margin-top: 4px;
+}
+
+.tt-calendar-apply-btn:hover {
+  filter: brightness(1.1);
+}
+
+.tt-calendar-apply-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Period Selector */
