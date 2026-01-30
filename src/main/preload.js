@@ -35,7 +35,18 @@ contextBridge.exposeInMainWorld('electron_nodeModules', {
     rmSync: (p, options) => fs.rmSync(p, options),
     copyFileSync: (src, dest) => fs.copyFileSync(src, dest),
     unlinkSync: (p) => fs.unlinkSync(p),
-    renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath)
+    renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
+    promises: {
+      access: (p, mode) => fs.promises.access(p, mode),
+      readdir: (p, options) => fs.promises.readdir(p, options),
+      readFile: (p, options) => fs.promises.readFile(p, options),
+      stat: (p) => fs.promises.stat(p).then(stat => ({
+        isDirectory: () => stat.isDirectory(),
+        isFile: () => stat.isFile(),
+        size: stat.size,
+        mtime: stat.mtime
+      }))
+    }
   },
   os: {
     homedir: () => require('os').homedir()
