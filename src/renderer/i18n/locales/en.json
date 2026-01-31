@@ -344,6 +344,7 @@
     "namePlaceholder": "Ex: Build",
     "commandPlaceholder": "Ex: npm run build",
     "running": "Running...",
+    "addScript": "Add a script (.bat)",
     "presets": "Presets",
     "preset": {
       "build": "Build",

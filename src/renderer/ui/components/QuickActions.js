@@ -182,10 +182,16 @@ function openConfigModal(project) {
         ${renderActionsList(actions)}
       </div>
 
-      <button class="quick-action-add-btn" id="btn-add-quick-action">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        ${t('quickActions.addAction')}
-      </button>
+      <div class="quick-action-add-buttons">
+        <button class="quick-action-add-btn" id="btn-add-quick-action">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          ${t('quickActions.addAction')}
+        </button>
+        <button class="quick-action-add-btn" id="btn-add-script">
+          ${QUICK_ACTION_ICONS.terminal}
+          ${t('quickActions.addScript')}
+        </button>
+      </div>
     </div>
   `;
 
@@ -309,6 +315,24 @@ function setupModalHandlers(project) {
   // Add button
   if (addBtn) {
     addBtn.onclick = () => showActionForm(project, null, listContainer);
+  }
+
+  // Add script button
+  const addScriptBtn = document.getElementById('btn-add-script');
+  if (addScriptBtn) {
+    addScriptBtn.onclick = async () => {
+      const filePath = await api.dialog.selectFile({
+        filters: [{ name: 'Scripts', extensions: ['bat', 'cmd', 'ps1'] }]
+      });
+      if (!filePath) return;
+
+      const fileName = filePath.replace(/\\/g, '/').split('/').pop();
+      const name = fileName.replace(/\.(bat|cmd|ps1)$/i, '');
+      const command = `"${filePath}"`;
+
+      addQuickAction(project.id, { name, command, icon: 'terminal' });
+      refreshModalList(project);
+    };
   }
 
   // Edit and delete buttons
