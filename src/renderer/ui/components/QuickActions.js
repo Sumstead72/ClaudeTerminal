@@ -328,7 +328,7 @@ function setupModalHandlers(project) {
 
       const fileName = filePath.replace(/\\/g, '/').split('/').pop();
       const name = fileName.replace(/\.(bat|cmd|ps1)$/i, '');
-      const command = `"${filePath}"`;
+      const command = `& "${filePath}"`;
 
       addQuickAction(project.id, { name, command, icon: 'terminal' });
       refreshModalList(project);
