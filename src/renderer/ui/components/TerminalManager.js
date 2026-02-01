@@ -2151,13 +2151,24 @@ function openFileTab(filePath, project) {
   const ext = fileName.lastIndexOf('.') !== -1 ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase() : '';
   const projectIndex = project ? getProjectIndex(project.id) : null;
 
-  // Read file content
+  // Detect file type
+  const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico', 'avif']);
+  const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogg', 'mov']);
+  const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'wma']);
+  const isImage = IMAGE_EXTENSIONS.has(ext);
+  const isVideo = VIDEO_EXTENSIONS.has(ext);
+  const isAudio = AUDIO_EXTENSIONS.has(ext);
+  const isMedia = isImage || isVideo || isAudio;
+
+  // Read file content (skip for binary/media files)
   let content = '';
   let fileSize = 0;
   try {
     const stat = fs.statSync(filePath);
     fileSize = stat.size;
-    content = fs.readFileSync(filePath, 'utf-8');
+    if (!isMedia) {
+      content = fs.readFileSync(filePath, 'utf-8');
+    }
   } catch (e) {
     content = `Error reading file: ${e.message}`;
   }
@@ -2167,9 +2178,6 @@ function openFileTab(filePath, project) {
   if (fileSize < 1024) sizeStr = `${fileSize} B`;
   else if (fileSize < 1024 * 1024) sizeStr = `${(fileSize / 1024).toFixed(1)} KB`;
   else sizeStr = `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
-
-  // Syntax highlight
-  const highlightedContent = highlight(content, ext);
 
   // Store in terminals Map
   const termData = {
@@ -2200,24 +2208,50 @@ function openFileTab(filePath, project) {
   wrapper.className = 'terminal-wrapper file-wrapper';
   wrapper.dataset.id = id;
 
-  // Line count
-  const lineCount = content.split('\n').length;
+  // Build content based on file type
+  let viewerBody;
+  const fileUrl = `file:///${filePath.replace(/\\/g, '/').replace(/^\//, '')}`;
 
-  // Build line numbers
-  const lines = content.split('\n');
-  const lineNums = lines.map((_, i) => `<span class="line-num">${i + 1}</span>`).join('\n');
+  if (isImage) {
+    viewerBody = `
+    <div class="file-viewer-media">
+      <img src="${fileUrl}" alt="${escapeHtml(fileName)}" draggable="false" />
+    </div>`;
+  } else if (isVideo) {
+    viewerBody = `
+    <div class="file-viewer-media">
+      <video controls src="${fileUrl}"></video>
+    </div>`;
+  } else if (isAudio) {
+    viewerBody = `
+    <div class="file-viewer-media file-viewer-media-audio">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64" style="opacity:0.3"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+      <audio controls src="${fileUrl}"></audio>
+    </div>`;
+  } else {
+    // Text file: syntax highlight
+    const highlightedContent = highlight(content, ext);
+    const lineCount = content.split('\n').length;
+    const lines = content.split('\n');
+    const lineNums = lines.map((_, i) => `<span class="line-num">${i + 1}</span>`).join('\n');
+
+    viewerBody = `
+    <div class="file-viewer-content">
+      <div class="file-viewer-lines">${lineNums}</div>
+      <pre class="file-viewer-code"><code>${highlightedContent}</code></pre>
+    </div>`;
+
+    sizeStr += ` &middot; ${lineCount} lines`;
+  }
 
   wrapper.innerHTML = `
     <div class="file-viewer-header">
       <span class="file-viewer-icon">${fileIcon}</span>
       <span class="file-viewer-name">${escapeHtml(fileName)}</span>
-      <span class="file-viewer-meta">${sizeStr} &middot; ${lineCount} lines</span>
+      <span class="file-viewer-meta">${sizeStr}</span>
       <span class="file-viewer-path" title="${escapeHtml(filePath)}">${escapeHtml(filePath)}</span>
     </div>
-    <div class="file-viewer-content">
-      <div class="file-viewer-lines">${lineNums}</div>
-      <pre class="file-viewer-code"><code>${highlightedContent}</code></pre>
-    </div>
+    ${viewerBody}
   `;
 
   container.appendChild(wrapper);
