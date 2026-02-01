@@ -763,10 +763,20 @@ function attachListeners(list) {
 }
 
 /**
- * Render the project list
+ * Render the project list (debounced via rAF to avoid redundant renders)
  */
+let _renderScheduled = false;
+
 function render() {
+  if (_renderScheduled) return;
+  _renderScheduled = true;
+  requestAnimationFrame(_renderNow);
+}
+
+function _renderNow() {
+  _renderScheduled = false;
   const list = document.getElementById('projects-list');
+  if (!list) return;
   const state = projectsState.get();
 
   if (state.projects.length === 0 && state.folders.length === 0) {

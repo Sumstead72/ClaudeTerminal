@@ -893,8 +893,8 @@ async function preloadAllProjects() {
 
   console.log(`[Dashboard] Preloading ${projects.length} projects...`);
 
-  // Load projects in parallel with a small delay between batches to avoid overload
-  const BATCH_SIZE = 3;
+  // Load projects in parallel batches
+  const BATCH_SIZE = 8;
   for (let i = 0; i < projects.length; i += BATCH_SIZE) {
     const batch = projects.slice(i, i + BATCH_SIZE);
     await Promise.all(batch.map(async (project) => {
