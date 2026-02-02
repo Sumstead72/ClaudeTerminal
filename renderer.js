@@ -603,7 +603,7 @@ function showToast({ type = 'info', title, message, duration = 5000 }) {
 function showGitToast({ success, title, message, details = [], duration = 5000 }) {
   // Format details into the message if available
   let fullMessage = message || '';
-  if (details && details.length > 0) {
+  if (details && Array.isArray(details) && details.length > 0) {
     const detailsText = details.map(d => `${d.icon} ${d.text}`).join('  •  ');
     fullMessage = fullMessage ? `${fullMessage}\n${detailsText}` : detailsText;
   }
@@ -727,8 +727,7 @@ async function gitPull(projectId) {
       showGitToast({
         success: false,
         title: 'Conflits de merge',
-        message: `${result.conflicts?.length || 0} fichier(s) en conflit`,
-        details: 'Résolvez les conflits ou annulez le merge depuis le dashboard',
+        message: `${result.conflicts?.length || 0} fichier(s) en conflit — Résolvez les conflits ou annulez le merge depuis le dashboard`,
         duration: 8000
       });
 
