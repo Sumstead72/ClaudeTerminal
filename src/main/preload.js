@@ -59,6 +59,9 @@ contextBridge.exposeInMainWorld('electron_nodeModules', {
     },
     resourcesPath: process.resourcesPath || ''
   },
+  child_process: {
+    execSync: (cmd, options) => require('child_process').execSync(cmd, options)
+  },
   // __dirname from preload (src/main) - calculate app root by going up two levels
   __dirname: path.join(__dirname, '..', '..')
 });
