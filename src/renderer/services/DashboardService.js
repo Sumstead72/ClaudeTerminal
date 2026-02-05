@@ -132,6 +132,27 @@ async function getProjectStats(projectPath) {
 }
 
 /**
+ * Get GitHub Actions workflow runs for a project
+ * @param {string} remoteUrl - Git remote URL
+ * @returns {Promise<Object>}
+ */
+async function getWorkflowRuns(remoteUrl) {
+  if (!remoteUrl || !remoteUrl.includes('github.com')) {
+    console.log('[Dashboard] Not a GitHub repo:', remoteUrl);
+    return { runs: [], notGitHub: true };
+  }
+
+  try {
+    const result = await api.github.workflowRuns(remoteUrl);
+    console.log('[Dashboard] Workflow runs result:', result);
+    return result;
+  } catch (e) {
+    console.error('[Dashboard] Error fetching workflow runs:', e);
+    return { runs: [], error: e.message };
+  }
+}
+
+/**
  * Load full dashboard data for a project
  * @param {string} projectPath
  * @returns {Promise<Object>}
@@ -142,7 +163,17 @@ async function loadDashboardData(projectPath) {
     getProjectStats(projectPath)
   ]);
 
-  return { gitInfo, stats };
+  // Fetch workflow runs if it's a GitHub repo
+  let workflowRuns = { runs: [] };
+  console.log('[Dashboard] gitInfo.remoteUrl:', gitInfo.remoteUrl);
+  if (gitInfo.isGitRepo && gitInfo.remoteUrl) {
+    console.log('[Dashboard] Fetching workflow runs...');
+    workflowRuns = await getWorkflowRuns(gitInfo.remoteUrl);
+  } else {
+    console.log('[Dashboard] Skipping workflow runs - not a git repo or no remote');
+  }
+
+  return { gitInfo, stats, workflowRuns };
 }
 
 /**
@@ -515,10 +546,86 @@ function buildContributorsHtml(contributors) {
 }
 
 /**
+ * Build GitHub Actions workflow runs section HTML
+ * @param {Object} workflowRuns - { runs, authenticated, notGitHub, notFound }
+ * @returns {string}
+ */
+function buildWorkflowRunsHtml(workflowRuns) {
+  if (!workflowRuns || workflowRuns.notGitHub || workflowRuns.notFound) return '';
+  if (!workflowRuns.authenticated) return '';
+  if (!workflowRuns.runs || workflowRuns.runs.length === 0) return '';
+
+  const getStatusIcon = (status, conclusion) => {
+    if (status === 'in_progress' || status === 'queued') {
+      return '<svg class="workflow-icon running" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>';
+    }
+    if (conclusion === 'success') {
+      return '<svg class="workflow-icon success" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+    }
+    if (conclusion === 'failure') {
+      return '<svg class="workflow-icon failure" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+    }
+    if (conclusion === 'cancelled') {
+      return '<svg class="workflow-icon cancelled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>';
+    }
+    // skipped, neutral, etc.
+    return '<svg class="workflow-icon skipped" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
+  };
+
+  const getStatusClass = (status, conclusion) => {
+    if (status === 'in_progress' || status === 'queued') return 'running';
+    if (conclusion === 'success') return 'success';
+    if (conclusion === 'failure') return 'failure';
+    if (conclusion === 'cancelled') return 'cancelled';
+    return 'skipped';
+  };
+
+  const formatTime = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return t('time.justNow') || 'just now';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${diffDays}d`;
+  };
+
+  return `
+    <div class="dashboard-section workflow-runs-section">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17l4.59-4.59L16 11l-6 6z"/></svg>
+        GitHub Actions
+      </h3>
+      <div class="workflow-runs-list">
+        ${workflowRuns.runs.map(run => `
+          <div class="workflow-run-item ${getStatusClass(run.status, run.conclusion)}" data-url="${escapeHtml(run.url)}">
+            <div class="workflow-run-status">
+              ${getStatusIcon(run.status, run.conclusion)}
+            </div>
+            <div class="workflow-run-info">
+              <div class="workflow-run-name">${escapeHtml(run.name)}</div>
+              <div class="workflow-run-meta">
+                <span class="workflow-branch">${escapeHtml(run.branch)}</span>
+                <span class="workflow-commit">${run.commit}</span>
+                <span class="workflow-time">${formatTime(run.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Render the dashboard HTML with given data
  * @param {HTMLElement} container
  * @param {Object} project
- * @param {Object} data - { gitInfo, stats }
+ * @param {Object} data - { gitInfo, stats, workflowRuns }
  * @param {Object} options
  * @param {boolean} isRefreshing - Show refresh indicator
  */
@@ -534,7 +641,7 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
     onCopyPath
   } = options;
 
-  const { gitInfo, stats } = data;
+  const { gitInfo, stats, workflowRuns } = data;
   const isFivem = project.type === 'fivem';
   const gitOps = getGitOperation(project.id);
   const hasMergeConflict = gitOps.mergeInProgress && gitOps.conflicts.length > 0;
@@ -624,6 +731,7 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
     <div class="dashboard-grid" data-animate="3">
       <div class="dashboard-col">
         ${buildGitStatusHtml(gitInfo)}
+        ${buildWorkflowRunsHtml(workflowRuns)}
       </div>
       <div class="dashboard-col">
         ${buildStatsHtml(stats, gitInfo)}
@@ -631,6 +739,17 @@ function renderDashboardHtml(container, project, data, options, isRefreshing = f
       </div>
     </div>
   `;
+
+  // Attach click handlers for workflow runs
+  container.querySelectorAll('.workflow-run-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const url = item.dataset.url;
+      if (url) {
+        api.dialog.openExternal(url);
+      }
+    });
+    item.style.cursor = 'pointer';
+  });
 
   // Attach event listeners
   container.querySelector('#dash-btn-open-folder')?.addEventListener('click', () => {

@@ -136,7 +136,8 @@ contextBridge.exposeInMainWorld('electron_api', {
     selectFolder: () => ipcRenderer.invoke('select-folder'),
     selectFile: (params) => ipcRenderer.invoke('select-file', params),
     openInExplorer: (path) => ipcRenderer.send('open-in-explorer', path),
-    openInEditor: (params) => ipcRenderer.send('open-in-editor', params)
+    openInEditor: (params) => ipcRenderer.send('open-in-editor', params),
+    openExternal: (url) => ipcRenderer.send('open-external', url)
   },
 
   window: {
@@ -168,7 +169,8 @@ contextBridge.exposeInMainWorld('electron_api', {
     authStatus: () => ipcRenderer.invoke('github-auth-status'),
     logout: () => ipcRenderer.invoke('github-logout'),
     setToken: (token) => ipcRenderer.invoke('github-set-token', token),
-    getToken: () => ipcRenderer.invoke('github-get-token')
+    getToken: () => ipcRenderer.invoke('github-get-token'),
+    workflowRuns: (remoteUrl) => ipcRenderer.invoke('github-workflow-runs', { remoteUrl })
   },
 
   // ==================== PROJECT ====================

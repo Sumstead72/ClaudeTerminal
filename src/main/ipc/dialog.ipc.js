@@ -78,6 +78,11 @@ function registerDialogHandlers() {
     exec(`${editor} "${projectPath}"`);
   });
 
+  // Open external URL in browser
+  ipcMain.on('open-external', (event, url) => {
+    shell.openExternal(url);
+  });
+
   // Show notification
   ipcMain.on('show-notification', (event, { title, body, terminalId }) => {
     if (!Notification.isSupported()) return;

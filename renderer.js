@@ -4487,6 +4487,175 @@ if (usageElements.container) {
   }, 2000);
 }
 
+// ========== CI STATUS BAR ==========
+const ciStatusBar = {
+  element: document.getElementById('ci-status-bar'),
+  workflowName: document.getElementById('ci-workflow-name'),
+  statusText: document.getElementById('ci-status-text'),
+  branch: document.getElementById('ci-branch'),
+  duration: document.getElementById('ci-duration'),
+  linkBtn: document.getElementById('ci-status-link'),
+  closeBtn: document.getElementById('ci-status-close'),
+  currentRun: null,
+  pollInterval: null,
+  hideTimeout: null,
+  startTime: null
+};
+
+/**
+ * Show CI status bar with workflow info
+ */
+function showCIStatusBar(run) {
+  if (!ciStatusBar.element) return;
+
+  ciStatusBar.currentRun = run;
+  ciStatusBar.startTime = new Date(run.createdAt);
+
+  // Update content
+  ciStatusBar.workflowName.textContent = run.name;
+  ciStatusBar.branch.textContent = run.branch;
+
+  // Set status
+  ciStatusBar.element.classList.remove('success', 'failure', 'hiding');
+
+  if (run.status === 'completed') {
+    if (run.conclusion === 'success') {
+      ciStatusBar.element.classList.add('success');
+      ciStatusBar.statusText.textContent = 'Passed';
+    } else {
+      ciStatusBar.element.classList.add('failure');
+      ciStatusBar.statusText.textContent = run.conclusion === 'cancelled' ? 'Cancelled' : 'Failed';
+    }
+  } else {
+    ciStatusBar.statusText.textContent = run.status === 'queued' ? 'Queued' : 'Running';
+  }
+
+  // Update duration
+  updateCIDuration();
+
+  // Show bar
+  ciStatusBar.element.style.display = 'flex';
+
+  // Auto-hide after completion (5 seconds)
+  if (run.status === 'completed') {
+    clearTimeout(ciStatusBar.hideTimeout);
+    ciStatusBar.hideTimeout = setTimeout(() => {
+      hideCIStatusBar();
+    }, 5000);
+  }
+}
+
+/**
+ * Hide CI status bar with animation
+ */
+function hideCIStatusBar() {
+  if (!ciStatusBar.element) return;
+
+  ciStatusBar.element.classList.add('hiding');
+  setTimeout(() => {
+    ciStatusBar.element.style.display = 'none';
+    ciStatusBar.element.classList.remove('hiding');
+    ciStatusBar.currentRun = null;
+  }, 300);
+}
+
+/**
+ * Update duration display
+ */
+function updateCIDuration() {
+  if (!ciStatusBar.startTime || !ciStatusBar.duration) return;
+
+  const elapsed = Math.floor((Date.now() - ciStatusBar.startTime.getTime()) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  ciStatusBar.duration.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Check CI status for current project
+ */
+async function checkCIStatus() {
+  const filterIdx = projectsState.get().selectedProjectFilter;
+  if (filterIdx === null || filterIdx === undefined) return;
+
+  const projects = projectsState.get().projects;
+  const project = projects[filterIdx];
+  if (!project) return;
+
+  try {
+    // Get git info for remote URL
+    const gitInfo = await api.git.info(project.path);
+    if (!gitInfo.isGitRepo || !gitInfo.remoteUrl || !gitInfo.remoteUrl.includes('github.com')) {
+      return;
+    }
+
+    // Fetch workflow runs
+    const result = await api.github.workflowRuns(gitInfo.remoteUrl);
+    if (!result.success || !result.authenticated || !result.runs || result.runs.length === 0) {
+      // No runs or not authenticated - hide bar if showing
+      if (ciStatusBar.currentRun) {
+        hideCIStatusBar();
+      }
+      return;
+    }
+
+    // Find most recent run on current branch or any in-progress run
+    const currentBranch = gitInfo.branch;
+    const inProgressRun = result.runs.find(r => r.status === 'in_progress' || r.status === 'queued');
+    const branchRun = result.runs.find(r => r.branch === currentBranch);
+    const relevantRun = inProgressRun || branchRun;
+
+    if (!relevantRun) {
+      if (ciStatusBar.currentRun) {
+        hideCIStatusBar();
+      }
+      return;
+    }
+
+    // Check if this is a new run or status changed
+    if (!ciStatusBar.currentRun ||
+        ciStatusBar.currentRun.id !== relevantRun.id ||
+        ciStatusBar.currentRun.status !== relevantRun.status) {
+      showCIStatusBar(relevantRun);
+    }
+  } catch (e) {
+    console.error('[CI Status] Error checking status:', e);
+  }
+}
+
+// Initialize CI status bar
+if (ciStatusBar.element) {
+  // Link button opens GitHub
+  ciStatusBar.linkBtn?.addEventListener('click', () => {
+    if (ciStatusBar.currentRun?.url) {
+      api.dialog.openExternal(ciStatusBar.currentRun.url);
+    }
+  });
+
+  // Close button hides bar
+  ciStatusBar.closeBtn?.addEventListener('click', () => {
+    hideCIStatusBar();
+    // Don't show again for this run
+    if (ciStatusBar.currentRun) {
+      ciStatusBar.currentRun.dismissed = true;
+    }
+  });
+
+  // Update duration every second when visible
+  setInterval(() => {
+    if (ciStatusBar.element.style.display !== 'none' &&
+        ciStatusBar.currentRun?.status !== 'completed') {
+      updateCIDuration();
+    }
+  }, 1000);
+
+  // Poll CI status every 30 seconds
+  setInterval(checkCIStatus, 30000);
+
+  // Initial check after 3 seconds
+  setTimeout(checkCIStatus, 3000);
+}
+
 // ========== TIME TRACKING DISPLAY ==========
 const { formatDuration: formatTimeDisplay } = require('./src/renderer/utils/format');
 const timeElements = {
