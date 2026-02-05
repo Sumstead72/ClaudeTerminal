@@ -551,18 +551,77 @@ function gitClone(repoUrl, targetPath, options = {}) {
  * @returns {Promise<Object>} - Lines count by type
  */
 async function countLinesOfCode(projectPath) {
-  return new Promise((resolve) => {
-    // Use git ls-files to only count tracked files, or fall back to all files
-    const extensions = ['js', 'ts', 'jsx', 'tsx', 'vue', 'py', 'lua', 'css', 'scss', 'html', 'json', 'md', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'php', 'rb', 'swift', 'kt'];
-    const extPattern = extensions.join(',');
+  const extensions = ['.js', '.ts', '.jsx', '.tsx', '.vue', '.py', '.lua', '.css', '.scss', '.html', '.json', '.md', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.php', '.rb', '.swift', '.kt'];
 
-    // Use PowerShell on Windows for reliable line counting
+  // Try git ls-files first (fast, reads from index)
+  const gitResult = await new Promise((resolve) => {
+    const safeDir = `-c safe.directory="${projectPath.replace(/\\/g, '/')}"`;
+    exec(`git ${safeDir} ls-files`, { cwd: projectPath, encoding: 'utf8', maxBuffer: 1024 * 1024 * 50, timeout: 10000 }, (error, stdout) => {
+      if (error || !stdout.trim()) {
+        resolve(null);
+        return;
+      }
+      resolve(stdout.trim().split('\n').filter(f => f.trim()));
+    });
+  });
+
+  if (gitResult && gitResult.length > 0) {
+    return countLinesFromFileList(projectPath, gitResult, extensions);
+  }
+
+  // Fallback: filesystem scan for non-git projects
+  return countLinesFromFilesystem(projectPath, extensions);
+}
+
+async function countLinesFromFileList(projectPath, fileList, extensions) {
+  const path = require('path');
+  const fs = require('fs').promises;
+
+  // Filter files by extension
+  const sourceFiles = fileList.filter(f => {
+    const ext = path.extname(f).toLowerCase();
+    return extensions.includes(ext);
+  });
+
+  let totalLines = 0;
+  let totalFiles = 0;
+  const byExtension = {};
+
+  // Process files in batches of 50 to avoid blocking
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < sourceFiles.length; i += BATCH_SIZE) {
+    const batch = sourceFiles.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(batch.map(async (relPath) => {
+      const fullPath = path.join(projectPath, relPath);
+      const content = await fs.readFile(fullPath, 'utf8');
+      return { relPath, lines: content.split('\n').length };
+    }));
+
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      const { relPath, lines } = result.value;
+      totalLines += lines;
+      totalFiles++;
+
+      const ext = path.extname(relPath).toLowerCase();
+      if (!byExtension[ext]) byExtension[ext] = { files: 0, lines: 0 };
+      byExtension[ext].files++;
+      byExtension[ext].lines += lines;
+    }
+  }
+
+  return { total: totalLines, files: totalFiles, byExtension };
+}
+
+async function countLinesFromFilesystem(projectPath, extensions) {
+  return new Promise((resolve) => {
     const isWin = process.platform === 'win32';
 
     if (isWin) {
+      const extList = extensions.map(e => `'${e}'`).join(', ');
       const psCommand = `
-        $extensions = @('.js', '.ts', '.jsx', '.tsx', '.vue', '.py', '.lua', '.css', '.scss', '.html', '.json', '.md', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.php', '.rb', '.swift', '.kt');
-        $files = Get-ChildItem -Path "${projectPath.replace(/\\/g, '\\\\')}" -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $extensions -contains $_.Extension -and $_.FullName -notmatch 'node_modules|vendor|dist|build|\\.git' };
+        $extensions = @(${extList});
+        $files = Get-ChildItem -Path "${projectPath.replace(/\\/g, '\\\\')}" -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $extensions -contains $_.Extension -and $_.FullName -notmatch 'node_modules|vendor|dist|build|cache|stream|\\.git' };
         $totalLines = 0;
         $totalFiles = 0;
         $byExt = @{};
@@ -582,7 +641,7 @@ async function countLinesOfCode(projectPath) {
         $result | ConvertTo-Json -Compress
       `.replace(/\n/g, ' ');
 
-      exec(`powershell -NoProfile -Command "${psCommand}"`, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 10, timeout: 15000 }, (error, stdout) => {
+      exec(`powershell -NoProfile -Command "${psCommand}"`, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 10, timeout: 30000 }, (error, stdout) => {
         if (error || !stdout.trim()) {
           resolve({ total: 0, files: 0, byExtension: {} });
           return;
@@ -599,7 +658,6 @@ async function countLinesOfCode(projectPath) {
         }
       });
     } else {
-      // Unix: use find + wc
       const cmd = `find "${projectPath}" -type f \\( -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" -o -name "*.vue" -o -name "*.py" -o -name "*.lua" -o -name "*.css" -o -name "*.scss" -o -name "*.html" -o -name "*.go" -o -name "*.rs" -o -name "*.java" \\) -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*" -not -path "*/build/*" -not -path "*/vendor/*" | head -1000 | xargs wc -l 2>/dev/null | tail -1`;
 
       exec(cmd, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 10, timeout: 15000 }, (error, stdout) => {
