@@ -117,27 +117,11 @@ function loadWebglAddon(terminal) {
   }
 }
 
-// ── Output silence detection: if terminal stops producing output, mark as ready ──
-const OUTPUT_SILENCE_TIMEOUT = 5000; // 5 seconds of silence = Claude finished
-const outputSilenceTimers = new Map(); // terminalId -> timerId
-
-function resetOutputSilenceTimer(id) {
-  clearTimeout(outputSilenceTimers.get(id));
-  const td = getTerminal(id);
-  if (!td || td.isBasic || td.status !== 'working') return;
-  outputSilenceTimers.set(id, setTimeout(() => {
-    const current = getTerminal(id);
-    if (current && current.status === 'working') {
-      updateTerminalStatus(id, 'ready');
-    }
-    outputSilenceTimers.delete(id);
-  }, OUTPUT_SILENCE_TIMEOUT));
-}
-
-function clearOutputSilenceTimer(id) {
-  clearTimeout(outputSilenceTimers.get(id));
-  outputSilenceTimers.delete(id);
-}
+// ── Output silence detection disabled ──
+// Status detection relies solely on terminal title: ✳ = ready, spinner = working
+// Silence-based detection caused false "ready" during Claude's thinking phases
+function resetOutputSilenceTimer(_id) { /* no-op */ }
+function clearOutputSilenceTimer(_id) { /* no-op */ }
 
 // ── Throttled recordActivity (max 1 call/sec per project) ──
 const activityThrottles = new Map();
@@ -730,7 +714,10 @@ async function createTerminal(project, options = {}) {
     lastTitle = title;
     const spinnerChars = /[⠂⠄⠆⠇⠋⠙⠹⠸⠼⠴⠦⠧⠏]/;
     if (title.includes('✳')) updateTerminalStatus(id, 'ready');
-    else if (spinnerChars.test(title)) updateTerminalStatus(id, 'working');
+    else if (spinnerChars.test(title)) {
+      updateTerminalStatus(id, 'working');
+      // Title spinner = still working (primary detection mechanism)
+    }
   });
 
   // IPC data handling via centralized dispatcher
@@ -1829,7 +1816,10 @@ async function resumeSession(project, sessionId, options = {}) {
     lastTitle = title;
     const spinnerChars = /[⠂⠄⠆⠇⠋⠙⠹⠸⠼⠴⠦⠧⠏]/;
     if (title.includes('✳')) updateTerminalStatus(id, 'ready');
-    else if (spinnerChars.test(title)) updateTerminalStatus(id, 'working');
+    else if (spinnerChars.test(title)) {
+      updateTerminalStatus(id, 'working');
+      // Title spinner = still working (primary detection mechanism)
+    }
   });
 
   // IPC handlers via centralized dispatcher
@@ -2103,6 +2093,7 @@ async function createTerminalWithPrompt(project, prompt) {
       }
     } else if (spinnerChars.test(title)) {
       updateTerminalStatus(id, 'working');
+      // Title spinner = still working (primary detection mechanism)
     }
   });
 

@@ -38,17 +38,7 @@ function initialize() {
   // Initialize settings (applies accent color, etc.)
   services.SettingsService.initializeSettings();
 
-  // Register IPC listeners
-  services.TerminalService.registerTerminalListeners(
-    // onData callback
-    (id, data) => {
-      // Can be used for notifications, title updates, etc.
-    },
-    // onExit callback
-    (id) => {
-      // Terminal exited
-    }
-  );
+  // Terminal IPC listeners are handled by TerminalManager's centralized dispatcher
 
   services.McpService.registerMcpListeners(
     // onOutput callback

@@ -192,7 +192,8 @@ async function executeQuickAction(project, actionId) {
       const terminalId = await createTerminalCallback(project, {
         runClaude: false,
         skipPermissions: true,
-        name: action.name
+        name: action.name,
+        actionCommand: action.command
       });
 
       // Track this terminal for reuse

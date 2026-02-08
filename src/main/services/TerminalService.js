@@ -44,7 +44,8 @@ class TerminalService {
    */
   create({ cwd, runClaude, skipPermissions, resumeSessionId }) {
     const id = ++this.terminalId;
-    const shellPath = process.platform === 'win32' ? 'powershell.exe' : 'bash';
+    let shellPath = process.platform === 'win32' ? 'powershell.exe' : 'bash';
+    let shellArgs = process.platform === 'win32' ? ['-NoLogo', '-NoProfile'] : [];
 
     // Validate and resolve working directory
     let effectiveCwd = os.homedir();
@@ -60,9 +61,22 @@ class TerminalService {
       }
     }
 
+    // If running Claude, spawn it directly via cmd.exe /c (no shell banner, no prompt)
+    if (runClaude && process.platform === 'win32') {
+      const claudeArgs = ['claude'];
+      if (resumeSessionId) {
+        claudeArgs.push('--resume', resumeSessionId);
+      }
+      if (skipPermissions) {
+        claudeArgs.push('--dangerously-skip-permissions');
+      }
+      shellPath = 'cmd.exe';
+      shellArgs = ['/c', ...claudeArgs];
+    }
+
     let ptyProcess;
     try {
-      ptyProcess = pty.spawn(shellPath, [], {
+      ptyProcess = pty.spawn(shellPath, shellArgs, {
         name: 'xterm-256color',
         cols: 120,
         rows: 30,
@@ -105,8 +119,8 @@ class TerminalService {
       this.sendToRenderer('terminal-exit', { id });
     });
 
-    // Run Claude CLI if requested
-    if (runClaude) {
+    // Run Claude CLI on non-Windows platforms
+    if (runClaude && process.platform !== 'win32') {
       setTimeout(() => {
         let claudeCmd = 'claude';
         if (resumeSessionId) {
