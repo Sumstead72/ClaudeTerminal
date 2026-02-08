@@ -778,13 +778,39 @@ function attachListeners(list) {
     item.addEventListener('click', () => closeAllMoreActionsMenus());
   });
 
-  // Right-click on project → open more-actions menu
+  // Right-click on project → open more-actions menu at cursor position
   list.querySelectorAll('.project-item').forEach(item => {
     item.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
       const moreBtn = item.querySelector('.btn-more-actions');
-      if (moreBtn) moreBtn.click();
+      if (!moreBtn) return;
+      const menu = moreBtn.nextElementSibling;
+      if (!menu) return;
+
+      closeAllMoreActionsMenus();
+
+      // Measure menu dimensions
+      menu.style.visibility = 'hidden';
+      menu.classList.add('active');
+      const menuWidth = menu.offsetWidth;
+      const menuHeight = menu.offsetHeight;
+      menu.classList.remove('active');
+      menu.style.visibility = '';
+
+      // Position at cursor
+      let left = e.clientX;
+      let top = e.clientY;
+
+      // Keep within viewport
+      if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - 4;
+      if (left < 0) left = 4;
+      if (top + menuHeight > window.innerHeight) top = window.innerHeight - menuHeight - 4;
+      if (top < 0) top = 4;
+
+      menu.style.top = `${top}px`;
+      menu.style.left = `${left}px`;
+      menu.classList.add('active');
     });
   });
 
