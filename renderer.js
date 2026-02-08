@@ -69,7 +69,10 @@ const {
   onLanguageChange,
 
   // Time Tracking
-  getProjectTimes
+  getProjectTimes,
+
+  // Themes
+  TERMINAL_THEMES
 } = require('./src/renderer');
 
 // ========== LOCAL MODAL FUNCTIONS ==========
@@ -428,7 +431,7 @@ function registerAllShortcuts() {
   initKeyboardShortcuts();
 
   // Register settings shortcut
-  registerShortcut(getShortcutKey('openSettings'), () => showSettingsModal(), { global: true });
+  registerShortcut(getShortcutKey('openSettings'), () => switchToSettingsTab(), { global: true });
 
   // Close current terminal
   registerShortcut(getShortcutKey('closeTerminal'), () => {
@@ -1333,7 +1336,7 @@ document.getElementById('btn-notifications').onclick = () => {
   }
 };
 
-document.getElementById('btn-settings').onclick = () => showSettingsModal();
+document.getElementById('btn-settings').onclick = () => switchToSettingsTab();
 
 // Sidebar collapse toggle
 const sidebarEl = document.querySelector('.sidebar');
@@ -1352,6 +1355,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     const tabId = tab.dataset.tab;
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
+    document.getElementById('btn-settings').classList.remove('active');
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById(`tab-${tabId}`).classList.add('active');
     if (tabId === 'skills') loadSkills();
@@ -1540,8 +1544,22 @@ async function renameProjectUI(projectId) {
   }
 }
 
-// ========== SETTINGS MODAL ==========
-async function showSettingsModal(initialTab = 'general') {
+// ========== SETTINGS TAB ==========
+function switchToSettingsTab(initialSubTab = 'general') {
+  // Deactivate all nav-tabs, activate settings button
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('btn-settings').classList.add('active');
+  // Hide all tab-contents, show settings tab
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-settings').classList.add('active');
+  // Cleanup time tracking if leaving that tab
+  TimeTrackingDashboard.cleanup();
+  // Render settings content
+  renderSettingsTab(initialSubTab);
+}
+
+async function renderSettingsTab(initialTab = 'general') {
+  const container = document.getElementById('tab-settings');
   const settings = settingsState.get();
 
   // Get launch at startup setting
@@ -1563,200 +1581,226 @@ async function showSettingsModal(initialTab = 'general') {
   const availableLanguages = getAvailableLanguages();
   const currentLang = getCurrentLanguage();
 
-  showModal(t('settings.title'), `
-    <div class="settings-tabs">
-      <button class="settings-tab ${initialTab === 'general' ? 'active' : ''}" data-tab="general">
+  container.innerHTML = `
+    <div class="settings-inline-wrapper">
+      <div class="settings-inline-header">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-        General
-      </button>
-      <button class="settings-tab ${initialTab === 'claude' ? 'active' : ''}" data-tab="claude">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
-        Claude
-      </button>
-      <button class="settings-tab ${initialTab === 'github' ? 'active' : ''}" data-tab="github">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        GitHub
-      </button>
-      <button class="settings-tab ${initialTab === 'shortcuts' ? 'active' : ''}" data-tab="shortcuts">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
-        Raccourcis
-      </button>
-    </div>
-    <div class="settings-content">
-      <!-- General Tab -->
-      <div class="settings-panel ${initialTab === 'general' ? 'active' : ''}" data-panel="general">
-        <div class="settings-section">
-          <div class="settings-title">Apparence</div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <div>${t('settings.language')}</div>
-              <div class="settings-desc">Change the interface language</div>
+        <h2>${t('settings.title')}</h2>
+      </div>
+      <div class="settings-tabs">
+        <button class="settings-tab ${initialTab === 'general' ? 'active' : ''}" data-tab="general">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+          General
+        </button>
+        <button class="settings-tab ${initialTab === 'claude' ? 'active' : ''}" data-tab="claude">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
+          Claude
+        </button>
+        <button class="settings-tab ${initialTab === 'github' ? 'active' : ''}" data-tab="github">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </button>
+        <button class="settings-tab ${initialTab === 'themes' ? 'active' : ''}" data-tab="themes">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+          Themes
+        </button>
+        <button class="settings-tab ${initialTab === 'shortcuts' ? 'active' : ''}" data-tab="shortcuts">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
+          Raccourcis
+        </button>
+      </div>
+      <div class="settings-content">
+        <!-- General Tab -->
+        <div class="settings-panel ${initialTab === 'general' ? 'active' : ''}" data-panel="general">
+          <div class="settings-section">
+            <div class="settings-title">Apparence</div>
+            <div class="settings-row">
+              <div class="settings-label">
+                <div>${t('settings.language')}</div>
+                <div class="settings-desc">Change the interface language</div>
+              </div>
+              <select id="language-select" class="settings-select">
+                ${availableLanguages.map(lang =>
+                  `<option value="${lang.code}" ${currentLang === lang.code ? 'selected' : ''}>${lang.name}</option>`
+                ).join('')}
+              </select>
             </div>
-            <select id="language-select" class="settings-select">
-              ${availableLanguages.map(lang =>
-                `<option value="${lang.code}" ${currentLang === lang.code ? 'selected' : ''}>${lang.name}</option>`
+            <div class="settings-row">
+              <div class="settings-label">
+                <div>Couleur d'accent</div>
+                <div class="settings-desc">Personnalisez la couleur principale de l'interface</div>
+              </div>
+            </div>
+            <div class="color-picker">
+              ${['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].map(c =>
+                `<button class="color-swatch ${settings.accentColor === c ? 'selected' : ''}" style="background:${c}" data-color="${c}"></button>`
               ).join('')}
-            </select>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <div>Couleur d'accent</div>
-              <div class="settings-desc">Personnalisez la couleur principale de l'interface</div>
+              <div class="color-swatch-custom ${!['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].includes(settings.accentColor) ? 'selected' : ''}" style="background:${!['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].includes(settings.accentColor) ? settings.accentColor : 'var(--bg-tertiary)'}">
+                <input type="color" id="custom-color-input" value="${settings.accentColor}" title="Choisir une couleur personnalisee">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              </div>
+            </div>
+            <div class="settings-row" style="margin-top: 16px;">
+              <div class="settings-label">
+                <div>Theme du terminal</div>
+                <div class="settings-desc">Changez les couleurs du terminal</div>
+              </div>
+              <button type="button" class="btn-outline" id="btn-go-themes">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                ${TERMINAL_THEMES[settings.terminalTheme || 'claude']?.name || 'Claude'}
+              </button>
             </div>
           </div>
-          <div class="color-picker">
-            ${['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].map(c =>
-              `<button class="color-swatch ${settings.accentColor === c ? 'selected' : ''}" style="background:${c}" data-color="${c}"></button>`
-            ).join('')}
-            <div class="color-swatch-custom ${!['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].includes(settings.accentColor) ? 'selected' : ''}" style="background:${!['#d97706', '#dc2626', '#db2777', '#9333ea', '#4f46e5', '#2563eb', '#0891b2', '#0d9488', '#16a34a', '#65a30d'].includes(settings.accentColor) ? settings.accentColor : 'var(--bg-tertiary)'}">
-              <input type="color" id="custom-color-input" value="${settings.accentColor}" title="Choisir une couleur personnalisee">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <div class="settings-section">
+            <div class="settings-title">Systeme</div>
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-label">
+                <div>Lancer au demarrage</div>
+                <div class="settings-toggle-desc">Demarrer automatiquement avec Windows</div>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="launch-at-startup-toggle" ${launchAtStartup ? 'checked' : ''}>
+                <span class="settings-toggle-slider"></span>
+              </label>
             </div>
-          </div>
-          <div class="settings-row" style="margin-top: 16px;">
-            <div class="settings-label">
-              <div>Theme du terminal</div>
-              <div class="settings-desc">Changez les couleurs du terminal</div>
+            <div class="settings-toggle-row">
+              <div class="settings-toggle-label">
+                <div>Vue compacte des projets</div>
+                <div class="settings-toggle-desc">Afficher uniquement le nom des projets non selectionnes</div>
+              </div>
+              <label class="settings-toggle">
+                <input type="checkbox" id="compact-projects-toggle" ${settings.compactProjects !== false ? 'checked' : ''}>
+                <span class="settings-toggle-slider"></span>
+              </label>
             </div>
-            <select id="terminal-theme-select" class="settings-select">
-              <option value="claude" ${settings.terminalTheme === 'claude' || !settings.terminalTheme ? 'selected' : ''}>Claude</option>
-              <option value="dracula" ${settings.terminalTheme === 'dracula' ? 'selected' : ''}>Dracula</option>
-              <option value="monokai" ${settings.terminalTheme === 'monokai' ? 'selected' : ''}>Monokai</option>
-              <option value="nord" ${settings.terminalTheme === 'nord' ? 'selected' : ''}>Nord</option>
-              <option value="oneDark" ${settings.terminalTheme === 'oneDark' ? 'selected' : ''}>One Dark</option>
-              <option value="gruvbox" ${settings.terminalTheme === 'gruvbox' ? 'selected' : ''}>Gruvbox</option>
-              <option value="tokyoNight" ${settings.terminalTheme === 'tokyoNight' ? 'selected' : ''}>Tokyo Night</option>
-              <option value="catppuccin" ${settings.terminalTheme === 'catppuccin' ? 'selected' : ''}>Catppuccin</option>
-              <option value="synthwave" ${settings.terminalTheme === 'synthwave' ? 'selected' : ''}>Synthwave</option>
-              <option value="matrix" ${settings.terminalTheme === 'matrix' ? 'selected' : ''}>Matrix</option>
-            </select>
+            <div class="settings-row">
+              <div class="settings-label">
+                <div>Fermeture de la fenetre</div>
+                <div class="settings-desc">Action quand vous cliquez sur fermer</div>
+              </div>
+              <select id="close-action-select" class="settings-select">
+                <option value="ask" ${settings.closeAction === 'ask' || !settings.closeAction ? 'selected' : ''}>Demander</option>
+                <option value="minimize" ${settings.closeAction === 'minimize' ? 'selected' : ''}>Minimiser</option>
+                <option value="quit" ${settings.closeAction === 'quit' ? 'selected' : ''}>Quitter</option>
+              </select>
+            </div>
           </div>
         </div>
-        <div class="settings-section">
-          <div class="settings-title">Systeme</div>
-          <div class="settings-toggle-row">
-            <div class="settings-toggle-label">
-              <div>Lancer au demarrage</div>
-              <div class="settings-toggle-desc">Demarrer automatiquement avec Windows</div>
+        <!-- Claude Tab -->
+        <div class="settings-panel ${initialTab === 'claude' ? 'active' : ''}" data-panel="claude">
+          <div class="settings-section">
+            <div class="settings-title">Mode d'execution</div>
+            <div class="execution-mode-selector">
+              <div class="execution-mode-card ${!settings.skipPermissions ? 'selected' : ''}" data-mode="safe">
+                <div class="execution-mode-icon safe">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                </div>
+                <div class="execution-mode-content">
+                  <div class="execution-mode-title">Mode securise</div>
+                  <div class="execution-mode-desc">Claude demande confirmation avant chaque action</div>
+                </div>
+                <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+              </div>
+              <div class="execution-mode-card ${settings.skipPermissions ? 'selected' : ''}" data-mode="dangerous">
+                <div class="execution-mode-icon dangerous">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+                </div>
+                <div class="execution-mode-content">
+                  <div class="execution-mode-title">Mode autonome</div>
+                  <div class="execution-mode-desc">Claude execute sans confirmation</div>
+                  <div class="execution-mode-flag">--dangerously-skip-permissions</div>
+                </div>
+                <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+              </div>
             </div>
-            <label class="settings-toggle">
-              <input type="checkbox" id="launch-at-startup-toggle" ${launchAtStartup ? 'checked' : ''}>
-              <span class="settings-toggle-slider"></span>
-            </label>
-          </div>
-          <div class="settings-toggle-row">
-            <div class="settings-toggle-label">
-              <div>Vue compacte des projets</div>
-              <div class="settings-toggle-desc">Afficher uniquement le nom des projets non selectionnes</div>
+            <div class="settings-warning" id="dangerous-warning" style="display: ${settings.skipPermissions ? 'flex' : 'none'};">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+              <span>Ce mode permet a Claude d'executer des commandes sans validation.</span>
             </div>
-            <label class="settings-toggle">
-              <input type="checkbox" id="compact-projects-toggle" ${settings.compactProjects !== false ? 'checked' : ''}>
-              <span class="settings-toggle-slider"></span>
-            </label>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <div>Fermeture de la fenetre</div>
-              <div class="settings-desc">Action quand vous cliquez sur fermer</div>
-            </div>
-            <select id="close-action-select" class="settings-select">
-              <option value="ask" ${settings.closeAction === 'ask' || !settings.closeAction ? 'selected' : ''}>Demander</option>
-              <option value="minimize" ${settings.closeAction === 'minimize' ? 'selected' : ''}>Minimiser</option>
-              <option value="quit" ${settings.closeAction === 'quit' ? 'selected' : ''}>Quitter</option>
-            </select>
           </div>
         </div>
-      </div>
-      <!-- Claude Tab -->
-      <div class="settings-panel ${initialTab === 'claude' ? 'active' : ''}" data-panel="claude">
-        <div class="settings-section">
-          <div class="settings-title">Mode d'execution</div>
-          <div class="execution-mode-selector">
-            <div class="execution-mode-card ${!settings.skipPermissions ? 'selected' : ''}" data-mode="safe">
-              <div class="execution-mode-icon safe">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-              </div>
-              <div class="execution-mode-content">
-                <div class="execution-mode-title">Mode securise</div>
-                <div class="execution-mode-desc">Claude demande confirmation avant chaque action</div>
-              </div>
-              <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
-            </div>
-            <div class="execution-mode-card ${settings.skipPermissions ? 'selected' : ''}" data-mode="dangerous">
-              <div class="execution-mode-icon dangerous">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
-              </div>
-              <div class="execution-mode-content">
-                <div class="execution-mode-title">Mode autonome</div>
-                <div class="execution-mode-desc">Claude execute sans confirmation</div>
-                <div class="execution-mode-flag">--dangerously-skip-permissions</div>
-              </div>
-              <div class="execution-mode-check"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
-            </div>
-          </div>
-          <div class="settings-warning" id="dangerous-warning" style="display: ${settings.skipPermissions ? 'flex' : 'none'};">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
-            <span>Ce mode permet a Claude d'executer des commandes sans validation.</span>
-          </div>
-        </div>
-      </div>
-      <!-- GitHub Tab -->
-      <div class="settings-panel ${initialTab === 'github' ? 'active' : ''}" data-panel="github">
-        <div class="settings-section">
-          <div class="settings-title">Compte GitHub</div>
-          <div class="github-account-card" id="github-account-card">
-            ${githubStatus.authenticated ? `
-              <div class="github-account-connected">
-                <div class="github-account-info">
-                  <img src="${githubStatus.avatar_url || ''}" alt="" class="github-avatar" onerror="this.style.display='none'">
-                  <div class="github-account-details">
-                    <div class="github-account-name">${githubStatus.name || githubStatus.login}</div>
-                    <div class="github-account-login">@${githubStatus.login}</div>
+        <!-- GitHub Tab -->
+        <div class="settings-panel ${initialTab === 'github' ? 'active' : ''}" data-panel="github">
+          <div class="settings-section">
+            <div class="settings-title">Compte GitHub</div>
+            <div class="github-account-card" id="github-account-card">
+              ${githubStatus.authenticated ? `
+                <div class="github-account-connected">
+                  <div class="github-account-info">
+                    <img src="${githubStatus.avatar_url || ''}" alt="" class="github-avatar" onerror="this.style.display='none'">
+                    <div class="github-account-details">
+                      <div class="github-account-name">${githubStatus.name || githubStatus.login}</div>
+                      <div class="github-account-login">@${githubStatus.login}</div>
+                    </div>
+                  </div>
+                  <button type="button" class="btn-outline-danger btn-sm" id="btn-github-disconnect">Deconnecter</button>
+                </div>
+              ` : `
+                <div class="github-account-disconnected">
+                  <div class="github-account-message">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    <div>
+                      <div class="github-account-title">Connectez votre compte GitHub</div>
+                      <div class="github-account-desc">Entrez un Personal Access Token pour cloner vos repos prives</div>
+                    </div>
                   </div>
                 </div>
-                <button type="button" class="btn-outline-danger btn-sm" id="btn-github-disconnect">Deconnecter</button>
-              </div>
-            ` : `
-              <div class="github-account-disconnected">
-                <div class="github-account-message">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                  <div>
-                    <div class="github-account-title">Connectez votre compte GitHub</div>
-                    <div class="github-account-desc">Entrez un Personal Access Token pour cloner vos repos prives</div>
+                <div class="github-token-form">
+                  <div class="github-token-input-group">
+                    <input type="password" id="github-token-input" class="github-token-input" placeholder="ghp_xxxxxxxxxxxx">
+                    <button type="button" class="btn-github-connect" id="btn-github-connect">Connecter</button>
+                  </div>
+                  <div class="github-token-help">
+                    <a href="#" id="github-token-help-link">Comment creer un token ?</a>
                   </div>
                 </div>
-              </div>
-              <div class="github-token-form">
-                <div class="github-token-input-group">
-                  <input type="password" id="github-token-input" class="github-token-input" placeholder="ghp_xxxxxxxxxxxx">
-                  <button type="button" class="btn-github-connect" id="btn-github-connect">Connecter</button>
-                </div>
-                <div class="github-token-help">
-                  <a href="#" id="github-token-help-link">Comment creer un token ?</a>
-                </div>
-              </div>
-            `}
+              `}
+            </div>
+            <div class="github-device-flow-container" id="github-device-flow" style="display: none;"></div>
           </div>
-          <div class="github-device-flow-container" id="github-device-flow" style="display: none;"></div>
+        </div>
+        <!-- Themes Tab -->
+        <div class="settings-panel ${initialTab === 'themes' ? 'active' : ''}" data-panel="themes">
+          <div class="settings-section">
+            <div class="settings-title">Theme du terminal</div>
+            <div class="settings-desc" style="margin-bottom: 12px;">Choisissez un theme pour personnaliser les couleurs de vos terminaux</div>
+            <div class="theme-grid" id="theme-grid">
+              ${Object.entries(TERMINAL_THEMES).map(([id, theme]) => {
+                const isSelected = settings.terminalTheme === id || (!settings.terminalTheme && id === 'claude');
+                const colors = [theme.red, theme.green, theme.yellow, theme.blue, theme.magenta, theme.cyan];
+                return `<div class="theme-card ${isSelected ? 'selected' : ''}" data-theme-id="${id}">
+                  <div class="theme-card-preview" style="background:${theme.background}">
+                    <span class="theme-card-cursor" style="background:${theme.cursor}"></span>
+                    <span class="theme-card-text" style="color:${theme.foreground}">~$&nbsp;</span>
+                    <span class="theme-card-text" style="color:${theme.green}">node</span>
+                  </div>
+                  <div class="theme-card-colors">
+                    ${colors.map(c => `<span class="theme-card-swatch" style="background:${c}"></span>`).join('')}
+                  </div>
+                  <div class="theme-card-name">${theme.name}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        <!-- Shortcuts Tab -->
+        <div class="settings-panel ${initialTab === 'shortcuts' ? 'active' : ''}" data-panel="shortcuts">
+          ${renderShortcutsPanel()}
         </div>
       </div>
-      <!-- Shortcuts Tab -->
-      <div class="settings-panel ${initialTab === 'shortcuts' ? 'active' : ''}" data-panel="shortcuts">
-        ${renderShortcutsPanel()}
+      <div class="settings-inline-footer">
+        <button type="button" class="btn-primary" id="btn-save-settings">Sauvegarder</button>
       </div>
     </div>
-  `, `
-    <button type="button" class="btn-cancel" onclick="closeModal()">Fermer</button>
-    <button type="button" class="btn-primary" id="btn-save-settings">Sauvegarder</button>
-  `);
+  `;
 
   // Tab switching
-  document.querySelectorAll('.settings-tab').forEach(tab => {
+  container.querySelectorAll('.settings-tab').forEach(tab => {
     tab.onclick = () => {
-      document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+      container.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      container.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
-      document.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`)?.classList.add('active');
+      container.querySelector(`.settings-panel[data-panel="${tab.dataset.tab}"]`)?.classList.add('active');
     };
   });
 
@@ -1764,36 +1808,64 @@ async function showSettingsModal(initialTab = 'general') {
   setupShortcutsPanelHandlers();
 
   // Execution mode cards
-  document.querySelectorAll('.execution-mode-card').forEach(card => {
+  container.querySelectorAll('.execution-mode-card').forEach(card => {
     card.onclick = () => {
-      document.querySelectorAll('.execution-mode-card').forEach(c => c.classList.remove('selected'));
+      container.querySelectorAll('.execution-mode-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       document.getElementById('dangerous-warning').style.display = card.dataset.mode === 'dangerous' ? 'flex' : 'none';
     };
   });
 
   // Color swatches
-  document.querySelectorAll('.color-swatch').forEach(swatch => {
+  container.querySelectorAll('.color-swatch').forEach(swatch => {
     swatch.onclick = () => {
-      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
-      document.querySelector('.color-swatch-custom')?.classList.remove('selected');
+      container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      container.querySelector('.color-swatch-custom')?.classList.remove('selected');
       swatch.classList.add('selected');
     };
   });
 
   // Custom color picker
   const customColorInput = document.getElementById('custom-color-input');
-  const customSwatch = document.querySelector('.color-swatch-custom');
+  const customSwatch = container.querySelector('.color-swatch-custom');
   if (customColorInput && customSwatch) {
     customColorInput.oninput = (e) => {
       const color = e.target.value;
       customSwatch.style.background = color;
-      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
       customSwatch.classList.add('selected');
     };
     customSwatch.onclick = (e) => {
       if (e.target === customColorInput) return;
       customColorInput.click();
+    };
+  }
+
+  // Theme card selection with live preview
+  container.querySelectorAll('.theme-card').forEach(card => {
+    card.onclick = () => {
+      container.querySelectorAll('.theme-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      // Live preview: apply theme immediately to open terminals
+      const themeId = card.dataset.themeId;
+      TerminalManager.updateAllTerminalsTheme(themeId);
+      // Update the button label in general tab
+      const btn = document.getElementById('btn-go-themes');
+      if (btn) {
+        const themeName = TERMINAL_THEMES[themeId]?.name || themeId;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg> ${themeName}`;
+      }
+    };
+  });
+
+  // Navigate to themes tab from general tab button
+  const btnGoThemes = document.getElementById('btn-go-themes');
+  if (btnGoThemes) {
+    btnGoThemes.onclick = () => {
+      container.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      container.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+      container.querySelector('.settings-tab[data-tab="themes"]')?.classList.add('active');
+      container.querySelector('.settings-panel[data-panel="themes"]')?.classList.add('active');
     };
   }
 
@@ -1820,7 +1892,7 @@ async function showSettingsModal(initialTab = 'general') {
         try {
           const result = await api.github.setToken(token);
           if (result.success && result.authenticated) {
-            showSettingsModal('github');
+            renderSettingsTab('github');
           } else {
             tokenInput.classList.add('error');
             tokenInput.value = '';
@@ -1854,7 +1926,7 @@ async function showSettingsModal(initialTab = 'general') {
     if (disconnectBtn) {
       disconnectBtn.onclick = async () => {
         await api.github.logout();
-        showSettingsModal('github');
+        renderSettingsTab('github');
       };
     }
   }
@@ -1862,17 +1934,17 @@ async function showSettingsModal(initialTab = 'general') {
 
   // Save settings
   document.getElementById('btn-save-settings').onclick = async () => {
-    const selectedMode = document.querySelector('.execution-mode-card.selected');
+    const selectedMode = container.querySelector('.execution-mode-card.selected');
     const closeActionSelect = document.getElementById('close-action-select');
-    const terminalThemeSelect = document.getElementById('terminal-theme-select');
+    const selectedThemeCard = container.querySelector('.theme-card.selected');
     const languageSelect = document.getElementById('language-select');
-    const newTerminalTheme = terminalThemeSelect?.value || 'claude';
+    const newTerminalTheme = selectedThemeCard?.dataset.themeId || 'claude';
     const newLanguage = languageSelect?.value || getCurrentLanguage();
 
     // Get accent color from preset swatch or custom picker
     let accentColor = settings.accentColor;
-    const selectedSwatch = document.querySelector('.color-swatch.selected');
-    const customSwatchSelected = document.querySelector('.color-swatch-custom.selected');
+    const selectedSwatch = container.querySelector('.color-swatch.selected');
+    const customSwatchSelected = container.querySelector('.color-swatch-custom.selected');
     if (selectedSwatch) {
       accentColor = selectedSwatch.dataset.color;
     } else if (customSwatchSelected) {
@@ -1920,7 +1992,8 @@ async function showSettingsModal(initialTab = 'general') {
       }
     }
 
-    closeModal();
+    // Show confirmation toast
+    showToast({ type: 'info', title: t('settings.saved') || 'Settings saved', message: '' });
   };
 }
 
@@ -3219,7 +3292,7 @@ document.getElementById('btn-new-project').onclick = () => {
         document.getElementById('link-github-settings')?.addEventListener('click', (e) => {
           e.preventDefault();
           closeModal();
-          showSettingsModal('github');
+          switchToSettingsTab('github');
         });
       }
     } catch (e) {
