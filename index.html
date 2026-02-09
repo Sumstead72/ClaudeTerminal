@@ -165,7 +165,11 @@
     <div class="content">
       <!-- Claude Tab -->
       <div class="tab-content active" id="tab-claude">
-        <div class="claude-layout">
+        <div class="claude-layout" id="claude-layout">
+          <!-- Show projects button (visible when panel is hidden) -->
+          <button class="btn-show-projects" id="btn-show-projects" title="Show projects">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </button>
           <!-- Projects Panel -->
           <div class="projects-panel">
             <div class="panel-header">
@@ -176,6 +180,9 @@
                 </button>
                 <button class="btn-icon" id="btn-new-project" data-i18n-title="common.new">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+                <button class="btn-icon" id="btn-toggle-projects" title="Hide projects">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                 </button>
               </div>
             </div>

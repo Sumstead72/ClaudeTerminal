@@ -4606,6 +4606,33 @@ api.tray.onShowSessions(() => {
   }
 })();
 
+// ========== PROJECTS PANEL TOGGLE ==========
+(function initProjectsPanelToggle() {
+  const panel = document.querySelector('.projects-panel');
+  const layout = document.getElementById('claude-layout');
+  const btnToggle = document.getElementById('btn-toggle-projects');
+  const btnShow = document.getElementById('btn-show-projects');
+  if (!panel || !layout || !btnToggle || !btnShow) return;
+
+  // Restore saved state
+  if (localStorage.getItem('projects-panel-hidden') === 'true') {
+    panel.classList.add('collapsed');
+    layout.classList.add('projects-hidden');
+  }
+
+  btnToggle.onclick = () => {
+    panel.classList.add('collapsed');
+    layout.classList.add('projects-hidden');
+    localStorage.setItem('projects-panel-hidden', 'true');
+  };
+
+  btnShow.onclick = () => {
+    panel.classList.remove('collapsed');
+    layout.classList.remove('projects-hidden');
+    localStorage.setItem('projects-panel-hidden', 'false');
+  };
+})();
+
 // ========== INIT ==========
 setupContextMenuHandlers();
 checkAllProjectsGitStatus();

@@ -621,6 +621,7 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 .projects-panel {
@@ -635,6 +636,55 @@ body {
   overflow: visible;
   position: relative;
   z-index: 10;
+  transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
+}
+
+.projects-panel.collapsed {
+  width: 0 !important;
+  min-width: 0;
+  max-width: 0;
+  border-right: none;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Toggle button icon rotation */
+#btn-toggle-projects svg {
+  transition: transform 0.2s ease;
+}
+
+/* Thin strip to re-open projects panel */
+.btn-show-projects {
+  position: absolute;
+  top: 53px;
+  left: 0;
+  width: 20px;
+  height: calc(100% - 53px);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  transition: all 0.15s;
+  display: none;
+  padding: 0;
+}
+
+.btn-show-projects:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent-color);
+}
+
+.btn-show-projects svg {
+  width: 14px;
+  height: 14px;
+}
+
+.claude-layout.projects-hidden .btn-show-projects {
+  display: flex;
 }
 
 .sessions-panel {
