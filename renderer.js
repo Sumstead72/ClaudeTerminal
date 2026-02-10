@@ -1059,14 +1059,36 @@ async function showSessionsModal(project) {
       return text.length <= maxLength ? text : text.slice(0, maxLength) + '...';
     };
 
+    const cleanPromptAsTitle = (prompt) => {
+      if (!prompt) return 'Sans titre';
+      let clean = prompt
+        .replace(/```[\s\S]*?```/g, '')       // remove code blocks
+        .replace(/`[^`]+`/g, '')              // remove inline code
+        .replace(/<[^>]+>/g, '')              // remove HTML/XML tags
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url) -> text
+        .replace(/https?:\/\/\S+/g, '')       // remove URLs
+        .replace(/[#*_~>|]/g, '')             // remove markdown symbols
+        .replace(/\n+/g, ' ')                 // newlines to spaces
+        .replace(/\s+/g, ' ')                 // collapse whitespace
+        .trim();
+      // Take first sentence or chunk
+      const firstSentence = clean.match(/^[^.!?\n]+[.!?]?/);
+      if (firstSentence) clean = firstSentence[0].trim();
+      // Capitalize first letter
+      if (clean.length > 0) clean = clean[0].toUpperCase() + clean.slice(1);
+      // Truncate
+      if (clean.length > 80) clean = clean.slice(0, 77) + '...';
+      return clean || 'Sans titre';
+    };
+
     const sessionsHtml = sessions.map(session => {
-      const title = session.summary || truncateText(session.firstPrompt, 80) || 'Sans titre';
+      const title = session.summary || cleanPromptAsTitle(session.firstPrompt);
       const showPrompt = session.summary && session.firstPrompt;
       return `
       <div class="session-card-modal" data-session-id="${session.sessionId}">
         <div class="session-header">
           <span class="session-icon">💬</span>
-          <span class="session-title">${escapeHtml(truncateText(title, 80))}</span>
+          <span class="session-title">${escapeHtml(title)}</span>
         </div>
         ${showPrompt ? `<div class="session-prompt">${escapeHtml(truncateText(session.firstPrompt, 100))}</div>` : ''}
         <div class="session-meta">
@@ -3128,14 +3150,37 @@ function renderMemoryContent(content, source, fileExists = true) {
 }
 
 function parseMarkdownToHtml(md) {
-  // Simple markdown parser
-  let html = escapeHtml(md);
+  // Extract code blocks before escaping HTML to preserve their content
+  const codeBlocks = [];
+  let processed = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push({ lang, code });
+    return `\n%%CODEBLOCK_${idx}%%\n`;
+  });
 
-  // Code blocks
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="code-block"><code class="lang-$1">$2</code></pre>');
+  // Extract inline code before escaping
+  const inlineCodes = [];
+  processed = processed.replace(/`([^`]+)`/g, (_, code) => {
+    const idx = inlineCodes.length;
+    inlineCodes.push(code);
+    return `%%INLINE_${idx}%%`;
+  });
 
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+  // Now escape HTML on the remaining text
+  let html = escapeHtml(processed);
+
+  // Restore code blocks with escaped content
+  codeBlocks.forEach((block, idx) => {
+    html = html.replace(
+      `%%CODEBLOCK_${idx}%%`,
+      `</p><pre class="code-block"><code class="lang-${block.lang}">${escapeHtml(block.code)}</code></pre><p>`
+    );
+  });
+
+  // Restore inline code with escaped content
+  inlineCodes.forEach((code, idx) => {
+    html = html.replace(`%%INLINE_${idx}%%`, `<code class="inline-code">${escapeHtml(code)}</code>`);
+  });
 
   // Headers
   html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
@@ -3147,18 +3192,44 @@ function parseMarkdownToHtml(md) {
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
-  // Lists
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+  // Links: [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="memory-link">$1</a>');
+
+  // Horizontal rules
+  html = html.replace(/^---+$/gm, '<hr>');
+
+  // Lists - handle nested with indentation
+  html = html.replace(/^(\s*)- (.+)$/gm, (_, indent, text) => {
+    const depth = Math.floor(indent.length / 2);
+    return `<li class="list-depth-${depth}">${text}</li>`;
+  });
+  html = html.replace(/((?:<li[^>]*>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
 
   // Numbered lists
   html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+
+  // Tables: basic support
+  html = html.replace(/^\|(.+)\|$/gm, (match, row) => {
+    const cells = row.split('|').map(c => c.trim());
+    if (cells.every(c => /^[-:]+$/.test(c))) return '%%TABLE_SEP%%';
+    const tag = 'td';
+    return `<tr>${cells.map(c => `<${tag}>${c}</${tag}>`).join('')}</tr>`;
+  });
+  html = html.replace(/((?:<tr>.*<\/tr>\n?%%TABLE_SEP%%\n?)?(?:<tr>.*<\/tr>\n?)+)/g, (match) => {
+    let table = match.replace(/%%TABLE_SEP%%\n?/g, '');
+    // First row becomes header
+    table = table.replace(/<tr>(.*?)<\/tr>/, (_, cells) => {
+      return `<thead><tr>${cells.replace(/<td>/g, '<th>').replace(/<\/td>/g, '</th>')}</tr></thead><tbody>`;
+    });
+    return `<table class="memory-table">${table}</tbody></table>`;
+  });
+  html = html.replace(/%%TABLE_SEP%%/g, '');
 
   // Paragraphs
   html = html.replace(/\n\n/g, '</p><p>');
   html = `<p>${html}</p>`;
 
-  // Clean up empty paragraphs
+  // Clean up empty paragraphs and fix nesting
   html = html.replace(/<p>\s*<\/p>/g, '');
   html = html.replace(/<p>(<h[1-4]>)/g, '$1');
   html = html.replace(/(<\/h[1-4]>)<\/p>/g, '$1');
@@ -3166,6 +3237,10 @@ function parseMarkdownToHtml(md) {
   html = html.replace(/(<\/pre>)<\/p>/g, '$1');
   html = html.replace(/<p>(<ul>)/g, '$1');
   html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+  html = html.replace(/<p>(<hr>)/g, '$1');
+  html = html.replace(/(<hr>)<\/p>/g, '$1');
+  html = html.replace(/<p>(<table)/g, '$1');
+  html = html.replace(/(<\/table>)<\/p>/g, '$1');
 
   return html;
 }
