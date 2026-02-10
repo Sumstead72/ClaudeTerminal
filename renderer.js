@@ -1059,20 +1059,23 @@ async function showSessionsModal(project) {
       return text.length <= maxLength ? text : text.slice(0, maxLength) + '...';
     };
 
-    const sessionsHtml = sessions.map(session => `
+    const sessionsHtml = sessions.map(session => {
+      const title = session.summary || truncateText(session.firstPrompt, 80) || 'Sans titre';
+      const showPrompt = session.summary && session.firstPrompt;
+      return `
       <div class="session-card-modal" data-session-id="${session.sessionId}">
         <div class="session-header">
           <span class="session-icon">💬</span>
-          <span class="session-title">${escapeHtml(truncateText(session.summary, 50))}</span>
+          <span class="session-title">${escapeHtml(truncateText(title, 80))}</span>
         </div>
-        <div class="session-prompt">${escapeHtml(truncateText(session.firstPrompt, 100))}</div>
+        ${showPrompt ? `<div class="session-prompt">${escapeHtml(truncateText(session.firstPrompt, 100))}</div>` : ''}
         <div class="session-meta">
-          <span class="session-messages">${session.messageCount} msgs</span>
+          ${session.messageCount ? `<span class="session-messages">${session.messageCount} msgs</span>` : ''}
           <span class="session-time">${formatRelativeTime(session.modified)}</span>
           ${session.gitBranch ? `<span class="session-branch">${escapeHtml(session.gitBranch)}</span>` : ''}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
 
     showModal(`Reprendre - ${project.name}`, `
       <div class="sessions-modal">

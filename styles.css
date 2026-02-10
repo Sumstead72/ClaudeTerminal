@@ -7608,7 +7608,7 @@ body.compact-projects .project-item:not(.active):hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 400px;
+  max-height: 60vh;
   overflow-y: auto;
 }
 
