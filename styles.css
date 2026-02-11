@@ -2351,16 +2351,16 @@ body.compact-projects .project-item:not(.active):hover {
 
 .list-section-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
 }
 
 .list-card {
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
-  padding: 16px;
-  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -2373,17 +2373,19 @@ body.compact-projects .project-item:not(.active):hover {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: var(--accent);
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), transparent 50%);
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.3s;
 }
 
 .list-card:hover {
-  border-color: var(--accent);
-  background: var(--bg-tertiary);
+  border-color: rgba(217, 119, 6, 0.12);
+  background: linear-gradient(145deg, rgba(42, 42, 42, 0.5), var(--bg-secondary));
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(217, 119, 6, 0.06);
 }
 
 .list-card:hover::before {
@@ -2399,33 +2401,37 @@ body.compact-projects .project-item:not(.active):hover {
 }
 
 .list-card-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
 .list-card-badge {
-  padding: 3px 8px;
+  padding: 2px 8px;
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-radius: 4px;
-  background: var(--accent-dim);
+  letter-spacing: 0.8px;
+  border-radius: 10px;
+  background: rgba(217, 119, 6, 0.08);
   color: var(--accent);
   white-space: nowrap;
   flex-shrink: 0;
+  border: 1px solid rgba(217, 119, 6, 0.12);
 }
 
 .list-card-badge.agent {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.08);
   color: var(--info);
+  border-color: rgba(59, 130, 246, 0.15);
 }
 
 .list-card-badge.plugin {
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.08);
   color: #a855f7;
+  border-color: rgba(168, 85, 247, 0.15);
 }
 
 .plugin-badge {
@@ -2455,10 +2461,10 @@ body.compact-projects .project-item:not(.active):hover {
 }
 
 .list-card-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 16px;
   flex: 1;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -2470,6 +2476,38 @@ body.compact-projects .project-item:not(.active):hover {
   display: flex;
   gap: 8px;
   margin-top: auto;
+}
+
+/* Card decorative initial monogram */
+.card-initial {
+  position: absolute;
+  top: -12px;
+  right: -4px;
+  font-size: 84px;
+  font-weight: 800;
+  color: var(--text-primary);
+  opacity: 0.025;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.3s;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.list-card:hover .card-initial {
+  opacity: 0.055;
+}
+
+/* Delete button: icon-only, appears on hover */
+.list-card .btn-del {
+  opacity: 0;
+  transition: opacity 0.2s, background 0.15s, color 0.15s;
+  flex: none;
+  padding: 8px;
+}
+
+.list-card:hover .btn-del {
+  opacity: 1;
 }
 
 .btn-sm {
@@ -14336,4 +14374,324 @@ body.compact-projects .project-item:not(.active):hover {
   padding: 2px 8px;
   border-radius: 10px;
   border: 1px solid;
+}
+
+/* ==================== SKILLS HEADER & SUB-TABS ==================== */
+
+.skills-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.skills-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skills-sub-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.skills-sub-tab {
+  padding: 6px 18px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.skills-sub-tab:hover {
+  color: var(--text-primary);
+}
+
+.skills-sub-tab.active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.skills-search-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  min-width: 250px;
+  max-width: 320px;
+  transition: border-color 0.2s;
+}
+
+.skills-search-container:focus-within {
+  border-color: var(--accent);
+}
+
+.skills-search-container svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.skills-search-container input {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+}
+
+.skills-search-container input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ==================== MARKETPLACE ==================== */
+
+.list-card-badge.marketplace {
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--success);
+  border-color: rgba(34, 197, 94, 0.15);
+}
+
+/* Marketplace card info section (source + stats) */
+.marketplace-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.marketplace-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.marketplace-card-stats svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+}
+
+.marketplace-card-source {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.marketplace-card-source::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  opacity: 0.5;
+}
+
+.marketplace-installed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 10px;
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--success);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+.btn-sm.btn-install {
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.btn-sm.btn-install:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+}
+
+.btn-sm.btn-install:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-sm.btn-uninstall {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+.btn-sm.btn-uninstall:hover {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+.marketplace-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-muted);
+  font-size: 13px;
+  gap: 8px;
+}
+
+.marketplace-loading .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.list-card.marketplace-card.installed {
+  border-color: rgba(34, 197, 94, 0.12);
+}
+
+.list-card.marketplace-card.installed::before {
+  background: linear-gradient(90deg, var(--success), transparent 50%);
+  opacity: 0.6;
+}
+
+.marketplace-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.marketplace-detail-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.marketplace-detail-source {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.marketplace-detail-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.marketplace-detail-stats svg {
+  width: 14px;
+  height: 14px;
+}
+
+.marketplace-detail-readme {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.marketplace-detail-readme h1,
+.marketplace-detail-readme h2,
+.marketplace-detail-readme h3 {
+  color: var(--text-primary);
+  margin: 16px 0 8px;
+}
+
+.marketplace-detail-readme h1:first-child,
+.marketplace-detail-readme h2:first-child {
+  margin-top: 0;
+}
+
+.marketplace-detail-readme code {
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.marketplace-detail-readme pre {
+  background: var(--bg-secondary);
+  padding: 12px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.marketplace-detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.marketplace-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.marketplace-empty svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+.marketplace-empty h3 {
+  font-size: 16px;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+
+.marketplace-empty p {
+  font-size: 13px;
 }

@@ -499,6 +499,31 @@
       "standaloneDesc": "Terminal Claude classique"
     }
   },
+  "marketplace": {
+    "title": "Marketplace",
+    "mySkills": "Mes Skills",
+    "searchPlaceholder": "Rechercher des skills...",
+    "discover": "Decouvrir",
+    "installed": "Installes",
+    "featured": "Populaires",
+    "searchResults": "Resultats de recherche",
+    "installs": "installations",
+    "install": "Installer",
+    "installing": "Installation...",
+    "uninstall": "Desinstaller",
+    "installedBadge": "Installe",
+    "details": "Details",
+    "openFolder": "Ouvrir le dossier",
+    "noResults": "Aucun skill trouve",
+    "noInstalled": "Aucun skill du marketplace installe",
+    "browseToInstall": "Parcourez l'onglet Decouvrir pour installer des skills",
+    "confirmUninstall": "Desinstaller \"{name}\" ?",
+    "installError": "Echec de l'installation",
+    "installedOn": "Installe le {date}",
+    "noReadme": "Aucune description disponible",
+    "readmeError": "Impossible de charger la description",
+    "searchHint": "Tapez pour rechercher des skills sur skills.sh"
+  },
   "errors": {
     "corruptedFile": "Fichier projets corrompu",
     "backupCreated": "Un backup a été créé: {filename}",

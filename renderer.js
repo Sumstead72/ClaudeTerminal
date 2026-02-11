@@ -111,7 +111,17 @@ const localState = {
   fivemServers: new Map(),
   gitOperations: new Map(),
   gitRepoStatus: new Map(),
-  selectedDashboardProject: -1
+  selectedDashboardProject: -1,
+  skillsActiveSubTab: 'local',
+  skillsInitialized: false,
+  marketplace: {
+    searchResults: [],
+    featured: [],
+    installed: [],
+    loading: false,
+    searchQuery: '',
+    searchCache: new Map()
+  }
 };
 
 // ========== I18N STATIC TEXT UPDATES ==========
@@ -2255,6 +2265,19 @@ document.getElementById('modal-overlay').onclick = (e) => { if (e.target.id === 
 
 // ========== SKILLS & AGENTS ==========
 async function loadSkills() {
+  if (!localState.skillsInitialized) {
+    localState.skillsInitialized = true;
+    setupSkillsSubTabs();
+  }
+
+  if (localState.skillsActiveSubTab === 'local') {
+    await loadLocalSkills();
+  } else {
+    await loadMarketplaceContent();
+  }
+}
+
+async function loadLocalSkills() {
   localState.skills = [];
   try {
     await fs.promises.access(skillsDir);
@@ -2282,6 +2305,47 @@ async function loadSkills() {
     if (e.code !== 'ENOENT') console.error('Error loading skills:', e);
   }
   renderSkills();
+}
+
+function setupSkillsSubTabs() {
+  document.querySelectorAll('.skills-sub-tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.skills-sub-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      localState.skillsActiveSubTab = btn.dataset.subtab;
+
+      const newSkillBtn = document.getElementById('btn-new-skill');
+      const searchContainer = document.getElementById('skills-marketplace-search');
+
+      if (btn.dataset.subtab === 'local') {
+        newSkillBtn.style.display = '';
+        searchContainer.style.display = 'none';
+      } else {
+        newSkillBtn.style.display = 'none';
+        searchContainer.style.display = 'flex';
+      }
+
+      loadSkills();
+    };
+  });
+
+  // Setup marketplace search
+  const input = document.getElementById('marketplace-search-input');
+  if (input) {
+    input.addEventListener('input', () => {
+      clearTimeout(marketplaceSearchTimeout);
+      const query = input.value.trim();
+      localState.marketplace.searchQuery = query;
+
+      marketplaceSearchTimeout = setTimeout(() => {
+        if (query.length >= 2) {
+          searchMarketplace(query);
+        } else if (query.length === 0) {
+          loadMarketplaceFeatured();
+        }
+      }, 300);
+    });
+  }
 }
 
 /**
@@ -2480,18 +2544,28 @@ function renderSkills() {
     html += `<div class="list-section">
       <div class="list-section-title">Local <span class="list-section-count">${localSkills.length}</span></div>
       <div class="list-section-grid">`;
-    html += localSkills.map(s => `
+    html += localSkills.map(s => {
+      const desc = (s.description && s.description !== '---' && s.description !== 'Aucune description') ? escapeHtml(s.description) : '';
+      const initial = escapeHtml((s.name || '?').charAt(0).toUpperCase());
+      return `
       <div class="list-card" data-path="${s.path.replace(/"/g, '&quot;')}" data-is-plugin="false">
+        <div class="card-initial">${initial}</div>
         <div class="list-card-header">
           <div class="list-card-title">${escapeHtml(s.name)}</div>
           <div class="list-card-badge">Skill</div>
         </div>
-        <div class="list-card-desc">${escapeHtml(s.description)}</div>
+        ${desc ? `<div class="list-card-desc">${desc}</div>` : ''}
         <div class="list-card-footer">
-          <button class="btn-sm btn-secondary btn-open">Ouvrir</button>
-          <button class="btn-sm btn-delete btn-del">Suppr</button>
+          <button class="btn-sm btn-secondary btn-open">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            ${t('marketplace.openFolder') || 'Ouvrir'}
+          </button>
+          <button class="btn-sm btn-delete btn-del" title="${t('common.delete') || 'Supprimer'}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          </button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     html += `</div></div>`;
   }
 
@@ -2500,17 +2574,25 @@ function renderSkills() {
     html += `<div class="list-section">
       <div class="list-section-title"><span class="plugin-badge">Plugin</span> ${escapeHtml(source)} <span class="list-section-count">${skills.length}</span></div>
       <div class="list-section-grid">`;
-    html += skills.map(s => `
+    html += skills.map(s => {
+      const desc = (s.description && s.description !== '---' && s.description !== 'Aucune description') ? escapeHtml(s.description) : '';
+      const initial = escapeHtml((s.name || '?').charAt(0).toUpperCase());
+      return `
       <div class="list-card plugin-card" data-path="${s.path.replace(/"/g, '&quot;')}" data-is-plugin="true">
+        <div class="card-initial">${initial}</div>
         <div class="list-card-header">
           <div class="list-card-title">${escapeHtml(s.name)}</div>
           <div class="list-card-badge plugin">Plugin</div>
         </div>
-        <div class="list-card-desc">${escapeHtml(s.description)}</div>
+        ${desc ? `<div class="list-card-desc">${desc}</div>` : ''}
         <div class="list-card-footer">
-          <button class="btn-sm btn-secondary btn-open">Ouvrir</button>
+          <button class="btn-sm btn-secondary btn-open">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            ${t('marketplace.openFolder') || 'Ouvrir'}
+          </button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     html += `</div></div>`;
   });
 
@@ -2535,18 +2617,28 @@ function renderAgents() {
   let html = `<div class="list-section">
     <div class="list-section-title">Agents <span class="list-section-count">${localState.agents.length}</span></div>
     <div class="list-section-grid">`;
-  html += localState.agents.map(a => `
+  html += localState.agents.map(a => {
+    const desc = (a.description && a.description !== '---' && a.description !== 'Aucune description') ? escapeHtml(a.description) : '';
+    const initial = escapeHtml((a.name || '?').charAt(0).toUpperCase());
+    return `
     <div class="list-card agent-card" data-path="${a.path.replace(/"/g, '&quot;')}">
+      <div class="card-initial">${initial}</div>
       <div class="list-card-header">
         <div class="list-card-title">${escapeHtml(a.name)}</div>
         <div class="list-card-badge agent">Agent</div>
       </div>
-      <div class="list-card-desc">${escapeHtml(a.description)}</div>
+      ${desc ? `<div class="list-card-desc">${desc}</div>` : ''}
       <div class="list-card-footer">
-        <button class="btn-sm btn-secondary btn-open">Ouvrir</button>
-        <button class="btn-sm btn-delete btn-del">Suppr</button>
+        <button class="btn-sm btn-secondary btn-open">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+          ${t('marketplace.openFolder') || 'Ouvrir'}
+        </button>
+        <button class="btn-sm btn-delete btn-del" title="${t('common.delete') || 'Supprimer'}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   html += `</div></div>`;
 
   list.innerHTML = html;
@@ -2555,6 +2647,310 @@ function renderAgents() {
     card.querySelector('.btn-open').onclick = () => api.dialog.openInExplorer(card.dataset.path);
     card.querySelector('.btn-del').onclick = async () => { if (confirm('Supprimer cet agent ?')) { await fs.promises.rm(card.dataset.path, { recursive: true, force: true }); loadAgents(); } };
   });
+}
+
+// ========== MARKETPLACE ==========
+let marketplaceSearchTimeout = null;
+
+async function loadMarketplaceContent() {
+  if (localState.marketplace.searchQuery) {
+    await searchMarketplace(localState.marketplace.searchQuery);
+  } else {
+    await loadMarketplaceFeatured();
+  }
+}
+
+async function searchMarketplace(query) {
+  const list = document.getElementById('skills-list');
+
+  // Show cached results instantly if available
+  const cachedResults = localState.marketplace.searchCache.get(query);
+  if (cachedResults) {
+    localState.marketplace.searchResults = cachedResults;
+    renderMarketplaceCards(cachedResults, t('marketplace.searchResults'));
+  } else {
+    list.innerHTML = `<div class="marketplace-loading"><div class="spinner"></div>${t('common.loading')}</div>`;
+  }
+
+  try {
+    const [result, installedResult] = await Promise.all([
+      api.marketplace.search(query, 30),
+      api.marketplace.installed()
+    ]);
+    if (!result.success) throw new Error(result.error);
+
+    const newSkills = result.skills || [];
+    if (installedResult.success) {
+      localState.marketplace.installed = installedResult.installed || [];
+    }
+
+    // Update local search cache
+    localState.marketplace.searchCache.set(query, newSkills);
+
+    // Re-render only if data changed
+    if (JSON.stringify(newSkills) !== JSON.stringify(localState.marketplace.searchResults)) {
+      localState.marketplace.searchResults = newSkills;
+      renderMarketplaceCards(newSkills, t('marketplace.searchResults'));
+    }
+  } catch (e) {
+    if (!cachedResults) {
+      list.innerHTML = `<div class="marketplace-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg><h3>${t('common.error')}</h3><p>${escapeHtml(e.message)}</p></div>`;
+    }
+  }
+}
+
+async function loadMarketplaceFeatured() {
+  const list = document.getElementById('skills-list');
+
+  // Show cached data instantly if available
+  if (localState.marketplace.featured.length > 0) {
+    renderMarketplaceCards(localState.marketplace.featured, t('marketplace.featured'));
+  } else {
+    list.innerHTML = `<div class="marketplace-loading"><div class="spinner"></div>${t('common.loading')}</div>`;
+  }
+
+  try {
+    const [result, installedResult] = await Promise.all([
+      api.marketplace.featured(30),
+      api.marketplace.installed()
+    ]);
+    if (!result.success) throw new Error(result.error);
+
+    const newSkills = result.skills || [];
+    if (installedResult.success) {
+      localState.marketplace.installed = installedResult.installed || [];
+    }
+
+    // Re-render only if data changed
+    if (JSON.stringify(newSkills) !== JSON.stringify(localState.marketplace.featured)) {
+      localState.marketplace.featured = newSkills;
+      renderMarketplaceCards(localState.marketplace.featured, t('marketplace.featured'));
+    }
+  } catch (e) {
+    // Only show error if no cached data
+    if (localState.marketplace.featured.length === 0) {
+      list.innerHTML = `<div class="marketplace-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg><h3>${t('common.error')}</h3><p>${escapeHtml(e.message)}</p></div>`;
+    }
+  }
+}
+
+
+function isSkillInstalled(skillId) {
+  // Check if skill folder exists on disk (installed via marketplace, npx skills, or manually)
+  try {
+    const skillPath = path.join(skillsDir, skillId);
+    return fs.existsSync(skillPath) && fs.existsSync(path.join(skillPath, 'SKILL.md'));
+  } catch { return false; }
+}
+
+function isSkillFromMarketplace(skillId) {
+  return localState.marketplace.installed.some(s => s.skillId === skillId);
+}
+
+function formatInstallCount(n) {
+  if (!n || n === 0) return '0';
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n.toString();
+}
+
+function renderMarketplaceCards(skills, sectionTitle) {
+  const list = document.getElementById('skills-list');
+
+  if (!skills || skills.length === 0) {
+    list.innerHTML = `<div class="marketplace-empty">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <h3>${t('marketplace.noResults')}</h3>
+      <p>${t('marketplace.searchHint')}</p>
+    </div>`;
+    return;
+  }
+
+  let html = `<div class="list-section">
+    <div class="list-section-title">${escapeHtml(sectionTitle)} <span class="list-section-count">${skills.length}</span></div>
+    <div class="list-section-grid">`;
+
+  html += skills.map(skill => {
+    const installed = isSkillInstalled(skill.skillId || skill.name);
+    const cardClass = installed ? 'list-card marketplace-card installed' : 'list-card marketplace-card';
+    const skillName = skill.name || skill.skillId;
+    const initial = escapeHtml((skillName || '?').charAt(0).toUpperCase());
+    return `
+    <div class="${cardClass}" data-skill-id="${escapeHtml(skill.skillId || skill.name)}" data-source="${escapeHtml(skill.source || '')}" data-name="${escapeHtml(skillName)}" data-installs="${skill.installs || 0}">
+      <div class="card-initial">${initial}</div>
+      <div class="list-card-header">
+        <div class="list-card-title">${escapeHtml(skillName)}</div>
+        <div class="list-card-badge marketplace">${installed ? t('marketplace.installedBadge') : 'Skill'}</div>
+      </div>
+      <div class="marketplace-card-info">
+        <div class="marketplace-card-stats">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          ${formatInstallCount(skill.installs)} ${t('marketplace.installs')}
+        </div>
+        ${skill.source ? `<div class="marketplace-card-source">${escapeHtml(skill.source)}</div>` : ''}
+      </div>
+      <div class="list-card-footer">
+        <button class="btn-sm btn-secondary btn-details">${t('marketplace.details')}</button>
+        ${installed
+          ? (isSkillFromMarketplace(skill.skillId || skill.name)
+              ? `<button class="btn-sm btn-uninstall">${t('marketplace.uninstall')}</button>`
+              : `<span class="marketplace-installed-badge">${t('marketplace.installedBadge')}</span>`)
+          : `<button class="btn-sm btn-install">${t('marketplace.install')}</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+
+  html += `</div></div>`;
+  list.innerHTML = html;
+  bindMarketplaceCardHandlers();
+}
+
+
+function bindMarketplaceCardHandlers() {
+  const list = document.getElementById('skills-list');
+
+  list.querySelectorAll('.marketplace-card').forEach(card => {
+    const skillId = card.dataset.skillId;
+    const source = card.dataset.source;
+    const name = card.dataset.name;
+    const installs = parseInt(card.dataset.installs) || 0;
+
+    const detailsBtn = card.querySelector('.btn-details');
+    if (detailsBtn) {
+      detailsBtn.onclick = () => showMarketplaceDetail({ skillId, source, name, installs });
+    }
+
+    const installBtn = card.querySelector('.btn-install');
+    if (installBtn) {
+      installBtn.onclick = async () => {
+        installBtn.disabled = true;
+        installBtn.textContent = t('marketplace.installing');
+
+        try {
+          const result = await api.marketplace.install({ source, skillId, name, installs });
+          if (!result.success) throw new Error(result.error);
+
+          // Refresh marketplace view
+          await loadMarketplaceContent();
+        } catch (e) {
+          installBtn.disabled = false;
+          installBtn.textContent = t('marketplace.install');
+          alert(`${t('marketplace.installError')}: ${e.message}`);
+        }
+      };
+    }
+
+    const uninstallBtn = card.querySelector('.btn-uninstall');
+    if (uninstallBtn) {
+      uninstallBtn.onclick = async () => {
+        if (!confirm(t('marketplace.confirmUninstall', { name: name || skillId }))) return;
+
+        try {
+          const result = await api.marketplace.uninstall(skillId);
+          if (!result.success) throw new Error(result.error);
+
+          // Refresh marketplace view
+          await loadMarketplaceContent();
+        } catch (e) {
+          alert(e.message);
+        }
+      };
+    }
+
+    const openFolderBtn = card.querySelector('.btn-open-folder');
+    if (openFolderBtn) {
+      const skillPath = path.join(skillsDir, skillId);
+      openFolderBtn.onclick = () => api.dialog.openInExplorer(skillPath);
+    }
+  });
+}
+
+async function showMarketplaceDetail(skill) {
+  const { skillId, source, name, installs } = skill;
+  const installed = isSkillInstalled(skillId);
+
+  let readmeHtml = `<div class="marketplace-loading"><div class="spinner"></div>${t('common.loading')}</div>`;
+
+  const content = `
+    <div class="marketplace-detail-header">
+      <div>
+        <div class="marketplace-detail-title">${escapeHtml(name || skillId)}</div>
+        <div class="marketplace-detail-source">${escapeHtml(source)}</div>
+        <div class="marketplace-detail-stats">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          ${formatInstallCount(installs)} ${t('marketplace.installs')}
+        </div>
+      </div>
+    </div>
+    <div class="marketplace-detail-readme" id="marketplace-readme-content">${readmeHtml}</div>
+    <div class="marketplace-detail-actions">
+      ${installed
+        ? (isSkillFromMarketplace(skillId)
+            ? `<button class="btn-primary btn-uninstall-detail" style="background: var(--danger);">${t('marketplace.uninstall')}</button>
+               <button class="btn-secondary btn-open-folder-detail">${t('marketplace.openFolder')}</button>`
+            : `<span class="marketplace-installed-badge">${t('marketplace.installedBadge')}</span>
+               <button class="btn-secondary btn-open-folder-detail">${t('marketplace.openFolder')}</button>`)
+        : `<button class="btn-primary btn-install-detail">${t('marketplace.install')}</button>`
+      }
+    </div>
+  `;
+
+  showModal(t('marketplace.details'), content);
+
+  // Load README async
+  try {
+    const result = await api.marketplace.readme(source, skillId);
+    const readmeEl = document.getElementById('marketplace-readme-content');
+    if (readmeEl) {
+      if (result.success && result.readme) {
+        readmeEl.textContent = result.readme;
+      } else {
+        readmeEl.innerHTML = `<em>${t('marketplace.noReadme')}</em>`;
+      }
+    }
+  } catch (e) {
+    const readmeEl = document.getElementById('marketplace-readme-content');
+    if (readmeEl) readmeEl.innerHTML = `<em>${t('marketplace.readmeError')}</em>`;
+  }
+
+  // Bind modal action buttons
+  const installDetailBtn = document.querySelector('.btn-install-detail');
+  if (installDetailBtn) {
+    installDetailBtn.onclick = async () => {
+      installDetailBtn.disabled = true;
+      installDetailBtn.textContent = t('marketplace.installing');
+      try {
+        const result = await api.marketplace.install({ source, skillId, name, installs });
+        if (!result.success) throw new Error(result.error);
+        closeModal();
+        loadMarketplaceContent();
+      } catch (e) {
+        installDetailBtn.disabled = false;
+        installDetailBtn.textContent = t('marketplace.install');
+        alert(`${t('marketplace.installError')}: ${e.message}`);
+      }
+    };
+  }
+
+  const uninstallDetailBtn = document.querySelector('.btn-uninstall-detail');
+  if (uninstallDetailBtn) {
+    uninstallDetailBtn.onclick = async () => {
+      if (!confirm(t('marketplace.confirmUninstall', { name: name || skillId }))) return;
+      try {
+        await api.marketplace.uninstall(skillId);
+        closeModal();
+        loadMarketplaceContent();
+      } catch (e) {
+        alert(e.message);
+      }
+    };
+  }
+
+  const openFolderDetailBtn = document.querySelector('.btn-open-folder-detail');
+  if (openFolderDetailBtn) {
+    openFolderDetailBtn.onclick = () => api.dialog.openInExplorer(path.join(skillsDir, skillId));
+  }
 }
 
 // ========== MCP ==========
@@ -4891,6 +5287,11 @@ api.tray.onShowSessions(() => {
 setupContextMenuHandlers();
 checkAllProjectsGitStatus();
 ProjectList.render();
+
+// Preload marketplace data silently
+api.marketplace.featured(30).then(result => {
+  if (result.success) localState.marketplace.featured = result.skills || [];
+}).catch(() => {});
 
 // Initialize keyboard shortcuts with customizable settings
 // Ctrl+Arrow shortcuts are handled directly in TerminalManager.js

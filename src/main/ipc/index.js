@@ -13,6 +13,7 @@ const { registerDialogHandlers, setMainWindow: setDialogMainWindow } = require('
 const { registerProjectHandlers } = require('./project.ipc');
 const { registerClaudeHandlers } = require('./claude.ipc');
 const { registerUsageHandlers } = require('./usage.ipc');
+const { registerMarketplaceHandlers } = require('./marketplace.ipc');
 
 /**
  * Register all IPC handlers
@@ -33,6 +34,7 @@ function registerAllHandlers(mainWindow) {
   registerProjectHandlers();
   registerClaudeHandlers();
   registerUsageHandlers();
+  registerMarketplaceHandlers();
 }
 
 module.exports = {

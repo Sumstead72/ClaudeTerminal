@@ -499,6 +499,31 @@
       "standaloneDesc": "Classic Claude terminal"
     }
   },
+  "marketplace": {
+    "title": "Marketplace",
+    "mySkills": "My Skills",
+    "searchPlaceholder": "Search skills...",
+    "discover": "Discover",
+    "installed": "Installed",
+    "featured": "Popular",
+    "searchResults": "Search results",
+    "installs": "installs",
+    "install": "Install",
+    "installing": "Installing...",
+    "uninstall": "Uninstall",
+    "installedBadge": "Installed",
+    "details": "Details",
+    "openFolder": "Open folder",
+    "noResults": "No skills found",
+    "noInstalled": "No marketplace skills installed",
+    "browseToInstall": "Browse the Discover tab to install skills",
+    "confirmUninstall": "Uninstall \"{name}\"?",
+    "installError": "Installation failed",
+    "installedOn": "Installed on {date}",
+    "noReadme": "No description available",
+    "readmeError": "Could not load description",
+    "searchHint": "Type to search for skills on skills.sh"
+  },
   "errors": {
     "corruptedFile": "Projects file corrupted",
     "backupCreated": "A backup was created: {filename}",

@@ -197,6 +197,16 @@ contextBridge.exposeInMainWorld('electron_api', {
     createPR: (params) => ipcRenderer.invoke('github-create-pr', params)
   },
 
+  // ==================== MARKETPLACE ====================
+  marketplace: {
+    search: (query, limit) => ipcRenderer.invoke('marketplace-search', { query, limit }),
+    featured: (limit) => ipcRenderer.invoke('marketplace-featured', { limit }),
+    readme: (source, skillId) => ipcRenderer.invoke('marketplace-readme', { source, skillId }),
+    install: (skill) => ipcRenderer.invoke('marketplace-install', { skill }),
+    uninstall: (skillId) => ipcRenderer.invoke('marketplace-uninstall', { skillId }),
+    installed: () => ipcRenderer.invoke('marketplace-installed')
+  },
+
   // ==================== PROJECT ====================
   project: {
     scanTodos: (projectPath) => ipcRenderer.invoke('scan-todos', projectPath),
