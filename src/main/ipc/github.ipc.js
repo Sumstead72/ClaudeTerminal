@@ -15,10 +15,10 @@ const pollingSessions = new Map();
 function registerGitHubHandlers() {
   // Start device flow
   ipcMain.handle('github-start-auth', async () => {
-    console.log('[GitHub IPC] github-start-auth called');
+    // console.log('[GitHub IPC] github-start-auth called');
     try {
       const deviceFlow = await GitHubAuthService.startDeviceFlow();
-      console.log('[GitHub IPC] Device flow started:', deviceFlow);
+      // console.log('[GitHub IPC] Device flow started:', deviceFlow);
       return { success: true, ...deviceFlow };
     } catch (e) {
       console.error('[GitHub IPC] Error starting device flow:', e);
@@ -86,16 +86,16 @@ function registerGitHubHandlers() {
 
   // Get workflow runs for a repository
   ipcMain.handle('github-workflow-runs', async (event, { remoteUrl }) => {
-    console.log('[GitHub IPC] Fetching workflow runs for:', remoteUrl);
+    // console.log('[GitHub IPC] Fetching workflow runs for:', remoteUrl);
     try {
       const parsed = GitHubAuthService.parseGitHubRemote(remoteUrl);
-      console.log('[GitHub IPC] Parsed remote:', parsed);
+      // console.log('[GitHub IPC] Parsed remote:', parsed);
       if (!parsed) {
         return { success: false, error: 'Not a GitHub repository' };
       }
 
       const result = await GitHubAuthService.getWorkflowRuns(parsed.owner, parsed.repo);
-      console.log('[GitHub IPC] Workflow runs result:', result);
+      // console.log('[GitHub IPC] Workflow runs result:', result);
       return { success: true, ...result, owner: parsed.owner, repo: parsed.repo };
     } catch (e) {
       console.error('[GitHub IPC] Error:', e);
@@ -118,7 +118,7 @@ function registerGitHubHandlers() {
 
   // Get pull requests for a repository
   ipcMain.handle('github-pull-requests', async (event, { remoteUrl }) => {
-    console.log('[GitHub IPC] Fetching pull requests for:', remoteUrl);
+    // console.log('[GitHub IPC] Fetching pull requests for:', remoteUrl);
     try {
       const parsed = GitHubAuthService.parseGitHubRemote(remoteUrl);
       if (!parsed) {

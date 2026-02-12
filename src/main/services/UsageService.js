@@ -58,7 +58,7 @@ function parseUsageOutput(output) {
       if (data.sonnet === null && allPercents.length >= 3) data.sonnet = parseFloat(allPercents[2]);
     }
 
-    console.log('[Usage] Parsed:', data);
+    // console.log('[Usage] Parsed:', data);
   } catch (e) {
     console.error('[Usage] Parse error:', e.message);
   }
@@ -81,7 +81,7 @@ function fetchUsage() {
     let phase = 'waiting_cmd'; // waiting_cmd -> waiting_claude -> waiting_usage -> done
     let resolved = false;
 
-    console.log('[Usage] Starting fetch...');
+    // console.log('[Usage] Starting fetch...');
 
     const proc = pty.spawn('cmd.exe', [], {
       name: 'xterm-256color',
@@ -94,7 +94,7 @@ function fetchUsage() {
     // Timeout - kill and parse what we have
     const timeout = setTimeout(() => {
       if (!resolved) {
-        console.log('[Usage] Timeout - parsing available data');
+        // console.log('[Usage] Timeout - parsing available data');
         finish();
       }
     }, 25000);
@@ -123,14 +123,14 @@ function fetchUsage() {
       // Phase 1: Wait for CMD prompt, then start Claude
       if (phase === 'waiting_cmd' && output.includes('>')) {
         phase = 'waiting_claude';
-        console.log('[Usage] CMD ready, starting Claude...');
+        // console.log('[Usage] CMD ready, starting Claude...');
         proc.write('claude --dangerously-skip-permissions\r');
       }
 
       // Phase 2: Wait for Claude to be ready (logo appears), then send /usage
       if (phase === 'waiting_claude' && output.includes('Claude Code')) {
         phase = 'waiting_usage';
-        console.log('[Usage] Claude ready, sending /usage...');
+        // console.log('[Usage] Claude ready, sending /usage...');
         setTimeout(() => {
           proc.write('/usage');
           setTimeout(() => proc.write('\t'), 300);
@@ -146,7 +146,7 @@ function fetchUsage() {
 
         if (hasData) {
           phase = 'done';
-          console.log('[Usage] Got usage data');
+          // console.log('[Usage] Got usage data');
           // Wait a bit for complete output then finish
           setTimeout(finish, 2000);
         }
@@ -181,7 +181,7 @@ function startPeriodicFetch(intervalMs = 300000) {
     if (isMainWindowVisible()) {
       fetchUsage().catch(e => console.error('[Usage]', e.message));
     } else {
-      console.log('[Usage] Skipping fetch - window hidden');
+      // console.log('[Usage] Skipping fetch - window hidden');
     }
   }, intervalMs);
 }
@@ -224,7 +224,7 @@ function onWindowShow() {
   const isStale = !lastFetch || (Date.now() - lastFetch.getTime() > staleMinutes * 60 * 1000);
 
   if (isStale && !isFetching) {
-    console.log('[Usage] Window shown, refreshing stale data...');
+    // console.log('[Usage] Window shown, refreshing stale data...');
     fetchUsage().catch(e => console.error('[Usage]', e.message));
   }
 }
