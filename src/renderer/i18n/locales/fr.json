@@ -682,7 +682,15 @@
     "slashCompact": "Compacter l'historique",
     "slashClear": "Effacer la conversation",
     "slashHelp": "Afficher l'aide",
-    "attachImage": "Joindre une image"
+    "attachImage": "Joindre une image",
+    "mentionFile": "Joindre un fichier du projet",
+    "mentionGit": "Joindre le diff git actuel",
+    "mentionTerminal": "Joindre la sortie du terminal",
+    "mentionErrors": "Joindre les erreurs du terminal",
+    "mentionSelection": "Joindre le texte sélectionné",
+    "mentionTodos": "Joindre les TODOs du projet",
+    "mentionProject": "Joindre les infos du projet actuel",
+    "mentionNoFiles": "Aucun fichier trouvé"
   },
   "hooks": {
     "consent": {
