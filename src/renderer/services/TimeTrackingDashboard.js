@@ -3,7 +3,7 @@
  * Renders a detailed time tracking dashboard with charts, stats, and project breakdown
  */
 
-const { projectsState, getGlobalTimes, getProjectTimes } = require('../state');
+const { projectsState, getGlobalTimes, getProjectTimes, getProjectSessions, getGlobalTrackingData } = require('../state');
 const { escapeHtml } = require('../utils');
 const { formatDuration, formatDurationLarge } = require('../utils/format');
 const { t } = require('../i18n');
@@ -117,8 +117,9 @@ function getSessionsForPeriod() {
     if (ArchiveService.isCurrentMonth(year, month)) {
       // Current month: read from live state
       for (const project of projects) {
-        if (!project.timeTracking?.sessions) continue;
-        for (const session of project.timeTracking.sessions) {
+        const sessions = getProjectSessions(project.id);
+        if (!sessions.length) continue;
+        for (const session of sessions) {
           const sessionDate = new Date(session.startTime);
           if (sessionDate >= periodStart && sessionDate < periodEnd) {
             allSessions.push({
@@ -189,7 +190,7 @@ function getGlobalSessionsForPeriod() {
 
   for (const { year, month } of months) {
     if (ArchiveService.isCurrentMonth(year, month)) {
-      const globalTracking = projectsState.get().globalTimeTracking;
+      const globalTracking = getGlobalTrackingData();
       if (globalTracking?.sessions) {
         allSessions = allSessions.concat(globalTracking.sessions);
       }
@@ -343,7 +344,7 @@ function getDailyData() {
  * Calculate streak (consecutive days with activity)
  */
 function calculateStreak() {
-  const globalTracking = projectsState.get().globalTimeTracking;
+  const globalTracking = getGlobalTrackingData();
   const activeDays = new Set();
 
   // Current month sessions from live state

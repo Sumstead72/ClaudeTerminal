@@ -46,11 +46,7 @@ function initializeState() {
   settingsState.loadSettings();
   projectsState.loadProjects();
   // Initialize time tracking with project state references
-  timeTrackingState.initTimeTracking(
-    projectsState.projectsState,
-    projectsState.saveProjects,
-    projectsState.saveProjectsImmediate
-  );
+  timeTrackingState.initTimeTracking(projectsState.projectsState);
   // Load FiveM resource shortcuts
   fivemState.loadResourceShortcuts();
   // Lazy require to avoid circular dependency

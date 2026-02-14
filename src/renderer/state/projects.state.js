@@ -179,7 +179,7 @@ function loadProjects() {
       }
 
       let needsSave = false;
-      let projects, folders, rootOrder, globalTimeTracking;
+      let projects, folders, rootOrder;
 
       if (Array.isArray(data)) {
         // Old format: migrate
@@ -208,21 +208,10 @@ function loadProjects() {
             project.folderId = null;
             needsSave = true;
           }
-          // Migration: Initialize timeTracking if not present
-          if (!project.timeTracking) {
-            project.timeTracking = {
-              totalTime: 0,
-              todayTime: 0,
-              lastActiveDate: null,
-              sessions: []
-            };
-            needsSave = true;
-          }
           return project;
         });
         folders = data.folders || [];
         rootOrder = data.rootOrder || [];
-        globalTimeTracking = data.globalTimeTracking || null;
 
         // Ensure all root-level items are in rootOrder
         const rootItems = new Set(rootOrder);
@@ -252,11 +241,7 @@ function loadProjects() {
         });
       }
 
-      const stateToSet = { projects, folders, rootOrder };
-      if (globalTimeTracking) {
-        stateToSet.globalTimeTracking = globalTimeTracking;
-      }
-      projectsState.set(stateToSet);
+      projectsState.set({ projects, folders, rootOrder });
 
       if (needsSave) {
         saveProjects();
@@ -308,13 +293,8 @@ function saveProjectsImmediate() {
 
   saveInProgress = true;
 
-  const { folders, projects, rootOrder, globalTimeTracking } = projectsState.get();
+  const { folders, projects, rootOrder } = projectsState.get();
   const data = { folders, projects, rootOrder };
-
-  // Include global time tracking if present
-  if (globalTimeTracking) {
-    data.globalTimeTracking = globalTimeTracking;
-  }
   const tempFile = `${projectsFile}.tmp`;
   const backupFile = `${projectsFile}.bak`;
 

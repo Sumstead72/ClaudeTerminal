@@ -15,7 +15,9 @@ const claudeDir = path.join(homeDir, '.claude');
 const projectsFile = path.join(dataDir, 'projects.json');
 const settingsFile = path.join(dataDir, 'settings.json');
 const legacyMcpsFile = path.join(dataDir, 'mcps.json');
-const archivesDir = path.join(dataDir, 'archives');
+const archivesDir = path.join(dataDir, 'archives'); // Legacy, kept for migration
+const timeTrackingFile = path.join(dataDir, 'timetracking.json');
+const timeTrackingDir = path.join(dataDir, 'timetracking');
 
 // Claude configuration files
 const claudeSettingsFile = path.join(claudeDir, 'settings.json');
@@ -27,7 +29,7 @@ const agentsDir = path.join(claudeDir, 'agents');
  * Ensure all required directories exist
  */
 function ensureDirectories() {
-  [dataDir, skillsDir, agentsDir, archivesDir].forEach(dir => {
+  [dataDir, skillsDir, agentsDir, timeTrackingDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -56,6 +58,8 @@ module.exports = {
   settingsFile,
   legacyMcpsFile,
   archivesDir,
+  timeTrackingFile,
+  timeTrackingDir,
   claudeSettingsFile,
   claudeConfigFile,
   skillsDir,

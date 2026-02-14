@@ -1,11 +1,11 @@
 /**
  * Archive Service
  * Manages monthly time tracking session archives
- * Archives are stored in ~/.claude-terminal/archives/ as monthly JSON files
+ * Archives are stored in ~/.claude-terminal/timetracking/YYYY/month.json
  */
 
 const { path, fs } = window.electron_nodeModules;
-const { archivesDir } = require('../utils/paths');
+const { timeTrackingDir, archivesDir } = require('../utils/paths');
 
 // Month names for filenames (lowercase English)
 const MONTH_NAMES = [
@@ -19,48 +19,35 @@ const archiveCache = new Map(); // "YYYY-MM" -> { data, loadedAt }
 
 /**
  * Get the cache key for a year/month
- * @param {number} year
- * @param {number} month - 0-based JS month index
- * @returns {string}
  */
 function getCacheKey(year, month) {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 }
 
 /**
- * Get the archive filename for a given year/month
- * @param {number} year
- * @param {number} month - 0-based JS month index
- * @returns {string} e.g. "february_2026.json"
- */
-function getArchiveFilename(year, month) {
-  return `${MONTH_NAMES[month]}_${year}.json`;
-}
-
-/**
  * Get the full path to an archive file
+ * New structure: timetracking/YYYY/month.json
  * @param {number} year
  * @param {number} month - 0-based JS month index
  * @returns {string}
  */
 function getArchiveFilePath(year, month) {
-  return path.join(archivesDir, getArchiveFilename(year, month));
+  return path.join(timeTrackingDir, String(year), `${MONTH_NAMES[month]}.json`);
 }
 
 /**
- * Ensure the archives directory exists
+ * Ensure the year directory exists under timetracking/
+ * @param {number} year
  */
-function ensureArchivesDir() {
-  if (!fs.existsSync(archivesDir)) {
-    fs.mkdirSync(archivesDir, { recursive: true });
+function ensureYearDir(year) {
+  const yearDir = path.join(timeTrackingDir, String(year));
+  if (!fs.existsSync(yearDir)) {
+    fs.mkdirSync(yearDir, { recursive: true });
   }
 }
 
 /**
  * Check if a year/month is the current month
- * @param {number} year
- * @param {number} month - 0-based
- * @returns {boolean}
  */
 function isCurrentMonth(year, month) {
   const now = new Date();
@@ -69,9 +56,6 @@ function isCurrentMonth(year, month) {
 
 /**
  * Create an empty archive structure
- * @param {number} year
- * @param {number} month - 0-based
- * @returns {Object}
  */
 function createEmptyArchive(year, month) {
   return {
@@ -86,8 +70,6 @@ function createEmptyArchive(year, month) {
 
 /**
  * Read an archive file from disk (bypasses cache)
- * @param {string} filePath
- * @returns {Object|null}
  */
 function readArchiveFromDisk(filePath) {
   try {
@@ -103,24 +85,18 @@ function readArchiveFromDisk(filePath) {
 
 /**
  * Load an archive with LRU caching
- * @param {number} year
- * @param {number} month - 0-based
- * @returns {Object|null}
  */
 function loadArchive(year, month) {
   const key = getCacheKey(year, month);
 
-  // Check cache
   if (archiveCache.has(key)) {
     return archiveCache.get(key).data;
   }
 
-  // Read from disk
   const filePath = getArchiveFilePath(year, month);
   const data = readArchiveFromDisk(filePath);
 
   if (data) {
-    // Evict oldest if cache full
     if (archiveCache.size >= MAX_CACHE_SIZE) {
       let oldestKey = null;
       let oldestTime = Infinity;
@@ -141,12 +117,9 @@ function loadArchive(year, month) {
 
 /**
  * Write an archive file atomically
- * @param {number} year
- * @param {number} month - 0-based
- * @param {Object} archiveData
  */
 function writeArchive(year, month, archiveData) {
-  ensureArchivesDir();
+  ensureYearDir(year);
 
   const filePath = getArchiveFilePath(year, month);
   const tempFile = `${filePath}.tmp`;
@@ -164,21 +137,15 @@ function writeArchive(year, month, archiveData) {
 
 /**
  * Append sessions to an archive, deduplicating by session ID
- * @param {number} year
- * @param {number} month - 0-based
- * @param {Array} globalSessions - Global sessions to add
- * @param {Object} projectSessionsMap - { projectId: { projectName, sessions: [] } }
  */
 function appendToArchive(year, month, globalSessions, projectSessionsMap) {
   const filePath = getArchiveFilePath(year, month);
 
-  // Read fresh from disk (bypass cache for writes)
   let archive = readArchiveFromDisk(filePath);
   if (!archive) {
     archive = createEmptyArchive(year, month);
   }
 
-  // Deduplicate global sessions
   if (globalSessions && globalSessions.length > 0) {
     const existingIds = new Set(archive.globalSessions.map(s => s.id));
     for (const session of globalSessions) {
@@ -188,7 +155,6 @@ function appendToArchive(year, month, globalSessions, projectSessionsMap) {
     }
   }
 
-  // Deduplicate project sessions
   if (projectSessionsMap) {
     for (const [projectId, data] of Object.entries(projectSessionsMap)) {
       if (!archive.projectSessions[projectId]) {
@@ -203,7 +169,6 @@ function appendToArchive(year, month, globalSessions, projectSessionsMap) {
           archive.projectSessions[projectId].sessions.push(session);
         }
       }
-      // Update project name to latest
       if (data.projectName) {
         archive.projectSessions[projectId].projectName = data.projectName;
       }
@@ -218,9 +183,6 @@ function appendToArchive(year, month, globalSessions, projectSessionsMap) {
 
 /**
  * Get archived global sessions for a specific month
- * @param {number} year
- * @param {number} month - 0-based
- * @returns {Array}
  */
 function getArchivedGlobalSessions(year, month) {
   const archive = loadArchive(year, month);
@@ -229,10 +191,6 @@ function getArchivedGlobalSessions(year, month) {
 
 /**
  * Get archived sessions for a specific project in a month
- * @param {number} year
- * @param {number} month - 0-based
- * @param {string} projectId
- * @returns {Array}
  */
 function getArchivedProjectSessions(year, month, projectId) {
   const archive = loadArchive(year, month);
@@ -241,36 +199,22 @@ function getArchivedProjectSessions(year, month, projectId) {
 
 /**
  * Get all archived project sessions for a month
- * @param {number} year
- * @param {number} month - 0-based
- * @returns {Object} { projectId: { projectName, sessions } }
  */
 function getArchivedAllProjectSessions(year, month) {
   const archive = loadArchive(year, month);
   return archive?.projectSessions || {};
 }
 
-/**
- * Invalidate cache for a specific month
- * @param {number} year
- * @param {number} month - 0-based
- */
 function invalidateArchiveCache(year, month) {
   archiveCache.delete(getCacheKey(year, month));
 }
 
-/**
- * Clear entire archive cache
- */
 function clearArchiveCache() {
   archiveCache.clear();
 }
 
 /**
  * Get list of months in a date range
- * @param {Date} periodStart
- * @param {Date} periodEnd
- * @returns {Array<{year: number, month: number}>}
  */
 function getMonthsInRange(periodStart, periodEnd) {
   const months = [];
@@ -284,10 +228,77 @@ function getMonthsInRange(periodStart, periodEnd) {
   return months;
 }
 
+/**
+ * Migrate old archives from ~/.claude-terminal/archives/ to timetracking/YYYY/month.json
+ * One-time migration on first launch after update
+ */
+function migrateOldArchives() {
+  try {
+    if (!fs.existsSync(archivesDir)) return;
+
+    const files = fs.readdirSync(archivesDir);
+    if (files.length === 0) {
+      // Empty directory, just remove it
+      try { fs.rmdirSync(archivesDir); } catch (_) {}
+      return;
+    }
+
+    let migratedCount = 0;
+
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+
+      // Parse old filename: "january_2026.json"
+      const match = file.match(/^([a-z]+)_(\d{4})\.json$/);
+      if (!match) continue;
+
+      const monthName = match[1];
+      const year = parseInt(match[2], 10);
+      const monthIndex = MONTH_NAMES.indexOf(monthName);
+      if (monthIndex === -1) continue;
+
+      const oldPath = path.join(archivesDir, file);
+      const newPath = getArchiveFilePath(year, monthIndex);
+
+      // Skip if already migrated
+      if (fs.existsSync(newPath)) {
+        // Remove old file since new one exists
+        try { fs.unlinkSync(oldPath); } catch (_) {}
+        continue;
+      }
+
+      // Read old, write to new location
+      const data = readArchiveFromDisk(oldPath);
+      if (data) {
+        ensureYearDir(year);
+        try {
+          fs.writeFileSync(newPath, JSON.stringify(data, null, 2));
+          fs.unlinkSync(oldPath);
+          migratedCount++;
+        } catch (err) {
+          console.warn('[ArchiveService] Failed to migrate:', file, err.message);
+        }
+      }
+    }
+
+    // Remove old archives dir if empty
+    try {
+      const remaining = fs.readdirSync(archivesDir);
+      if (remaining.length === 0) {
+        fs.rmdirSync(archivesDir);
+      }
+    } catch (_) {}
+
+    if (migratedCount > 0) {
+      console.debug(`[ArchiveService] Migrated ${migratedCount} archive(s) to new structure`);
+    }
+  } catch (error) {
+    console.warn('[ArchiveService] Migration error:', error.message);
+  }
+}
+
 module.exports = {
   getArchiveFilePath,
-  getArchiveFilename,
-  ensureArchivesDir,
   isCurrentMonth,
   loadArchive,
   writeArchive,
@@ -297,5 +308,6 @@ module.exports = {
   getArchivedAllProjectSessions,
   invalidateArchiveCache,
   clearArchiveCache,
-  getMonthsInRange
+  getMonthsInRange,
+  migrateOldArchives
 };
