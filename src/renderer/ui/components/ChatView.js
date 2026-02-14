@@ -130,9 +130,10 @@ function getToolDisplayInfo(toolName, input) {
 // ── Create Chat View ──
 
 function createChatView(wrapperEl, project, options = {}) {
-  const { terminalId = null, resumeSessionId = null, skipPermissions = false, onTabRename = null, onStatusChange = null } = options;
+  const { terminalId = null, resumeSessionId = null, skipPermissions = false, onTabRename = null, onStatusChange = null, onSwitchTerminal = null, onSwitchProject = null } = options;
   let sessionId = null;
   let isStreaming = false;
+  let isAborting = false;
   let pendingResumeId = resumeSessionId || null;
   let tabNamePending = false; // avoid concurrent tab name requests
   let currentStreamEl = null;
@@ -303,6 +304,16 @@ function createChatView(wrapperEl, project, options = {}) {
     updateSlashDropdown();
   });
 
+  // Ctrl+Arrow to switch terminals/projects (capture phase to intercept before textarea)
+  wrapperEl.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+      if (e.key === 'ArrowLeft' && onSwitchTerminal) { e.preventDefault(); e.stopPropagation(); onSwitchTerminal('left'); return; }
+      if (e.key === 'ArrowRight' && onSwitchTerminal) { e.preventDefault(); e.stopPropagation(); onSwitchTerminal('right'); return; }
+      if (e.key === 'ArrowUp' && onSwitchProject) { e.preventDefault(); e.stopPropagation(); onSwitchProject('up'); return; }
+      if (e.key === 'ArrowDown' && onSwitchProject) { e.preventDefault(); e.stopPropagation(); onSwitchProject('down'); return; }
+    }
+  }, true);
+
   inputEl.addEventListener('keydown', (e) => {
     // Slash dropdown navigation
     if (slashDropdown.style.display !== 'none') {
@@ -424,7 +435,10 @@ function createChatView(wrapperEl, project, options = {}) {
 
   sendBtn.addEventListener('click', handleSend);
   stopBtn.addEventListener('click', () => {
-    if (sessionId) api.chat.interrupt({ sessionId });
+    if (sessionId) {
+      isAborting = true;
+      api.chat.interrupt({ sessionId });
+    }
   });
 
   // ── Delegated click handlers ──
@@ -1558,8 +1572,11 @@ function createChatView(wrapperEl, project, options = {}) {
       if (message.is_error || (message.subtype && message.subtype !== 'success')) {
         removeThinkingIndicator();
         finalizeStreamBlock();
-        const errors = message.errors || [];
-        appendError(errors.length ? errors.join('\n') : (message.subtype || 'Unknown error'));
+        if (!isAborting) {
+          const errors = message.errors || [];
+          appendError(errors.length ? errors.join('\n') : (message.subtype || 'Unknown error'));
+        }
+        isAborting = false;
         setStreaming(false);
       } else {
         // Successful result (e.g. slash commands like /usage, /compact, /clear)
@@ -1796,7 +1813,10 @@ function createChatView(wrapperEl, project, options = {}) {
     removeThinkingIndicator();
     finalizeStreamBlock();
     resolveAllPendingCards();
-    appendError(error);
+    if (!isAborting) {
+      appendError(error);
+    }
+    isAborting = false;
     setStreaming(false);
   });
   unsubscribers.push(unsubError);
@@ -1805,6 +1825,7 @@ function createChatView(wrapperEl, project, options = {}) {
 
   const unsubDone = api.chat.onDone(({ sessionId: sid }) => {
     if (sid !== sessionId) return;
+    isAborting = false;
     removeThinkingIndicator();
     finalizeStreamBlock();
     setStreaming(false);

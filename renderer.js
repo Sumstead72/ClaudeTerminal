@@ -1348,81 +1348,89 @@ ProjectList.setCallbacks({
   getTerminalStatsForProject: TerminalManager.getTerminalStatsForProject
 });
 
+// Tab/project switch functions (shared between xterm handler and IPC ctrl-arrow)
+function switchTerminal(direction) {
+  const allTerminals = terminalsState.get().terminals;
+  const currentId = terminalsState.get().activeTerminal;
+  const currentFilter = projectsState.get().selectedProjectFilter;
+  const projects = projectsState.get().projects;
+  const filterProject = projects[currentFilter];
+
+  // Get only visible terminals (respecting project filter)
+  const visibleTerminals = [];
+  allTerminals.forEach((termData, id) => {
+    const isVisible = currentFilter === null ||
+      (filterProject && termData.project && termData.project.path === filterProject.path);
+    if (isVisible) {
+      visibleTerminals.push(id);
+    }
+  });
+
+  if (visibleTerminals.length === 0) return;
+
+  const currentIndex = visibleTerminals.indexOf(currentId);
+  let targetIndex;
+
+  if (currentIndex === -1) {
+    targetIndex = 0;
+  } else if (direction === 'left') {
+    targetIndex = (currentIndex - 1 + visibleTerminals.length) % visibleTerminals.length;
+  } else {
+    targetIndex = (currentIndex + 1) % visibleTerminals.length;
+  }
+
+  TerminalManager.setActiveTerminal(visibleTerminals[targetIndex]);
+}
+
+function switchProject(direction) {
+  const projects = projectsState.get().projects;
+  const terminals = terminalsState.get().terminals;
+
+  const visualOrder = getVisualProjectOrder();
+  const projectsWithTerminals = visualOrder.filter(project => {
+    for (const [, t] of terminals) {
+      if (t.project && t.project.path === project.path) return true;
+    }
+    return false;
+  });
+
+  if (projectsWithTerminals.length <= 1) return;
+
+  const currentFilter = projectsState.get().selectedProjectFilter;
+  const currentProject = projects[currentFilter];
+  const currentIdx = currentProject
+    ? projectsWithTerminals.findIndex(p => p.path === currentProject.path)
+    : -1;
+
+  let targetIdx;
+  if (currentIdx === -1) {
+    targetIdx = 0;
+  } else if (direction === 'up') {
+    targetIdx = (currentIdx - 1 + projectsWithTerminals.length) % projectsWithTerminals.length;
+  } else {
+    targetIdx = (currentIdx + 1) % projectsWithTerminals.length;
+  }
+
+  const targetProject = projectsWithTerminals[targetIdx];
+  const targetIndex = getProjectIndex(targetProject.id);
+  setSelectedProjectFilter(targetIndex);
+  ProjectList.render();
+  TerminalManager.filterByProject(targetIndex);
+}
+
 // Setup TerminalManager
 TerminalManager.setCallbacks({
   onNotification: showNotification,
   onRenderProjects: () => ProjectList.render(),
   onCreateTerminal: createTerminalForProject,
-  onSwitchTerminal: (direction) => {
-    const allTerminals = terminalsState.get().terminals;
-    const currentId = terminalsState.get().activeTerminal;
-    const currentFilter = projectsState.get().selectedProjectFilter;
-    const projects = projectsState.get().projects;
-    const filterProject = projects[currentFilter];
+  onSwitchTerminal: switchTerminal,
+  onSwitchProject: switchProject
+});
 
-    // Get only visible terminals (respecting project filter)
-    const visibleTerminals = [];
-    allTerminals.forEach((termData, id) => {
-      const isVisible = currentFilter === null ||
-        (filterProject && termData.project && termData.project.path === filterProject.path);
-      if (isVisible) {
-        visibleTerminals.push(id);
-      }
-    });
-
-    if (visibleTerminals.length === 0) return;
-
-    const currentIndex = visibleTerminals.indexOf(currentId);
-    let targetIndex;
-
-    if (currentIndex === -1) {
-      // Current terminal not in visible list, pick first
-      targetIndex = 0;
-    } else if (direction === 'left') {
-      targetIndex = (currentIndex - 1 + visibleTerminals.length) % visibleTerminals.length;
-    } else {
-      targetIndex = (currentIndex + 1) % visibleTerminals.length;
-    }
-
-    TerminalManager.setActiveTerminal(visibleTerminals[targetIndex]);
-  },
-  onSwitchProject: (direction) => {
-    const projects = projectsState.get().projects;
-    const terminals = terminalsState.get().terminals;
-
-    // Get projects in visual (sidebar) order, filtered to those with open terminals
-    const visualOrder = getVisualProjectOrder();
-    const projectsWithTerminals = visualOrder.filter(project => {
-      for (const [, t] of terminals) {
-        if (t.project && t.project.path === project.path) return true;
-      }
-      return false;
-    });
-
-    if (projectsWithTerminals.length <= 1) return;
-
-    // Find current project by path for stable comparison
-    const currentFilter = projectsState.get().selectedProjectFilter;
-    const currentProject = projects[currentFilter];
-    const currentIdx = currentProject
-      ? projectsWithTerminals.findIndex(p => p.path === currentProject.path)
-      : -1;
-
-    let targetIdx;
-    if (currentIdx === -1) {
-      targetIdx = 0;
-    } else if (direction === 'up') {
-      targetIdx = (currentIdx - 1 + projectsWithTerminals.length) % projectsWithTerminals.length;
-    } else {
-      targetIdx = (currentIdx + 1) % projectsWithTerminals.length;
-    }
-
-    const targetProject = projectsWithTerminals[targetIdx];
-    const targetIndex = getProjectIndex(targetProject.id);
-    setSelectedProjectFilter(targetIndex);
-    ProjectList.render();
-    TerminalManager.filterByProject(targetIndex);
-  }
+// Listen for Ctrl+Arrow forwarded from main process (bypasses Windows Snap)
+api.window.onCtrlArrow((dir) => {
+  if (dir === 'left' || dir === 'right') switchTerminal(dir);
+  else if (dir === 'up' || dir === 'down') switchProject(dir);
 });
 
 // Setup FileExplorer

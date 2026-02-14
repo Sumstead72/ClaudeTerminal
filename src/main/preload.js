@@ -187,7 +187,8 @@ contextBridge.exposeInMainWorld('electron_api', {
     minimize: () => ipcRenderer.send('window-minimize'),
     maximize: () => ipcRenderer.send('window-maximize'),
     close: () => ipcRenderer.send('window-close'),
-    setTitle: (title) => ipcRenderer.send('set-window-title', title)
+    setTitle: (title) => ipcRenderer.send('set-window-title', title),
+    onCtrlArrow: createListener('ctrl-arrow')
   },
 
   app: {

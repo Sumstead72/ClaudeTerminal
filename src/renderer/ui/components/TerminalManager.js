@@ -3602,7 +3602,9 @@ async function createChatTerminal(project, options = {}) {
       const data = getTerminal(id);
       if (data) data.name = name;
     },
-    onStatusChange: (status, substatus) => updateChatTerminalStatus(id, status, substatus)
+    onStatusChange: (status, substatus) => updateChatTerminalStatus(id, status, substatus),
+    onSwitchTerminal: (dir) => callbacks.onSwitchTerminal?.(dir),
+    onSwitchProject: (dir) => callbacks.onSwitchProject?.(dir),
   });
   const storedData = getTerminal(id);
   if (storedData) {
@@ -3670,7 +3672,9 @@ async function switchTerminalMode(id) {
     const chatView = createChatView(wrapper, project, {
       terminalId: id,
       skipPermissions: getSetting('skipPermissions') || false,
-      onStatusChange: (status, substatus) => updateChatTerminalStatus(id, status, substatus)
+      onStatusChange: (status, substatus) => updateChatTerminalStatus(id, status, substatus),
+      onSwitchTerminal: (dir) => callbacks.onSwitchTerminal?.(dir),
+      onSwitchProject: (dir) => callbacks.onSwitchProject?.(dir),
     });
 
     updateTerminal(id, { mode: 'chat', chatView, terminal: null, fitAddon: null, status: 'ready' });

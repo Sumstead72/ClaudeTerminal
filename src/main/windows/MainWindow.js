@@ -35,6 +35,18 @@ function createMainWindow({ isDev = false } = {}) {
   const htmlPath = path.join(__dirname, '..', '..', '..', 'index.html');
   mainWindow.loadFile(htmlPath);
 
+  // Intercept Ctrl+Arrow to prevent Windows Snap and forward to renderer for tab switching
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && !input.shift && !input.alt && !input.meta && input.type === 'keyDown') {
+      const dir = { Left: 'left', ArrowLeft: 'left', Right: 'right', ArrowRight: 'right',
+                     Up: 'up', ArrowUp: 'up', Down: 'down', ArrowDown: 'down' }[input.key];
+      if (dir) {
+        event.preventDefault();
+        mainWindow.webContents.send('ctrl-arrow', dir);
+      }
+    }
+  });
+
   // Open DevTools in development
   if (isDev) {
     mainWindow.webContents.openDevTools();
