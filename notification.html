@@ -218,13 +218,20 @@
       autoDismissTimer = setTimeout(function() { dismiss(); }, autoDismiss);
     }
 
-    // Click-through: re-enable mouse events on opaque content, ignore on transparent body
-    var notifEl = document.getElementById('notification');
-    notifEl.addEventListener('mouseenter', function() {
-      ipcRenderer.send('notification-mouse-enter', { notifId: notifId });
-    });
-    notifEl.addEventListener('mouseleave', function() {
-      ipcRenderer.send('notification-mouse-leave', { notifId: notifId });
+    // Click-through: use CSS hover forwarding to detect when mouse is over opaque content.
+    // With setIgnoreMouseEvents(true, {forward:true}), regular DOM mouseenter/mouseleave
+    // don't fire reliably — but mousemove does. We poll elementFromPoint to toggle click-through.
+    var isOverContent = false;
+    document.addEventListener('mousemove', function(e) {
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var overNotif = el && (el.closest('.notification') !== null);
+      if (overNotif && !isOverContent) {
+        isOverContent = true;
+        ipcRenderer.send('notification-mouse-enter', { notifId: notifId });
+      } else if (!overNotif && isOverContent) {
+        isOverContent = false;
+        ipcRenderer.send('notification-mouse-leave', { notifId: notifId });
+      }
     });
 
     // Single dismiss function — plays exit animation, then tells main to close
@@ -235,6 +242,7 @@
       if (autoDismissTimer) clearTimeout(autoDismissTimer);
       document.getElementById('notification').classList.add('exit');
       // Re-enable click-through immediately so dismissed notif doesn't block
+      isOverContent = false;
       ipcRenderer.send('notification-mouse-leave', { notifId: notifId });
       setTimeout(function() {
         ipcRenderer.send('notification-dismiss', { notifId: notifId });
