@@ -167,7 +167,9 @@ function createChatView(wrapperEl, project, options = {}) {
         </div>
       </div>
       <div class="chat-input-area">
+        <div class="chat-mention-dropdown" style="display:none"></div>
         <div class="chat-slash-dropdown" style="display:none"></div>
+        <div class="chat-mention-chips" style="display:none"></div>
         <div class="chat-image-preview" style="display:none"></div>
         <div class="chat-input-wrapper">
           <button class="chat-attach-btn" title="${escapeHtml(t('chat.attachImage') || 'Attach image')}">
@@ -213,6 +215,16 @@ function createChatView(wrapperEl, project, options = {}) {
   const attachBtn = chatView.querySelector('.chat-attach-btn');
   const fileInput = chatView.querySelector('.chat-file-input');
   const imagePreview = chatView.querySelector('.chat-image-preview');
+  const mentionDropdown = chatView.querySelector('.chat-mention-dropdown');
+  const mentionChipsEl = chatView.querySelector('.chat-mention-chips');
+
+  // ── Mention state ──
+
+  const pendingMentions = []; // Array of { type, label, icon, data }
+  let mentionSelectedIndex = 0;
+  let mentionMode = null; // null | 'types' | 'file'
+  let mentionFileCache = null; // { files: [], timestamp, projectPath }
+  const MENTION_FILE_CACHE_TTL = 5 * 60 * 1000;
 
   // ── Image attachments ──
 
@@ -301,7 +313,14 @@ function createChatView(wrapperEl, project, options = {}) {
   inputEl.addEventListener('input', () => {
     inputEl.style.height = 'auto';
     inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px';
-    updateSlashDropdown();
+    // Slash commands take precedence (/ at start of line)
+    if (inputEl.value.startsWith('/')) {
+      hideMentionDropdown();
+      updateSlashDropdown();
+    } else {
+      hideSlashDropdown();
+      updateMentionDropdown();
+    }
   });
 
   // Ctrl+Arrow to switch terminals/projects (capture phase to intercept before textarea)
@@ -315,6 +334,38 @@ function createChatView(wrapperEl, project, options = {}) {
   }, true);
 
   inputEl.addEventListener('keydown', (e) => {
+    // Mention dropdown navigation
+    if (mentionDropdown.style.display !== 'none') {
+      const items = mentionDropdown.querySelectorAll('.chat-mention-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        mentionSelectedIndex = Math.min(mentionSelectedIndex + 1, items.length - 1);
+        highlightMentionItem(items);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        mentionSelectedIndex = Math.max(mentionSelectedIndex - 1, 0);
+        highlightMentionItem(items);
+        return;
+      }
+      if ((e.key === 'Enter' || e.key === 'Tab') && mentionSelectedIndex >= 0 && items[mentionSelectedIndex]) {
+        e.preventDefault();
+        const item = items[mentionSelectedIndex];
+        if (mentionMode === 'file') {
+          selectMentionFile(item.dataset.path, item.dataset.fullpath);
+        } else {
+          selectMentionType(item.dataset.type);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        hideMentionDropdown();
+        return;
+      }
+    }
+
     // Slash dropdown navigation
     if (slashDropdown.style.display !== 'none') {
       const items = slashDropdown.querySelectorAll('.chat-slash-item');
@@ -430,8 +481,378 @@ function createChatView(wrapperEl, project, options = {}) {
 
   inputEl.addEventListener('blur', () => {
     // Small delay to allow click on dropdown items
-    setTimeout(() => hideSlashDropdown(), 150);
+    setTimeout(() => { hideSlashDropdown(); hideMentionDropdown(); }, 150);
   });
+
+  // ── Mention autocomplete ──
+
+  const MENTION_TYPES = [
+    { type: 'file', label: '@file', desc: t('chat.mentionFile') || 'Attach a file from your project', icon: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>' },
+    { type: 'git', label: '@git', desc: t('chat.mentionGit') || 'Attach current git diff', icon: '<svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>' },
+    { type: 'terminal', label: '@terminal', desc: t('chat.mentionTerminal') || 'Attach terminal output', icon: '<svg viewBox="0 0 24 24"><polyline points="4,17 10,11 4,5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>' },
+    { type: 'errors', label: '@errors', desc: t('chat.mentionErrors') || 'Attach error lines from terminal', icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' },
+    { type: 'selection', label: '@selection', desc: t('chat.mentionSelection') || 'Attach selected text', icon: '<svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>' },
+    { type: 'todos', label: '@todos', desc: t('chat.mentionTodos') || 'Attach TODO items from project', icon: '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>' },
+  ];
+
+  function updateMentionDropdown() {
+    const text = inputEl.value;
+    const cursorPos = inputEl.selectionStart;
+    const beforeCursor = text.substring(0, cursorPos);
+
+    // File picker mode: filter files by query after @file
+    if (mentionMode === 'file') {
+      const fileMatch = beforeCursor.match(/@file\s+(.*)$/i);
+      if (fileMatch) {
+        renderFileDropdown(fileMatch[1]);
+      } else if (!beforeCursor.match(/@file/i)) {
+        hideMentionDropdown();
+      }
+      return;
+    }
+
+    // Detect @ trigger
+    const atMatch = beforeCursor.match(/@(\w*)$/);
+    if (!atMatch) {
+      hideMentionDropdown();
+      return;
+    }
+
+    const query = atMatch[1].toLowerCase();
+    const filtered = MENTION_TYPES.filter(m => m.type.includes(query));
+    if (filtered.length === 0) {
+      hideMentionDropdown();
+      return;
+    }
+
+    mentionMode = 'types';
+    if (mentionSelectedIndex >= filtered.length) mentionSelectedIndex = filtered.length - 1;
+
+    mentionDropdown.innerHTML = filtered.map((item, i) => `
+      <div class="chat-mention-item${i === mentionSelectedIndex ? ' active' : ''}" data-type="${item.type}">
+        <span class="chat-mention-item-icon">${item.icon}</span>
+        <div class="chat-mention-item-info">
+          <span class="chat-mention-item-name">${escapeHtml(item.label)}</span>
+          <span class="chat-mention-item-desc">${escapeHtml(item.desc)}</span>
+        </div>
+      </div>
+    `).join('');
+
+    mentionDropdown.style.display = '';
+
+    mentionDropdown.querySelectorAll('.chat-mention-item').forEach((el, idx) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        selectMentionType(el.dataset.type);
+      });
+      el.addEventListener('mouseenter', () => {
+        mentionSelectedIndex = idx;
+        highlightMentionItem(mentionDropdown.querySelectorAll('.chat-mention-item'));
+      });
+    });
+  }
+
+  function highlightMentionItem(items) {
+    items.forEach((item, i) => item.classList.toggle('active', i === mentionSelectedIndex));
+    if (items[mentionSelectedIndex]) items[mentionSelectedIndex].scrollIntoView({ block: 'nearest' });
+  }
+
+  function hideMentionDropdown() {
+    mentionDropdown.style.display = 'none';
+    mentionDropdown.innerHTML = '';
+    mentionSelectedIndex = 0;
+    mentionMode = null;
+  }
+
+  function removeAtTrigger() {
+    const text = inputEl.value;
+    const cursorPos = inputEl.selectionStart;
+    const beforeCursor = text.substring(0, cursorPos);
+    const afterCursor = text.substring(cursorPos);
+    // Remove @word (or @file query) before cursor
+    const cleaned = beforeCursor.replace(/@\w*\s*$/, '');
+    inputEl.value = cleaned + afterCursor;
+    inputEl.selectionStart = inputEl.selectionEnd = cleaned.length;
+  }
+
+  function selectMentionType(type) {
+    if (type === 'file') {
+      // Switch to file picker mode — replace @partial with @file and wait for query
+      const text = inputEl.value;
+      const cursorPos = inputEl.selectionStart;
+      const beforeCursor = text.substring(0, cursorPos);
+      const afterCursor = text.substring(cursorPos);
+      const cleaned = beforeCursor.replace(/@\w*$/, '@file ');
+      inputEl.value = cleaned + afterCursor;
+      inputEl.selectionStart = inputEl.selectionEnd = cleaned.length;
+      mentionMode = 'file';
+      renderFileDropdown('');
+      inputEl.focus();
+      return;
+    }
+
+    // Direct mention types — add chip immediately
+    removeAtTrigger();
+    addMentionChip(type);
+    hideMentionDropdown();
+    inputEl.focus();
+  }
+
+  // ── File picker ──
+
+  function scanProjectFiles(projectPath) {
+    const { fs, path } = window.electron_nodeModules;
+    const files = [];
+    const ignoreDirs = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', 'vendor', '.cache', 'coverage', '.nuxt']);
+
+    function scan(dir, depth) {
+      if (depth > 6 || files.length >= 500) return;
+      try {
+        const entries = fs.readdirSync(dir);
+        for (const entry of entries) {
+          if (files.length >= 500) break;
+          if (entry.startsWith('.') && entry !== '.env') continue;
+          if (ignoreDirs.has(entry)) continue;
+          const fullPath = path.join(dir, entry);
+          try {
+            const stat = fs.statSync(fullPath);
+            if (stat.isDirectory()) {
+              scan(fullPath, depth + 1);
+            } else if (stat.isFile()) {
+              files.push({ path: path.relative(projectPath, fullPath).replace(/\\/g, '/'), fullPath, mtime: stat.mtimeMs });
+            }
+          } catch (e) { /* skip inaccessible */ }
+        }
+      } catch (e) { /* skip inaccessible */ }
+    }
+
+    scan(projectPath, 0);
+    files.sort((a, b) => b.mtime - a.mtime);
+    return files;
+  }
+
+  function getFileCache() {
+    const projectPath = project?.path;
+    if (!projectPath) return [];
+    if (mentionFileCache && mentionFileCache.projectPath === projectPath && Date.now() - mentionFileCache.timestamp < MENTION_FILE_CACHE_TTL) {
+      return mentionFileCache.files;
+    }
+    const files = scanProjectFiles(projectPath);
+    mentionFileCache = { files, timestamp: Date.now(), projectPath };
+    return files;
+  }
+
+  function renderFileDropdown(query) {
+    const files = getFileCache();
+    const q = query.trim().toLowerCase();
+    const filtered = q ? files.filter(f => f.path.toLowerCase().includes(q)) : files;
+    const shown = filtered.slice(0, 40);
+
+    if (shown.length === 0) {
+      mentionDropdown.innerHTML = `<div class="chat-mention-item" style="opacity:0.5;cursor:default"><span class="chat-mention-item-desc">${escapeHtml(t('chat.mentionNoFiles') || 'No files found')}</span></div>`;
+      mentionDropdown.style.display = '';
+      return;
+    }
+
+    mentionMode = 'file';
+    if (mentionSelectedIndex >= shown.length) mentionSelectedIndex = shown.length - 1;
+
+    const { path: pathModule } = window.electron_nodeModules;
+    mentionDropdown.innerHTML = shown.map((file, i) => `
+      <div class="chat-mention-item${i === mentionSelectedIndex ? ' active' : ''}" data-path="${escapeHtml(file.path)}" data-fullpath="${escapeHtml(file.fullPath)}">
+        <span class="chat-mention-item-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></span>
+        <span class="chat-mention-item-path">${escapeHtml(file.path)}</span>
+      </div>
+    `).join('');
+
+    mentionDropdown.style.display = '';
+
+    mentionDropdown.querySelectorAll('.chat-mention-item').forEach((el, idx) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (el.dataset.path) selectMentionFile(el.dataset.path, el.dataset.fullpath);
+      });
+      el.addEventListener('mouseenter', () => {
+        mentionSelectedIndex = idx;
+        highlightMentionItem(mentionDropdown.querySelectorAll('.chat-mention-item'));
+      });
+    });
+  }
+
+  function selectMentionFile(relativePath, fullPath) {
+    removeAtTrigger();
+    addMentionChip('file', { path: relativePath, fullPath });
+    hideMentionDropdown();
+    inputEl.focus();
+  }
+
+  // ── Mention chips ──
+
+  function getMentionIcon(type) {
+    const found = MENTION_TYPES.find(m => m.type === type);
+    return found ? found.icon : '';
+  }
+
+  function addMentionChip(type, data = null) {
+    const label = type === 'file' ? `@${data.path}` : `@${type}`;
+    pendingMentions.push({ type, label, icon: getMentionIcon(type), data });
+    renderMentionChips();
+  }
+
+  function removeMention(index) {
+    pendingMentions.splice(index, 1);
+    renderMentionChips();
+  }
+
+  function renderMentionChips() {
+    if (pendingMentions.length === 0) {
+      mentionChipsEl.style.display = 'none';
+      mentionChipsEl.innerHTML = '';
+      return;
+    }
+    mentionChipsEl.style.display = 'flex';
+    mentionChipsEl.innerHTML = pendingMentions.map((chip, i) => `
+      <div class="chat-mention-chip" data-index="${i}">
+        <span class="chat-mention-chip-icon">${chip.icon}</span>
+        <span class="chat-mention-chip-label">${escapeHtml(chip.label)}</span>
+        <button class="chat-mention-chip-remove" data-index="${i}" title="Remove">&times;</button>
+      </div>
+    `).join('');
+    mentionChipsEl.querySelectorAll('.chat-mention-chip-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeMention(parseInt(btn.dataset.index));
+      });
+    });
+  }
+
+  // ── Resolve mentions to text content ──
+
+  async function resolveMentions(mentions) {
+    const { fs } = window.electron_nodeModules;
+    const resolved = [];
+
+    for (const mention of mentions) {
+      let content = '';
+
+      switch (mention.type) {
+        case 'file': {
+          try {
+            const raw = fs.readFileSync(mention.data.fullPath, 'utf8');
+            const lines = raw.split('\n');
+            if (lines.length > 500) {
+              content = `File: ${mention.data.path} (showing first 500 of ${lines.length} lines)\n\n${lines.slice(0, 500).join('\n')}`;
+            } else {
+              content = `File: ${mention.data.path}\n\n${raw}`;
+            }
+          } catch (e) {
+            content = `[Error reading file: ${mention.data.path}]`;
+          }
+          break;
+        }
+
+        case 'git': {
+          try {
+            const status = await api.git.statusDetailed({ projectPath: project.path });
+            if (!status?.success || !status.files?.length) {
+              content = '[No git changes detected]';
+              break;
+            }
+            const diffs = [];
+            for (const file of status.files.slice(0, 20)) {
+              try {
+                const d = await api.git.fileDiff({ projectPath: project.path, filePath: file.path });
+                if (d?.diff) diffs.push(`--- ${file.path} ---\n${d.diff}`);
+              } catch (e) { /* skip */ }
+            }
+            content = diffs.length > 0 ? `Git Changes (${status.files.length} files):\n\n${diffs.join('\n\n')}` : '[No diff content available]';
+          } catch (e) {
+            content = '[Error fetching git diff]';
+          }
+          break;
+        }
+
+        case 'terminal': {
+          const lines = extractTerminalLines(200);
+          content = lines.length > 0 ? `Terminal Output (last ${lines.length} lines):\n\n${lines.join('\n')}` : '[No active terminal or empty output]';
+          break;
+        }
+
+        case 'errors': {
+          const allLines = extractTerminalLines(500);
+          const errorPattern = /error|exception|failed|ERR!|panic|FATAL|Traceback|at\s+\S+\s+\(/i;
+          const errorLines = allLines.filter(l => errorPattern.test(l));
+          content = errorLines.length > 0 ? `Error Lines (${errorLines.length} found):\n\n${errorLines.slice(0, 100).join('\n')}` : '[No errors detected in terminal output]';
+          break;
+        }
+
+        case 'selection': {
+          const sel = window.getSelection()?.toString();
+          if (sel && sel.trim()) {
+            const truncated = sel.length > 10000 ? sel.slice(0, 10000) + '\n\n(Truncated to 10,000 characters)' : sel;
+            content = `Selected Text:\n\n${truncated}`;
+          } else {
+            content = '[No text currently selected]';
+          }
+          break;
+        }
+
+        case 'todos': {
+          try {
+            const todos = await api.project.scanTodos(project.path);
+            if (todos?.length > 0) {
+              content = `TODO Items (${todos.length} found):\n\n${todos.slice(0, 50).map(t => `${t.type} [${t.file}:${t.line}]: ${t.text}`).join('\n')}`;
+            } else {
+              content = '[No TODOs found in project]';
+            }
+          } catch (e) {
+            content = '[Error scanning TODOs]';
+          }
+          break;
+        }
+      }
+
+      resolved.push({ label: mention.label, content });
+    }
+
+    return resolved;
+  }
+
+  function extractTerminalLines(maxLines) {
+    // Access active terminal's xterm.js buffer via state
+    try {
+      const { getActiveTerminal, getTerminal, getTerminalsForProject } = require('../../state');
+      const { getProjectIndex } = require('../../state');
+
+      // Try active terminal first, then find one for this project
+      let termData = null;
+      const activeId = getActiveTerminal();
+      if (activeId != null) {
+        const t = getTerminal(activeId);
+        if (t?.projectIndex === getProjectIndex(project?.id)) termData = t;
+      }
+      if (!termData) {
+        const projectTerminals = getTerminalsForProject(getProjectIndex(project?.id));
+        if (projectTerminals.length > 0) termData = getTerminal(projectTerminals[0].id);
+      }
+
+      if (!termData?.terminal?.buffer?.active) return [];
+      const buf = termData.terminal.buffer.active;
+      const totalLines = buf.baseY + buf.cursorY;
+      const startLine = Math.max(0, totalLines - maxLines);
+      const lines = [];
+      for (let i = startLine; i <= totalLines; i++) {
+        const row = buf.getLine(i);
+        if (row) {
+          const text = row.translateToString(true).trim();
+          if (text) lines.push(text);
+        }
+      }
+      return lines;
+    } catch (e) {
+      return [];
+    }
+  }
 
   sendBtn.addEventListener('click', handleSend);
   stopBtn.addEventListener('click', () => {
@@ -513,14 +934,18 @@ function createChatView(wrapperEl, project, options = {}) {
   async function handleSend() {
     const text = inputEl.value.trim();
     const hasImages = pendingImages.length > 0;
-    if ((!text && !hasImages) || isStreaming || sendLock) return;
+    const hasMentions = pendingMentions.length > 0;
+    if ((!text && !hasImages && !hasMentions) || isStreaming || sendLock) return;
 
     sendLock = true;
     if (project?.id) recordActivity(project.id);
 
-    // Snapshot images and clear pending
+    // Snapshot images and mentions, then clear pending
     const images = hasImages ? pendingImages.splice(0) : [];
+    const mentions = hasMentions ? pendingMentions.splice(0) : [];
     renderImagePreview();
+    renderMentionChips();
+    hideMentionDropdown();
 
     // Remove completed todo widget on new prompt
     if (todoWidgetEl && todoAllDone) {
@@ -531,12 +956,15 @@ function createChatView(wrapperEl, project, options = {}) {
       setTimeout(() => el.remove(), 300);
     }
 
-    appendUserMessage(text, images);
+    appendUserMessage(text, images, mentions);
     inputEl.value = '';
     inputEl.style.height = 'auto';
     turnHadAssistantContent = false;
     setStreaming(true);
     appendThinkingIndicator();
+
+    // Resolve mentions to text content
+    const resolvedMentions = mentions.length > 0 ? await resolveMentions(mentions) : [];
 
     // Prepare images payload (without dataUrl to reduce IPC size)
     const imagesPayload = images.map(({ base64, mediaType }) => ({ base64, mediaType }));
@@ -551,7 +979,8 @@ function createChatView(wrapperEl, project, options = {}) {
           prompt: text || '',
           permissionMode: skipPermissions ? 'bypassPermissions' : 'default',
           sessionId,
-          images: imagesPayload
+          images: imagesPayload,
+          mentions: resolvedMentions
         };
         if (pendingResumeId) {
           startOpts.resumeSessionId = pendingResumeId;
@@ -564,7 +993,7 @@ function createChatView(wrapperEl, project, options = {}) {
           setStreaming(false);
         }
       } else {
-        const result = await api.chat.send({ sessionId, text, images: imagesPayload });
+        const result = await api.chat.send({ sessionId, text, images: imagesPayload, mentions: resolvedMentions });
         if (!result.success) {
           appendError(result.error || t('chat.errorOccurred'));
           setStreaming(false);
@@ -875,12 +1304,17 @@ function createChatView(wrapperEl, project, options = {}) {
 
   // ── DOM helpers ──
 
-  function appendUserMessage(text, images = []) {
+  function appendUserMessage(text, images = [], mentions = []) {
     const welcome = messagesEl.querySelector('.chat-welcome');
     if (welcome) welcome.remove();
     const el = document.createElement('div');
     el.className = 'chat-msg chat-msg-user';
     let html = '';
+    if (mentions.length > 0) {
+      html += `<div class="chat-msg-mentions">${mentions.map(m =>
+        `<span class="chat-msg-mention-tag">${m.icon}<span>${escapeHtml(m.label)}</span></span>`
+      ).join('')}</div>`;
+    }
     if (images.length > 0) {
       html += `<div class="chat-msg-images">${images.map(img =>
         `<img src="${img.dataUrl}" alt="${escapeHtml(img.name || 'image')}" class="chat-msg-image" />`

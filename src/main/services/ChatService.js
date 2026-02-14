@@ -115,7 +115,7 @@ class ChatService {
    * @param {string} [params.resumeSessionId] - Session ID to resume
    * @returns {Promise<string>} Session ID
    */
-  async startSession({ cwd, prompt, permissionMode = 'default', resumeSessionId = null, sessionId = null, images = [] }) {
+  async startSession({ cwd, prompt, permissionMode = 'default', resumeSessionId = null, sessionId = null, images = [], mentions = [] }) {
     const sdk = await loadSDK();
     if (!sessionId) sessionId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -127,7 +127,7 @@ class ChatService {
     if (prompt) {
       messageQueue.push({
         type: 'user',
-        message: { role: 'user', content: this._buildContent(prompt, images) },
+        message: { role: 'user', content: this._buildContent(prompt, images, mentions) },
         parent_tool_use_id: null,
         session_id: sessionId
       });
@@ -188,32 +188,45 @@ class ChatService {
   /**
    * Send a follow-up message (push to async iterable queue)
    */
-  sendMessage(sessionId, text, images = []) {
+  sendMessage(sessionId, text, images = [], mentions = []) {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session ${sessionId} not found`);
 
     session.messageQueue.push({
       type: 'user',
-      message: { role: 'user', content: this._buildContent(text, images) },
+      message: { role: 'user', content: this._buildContent(text, images, mentions) },
       parent_tool_use_id: null,
       session_id: sessionId
     });
   }
 
   /**
-   * Build message content: plain string if text-only, content blocks array if images attached
+   * Build message content: plain string if text-only, content blocks array if images/mentions attached
    * @param {string} text
    * @param {Array} images - Array of { base64, mediaType } objects
+   * @param {Array} mentions - Array of { label, content } resolved context blocks
    * @returns {string|Array}
    */
-  _buildContent(text, images) {
-    if (!images || images.length === 0) return text;
+  _buildContent(text, images, mentions = []) {
+    const hasImages = images && images.length > 0;
+    const hasMentions = mentions && mentions.length > 0;
+
+    if (!hasImages && !hasMentions) return text;
 
     const content = [];
+
+    // Context blocks first — so Claude sees the context before the question
+    for (const mention of (mentions || [])) {
+      content.push({ type: 'text', text: `[Context: ${mention.label}]\n${mention.content}` });
+    }
+
+    // User's actual message
     if (text) {
       content.push({ type: 'text', text });
     }
-    for (const img of images) {
+
+    // Images last
+    for (const img of (images || [])) {
       content.push({
         type: 'image',
         source: {
@@ -223,6 +236,7 @@ class ChatService {
         }
       });
     }
+
     return content;
   }
 
