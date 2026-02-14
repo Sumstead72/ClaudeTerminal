@@ -103,6 +103,17 @@ function registerDialogHandlers() {
     updaterService.quitAndInstall();
   });
 
+  // Manually check for updates
+  ipcMain.handle('check-for-updates', async () => {
+    try {
+      updaterService.initialize();
+      const result = await updaterService.manualCheck();
+      return { success: true, version: result?.updateInfo?.version || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
   // Launch at startup - get current setting
   ipcMain.handle('get-launch-at-startup', () => {
     const settings = app.getLoginItemSettings();

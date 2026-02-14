@@ -307,7 +307,8 @@ contextBridge.exposeInMainWorld('electron_api', {
 
   // ==================== UPDATES ====================
   updates: {
-    onStatus: createListener('update-status')
+    onStatus: createListener('update-status'),
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates')
   },
 
   // ==================== SETUP WIZARD ====================

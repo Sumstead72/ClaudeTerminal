@@ -1956,6 +1956,16 @@ async function renderSettingsTab(initialTab = 'general') {
                 <option value="quit" ${settings.closeAction === 'quit' ? 'selected' : ''}>Quitter</option>
               </select>
             </div>
+            <div class="settings-row" style="margin-top: 8px;">
+              <div class="settings-label">
+                <div>${t('settings.checkForUpdates') || 'Mises a jour'}</div>
+                <div class="settings-desc">${t('settings.checkForUpdatesDesc') || 'Verifier si une nouvelle version est disponible'}</div>
+              </div>
+              <button type="button" class="btn-outline" id="btn-check-updates">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.49 12.65 0L21 3v7.12z"/></svg>
+                ${t('settings.checkForUpdatesBtn') || 'Verifier'}
+              </button>
+            </div>
           </div>
           <!-- Quick Action Presets Section -->
           <div class="settings-section">
@@ -2308,6 +2318,30 @@ async function renderSettingsTab(initialTab = 'general') {
       container.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
       container.querySelector('.settings-tab[data-tab="themes"]')?.classList.add('active');
       container.querySelector('.settings-panel[data-panel="themes"]')?.classList.add('active');
+    };
+  }
+
+  // Check for updates button
+  const btnCheckUpdates = document.getElementById('btn-check-updates');
+  if (btnCheckUpdates) {
+    btnCheckUpdates.onclick = async () => {
+      const originalText = btnCheckUpdates.innerHTML;
+      btnCheckUpdates.disabled = true;
+      btnCheckUpdates.innerHTML = `<span class="btn-spinner"></span> ${t('settings.checking') || 'Verification...'}`;
+      try {
+        const result = await api.updates.checkForUpdates();
+        if (result?.success && result.version) {
+          btnCheckUpdates.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> v${result.version}`;
+        } else {
+          btnCheckUpdates.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> ${t('settings.upToDate') || 'A jour'}`;
+        }
+      } catch (e) {
+        btnCheckUpdates.innerHTML = originalText;
+      }
+      setTimeout(() => {
+        btnCheckUpdates.disabled = false;
+        btnCheckUpdates.innerHTML = originalText;
+      }, 5000);
     };
   }
 
