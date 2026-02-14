@@ -17701,6 +17701,44 @@ select:focus-visible {
   word-break: break-word;
 }
 
+/* ── History divider ── */
+.chat-history-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 12px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  opacity: 0.6;
+}
+.chat-history-divider::before,
+.chat-history-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.3;
+}
+.chat-history-divider span {
+  white-space: nowrap;
+}
+
+/* History messages: slightly dimmed to distinguish from live messages */
+.chat-msg.history,
+.chat-tool-card.history,
+.chat-thinking.history {
+  opacity: 0.7;
+}
+
+/* Loading pulse animation for welcome logo */
+.chat-welcome-logo.loading-pulse {
+  animation: loading-pulse 1.2s ease-in-out infinite;
+}
+@keyframes loading-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.45; }
+}
+
 /* ── Inline code ── */
 .chat-inline-code {
   background: var(--bg-secondary);

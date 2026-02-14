@@ -2691,11 +2691,108 @@ function createChatView(wrapperEl, project, options = {}) {
   });
   unsubscribers.push(unsubPerm);
 
-  // If resuming, show a notice instead of welcome message
+  // If resuming, load and display conversation history
   if (pendingResumeId) {
     const welcomeEl = wrapperEl.querySelector('.chat-welcome');
     if (welcomeEl) {
-      welcomeEl.querySelector('.chat-welcome-text').textContent = t('chat.conversationResumed') || 'Conversation resumed — type a message to continue.';
+      welcomeEl.querySelector('.chat-welcome-text').textContent = t('chat.loadingHistory') || 'Loading conversation...';
+      welcomeEl.querySelector('.chat-welcome-logo').classList.add('loading-pulse');
+    }
+
+    // Load history async then render
+    api.chat.loadHistory({ projectPath: project.path, sessionId: pendingResumeId }).then(result => {
+      if (welcomeEl) welcomeEl.remove();
+
+      if (result?.success && result.messages?.length > 0) {
+        renderHistoryMessages(result.messages);
+      }
+
+      // Show resume divider
+      const divider = document.createElement('div');
+      divider.className = 'chat-history-divider';
+      divider.innerHTML = `<span>${escapeHtml(t('chat.conversationResumed') || 'Conversation resumed')}</span>`;
+      messagesEl.appendChild(divider);
+      scrollToBottom();
+    }).catch(() => {
+      if (welcomeEl) {
+        welcomeEl.querySelector('.chat-welcome-text').textContent = t('chat.conversationResumed') || 'Conversation resumed — type a message to continue.';
+        welcomeEl.querySelector('.chat-welcome-logo').classList.remove('loading-pulse');
+      }
+    });
+  }
+
+  /**
+   * Render history messages from JSONL data into the chat UI.
+   * Creates static (non-interactive) message elements.
+   */
+  function renderHistoryMessages(messages) {
+    // Build a map of tool_use_id -> tool_result output for enriching tool cards
+    const toolResults = new Map();
+    for (const msg of messages) {
+      if (msg.role === 'tool_result' && msg.toolUseId) {
+        toolResults.set(msg.toolUseId, msg.output || '');
+      }
+    }
+
+    let currentAssistantEl = null;
+
+    for (const msg of messages) {
+      if (msg.role === 'user') {
+        currentAssistantEl = null;
+        const el = document.createElement('div');
+        el.className = 'chat-msg chat-msg-user history';
+        el.innerHTML = `<div class="chat-msg-content">${renderMarkdown(msg.text)}</div>`;
+        messagesEl.appendChild(el);
+
+      } else if (msg.role === 'assistant' && msg.type === 'text') {
+        const el = document.createElement('div');
+        el.className = 'chat-msg chat-msg-assistant history';
+        el.innerHTML = `<div class="chat-msg-content">${renderMarkdown(msg.text)}</div>`;
+        messagesEl.appendChild(el);
+        currentAssistantEl = el;
+
+      } else if (msg.role === 'assistant' && msg.type === 'thinking') {
+        const el = document.createElement('div');
+        el.className = 'chat-thinking history';
+        el.innerHTML = `
+          <div class="chat-thinking-header">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="chat-thinking-chevron"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+            <span>${escapeHtml(t('chat.thinking'))}</span>
+          </div>
+          <div class="chat-thinking-content">${renderMarkdown(msg.text)}</div>
+        `;
+        messagesEl.appendChild(el);
+
+      } else if (msg.role === 'assistant' && msg.type === 'tool_use') {
+        // Skip TodoWrite from history — it's internal state
+        if (msg.toolName === 'TodoWrite') continue;
+
+        const detail = getToolDisplayInfo(msg.toolName, msg.toolInput || {});
+        const el = document.createElement('div');
+        el.className = 'chat-tool-card history';
+        const truncated = detail && detail.length > 80 ? '...' + detail.slice(-77) : (detail || '');
+        el.innerHTML = `
+          <div class="chat-tool-icon">${getToolIcon(msg.toolName)}</div>
+          <div class="chat-tool-info">
+            <span class="chat-tool-name">${escapeHtml(msg.toolName)}</span>
+            <span class="chat-tool-detail">${truncated ? escapeHtml(truncated) : ''}</span>
+          </div>
+          <div class="chat-tool-status complete">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </div>
+        `;
+
+        // Store tool input/output for expand
+        if (msg.toolInput) {
+          el.dataset.toolInput = JSON.stringify(msg.toolInput);
+          el.classList.add('expandable');
+        }
+        if (msg.toolUseId && toolResults.has(msg.toolUseId)) {
+          el.dataset.toolOutput = toolResults.get(msg.toolUseId);
+        }
+
+        messagesEl.appendChild(el);
+      }
     }
   }
 

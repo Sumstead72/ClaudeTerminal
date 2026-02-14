@@ -172,12 +172,145 @@ async function getClaudeSessions(projectPath) {
 }
 
 /**
+ * Load full conversation history from a session JSONL file.
+ * Returns an array of simplified messages for the chat UI replay.
+ * @param {string} projectPath - The project path
+ * @param {string} sessionId - The session ID (UUID)
+ * @returns {Promise<Array>} - Array of { role, type, content, toolName, toolInput, toolOutput, thinking, ... }
+ */
+async function loadSessionHistory(projectPath, sessionId) {
+  const sessionsDir = getProjectSessionsDir(projectPath);
+
+  // Find the JSONL file — could be sessionId.jsonl or another file containing this sessionId
+  let filePath = path.join(sessionsDir, `${sessionId}.jsonl`);
+  try {
+    await fs.promises.access(filePath);
+  } catch {
+    // Session file not found — scan directory for matching sessionId
+    try {
+      const files = await fs.promises.readdir(sessionsDir);
+      const jsonlFiles = files.filter(f => f.endsWith('.jsonl'));
+      for (const f of jsonlFiles) {
+        const candidate = path.join(sessionsDir, f);
+        const head = await readFirstLines(candidate, 5);
+        for (const line of head) {
+          try {
+            const obj = JSON.parse(line);
+            if (obj.sessionId === sessionId) {
+              filePath = candidate;
+              break;
+            }
+          } catch {}
+        }
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  // Read all lines from the JSONL file
+  return new Promise((resolve) => {
+    const messages = [];
+    const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
+    rl.on('line', (line) => {
+      try {
+        const obj = JSON.parse(line);
+
+        // User message
+        if (obj.type === 'user' && obj.message) {
+          let text = '';
+          const content = obj.message.content;
+          if (typeof content === 'string') {
+            text = content;
+          } else if (Array.isArray(content)) {
+            text = content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+          }
+          if (text) {
+            messages.push({ role: 'user', text });
+          }
+        }
+
+        // Assistant message
+        if ((obj.type === 'assistant' || (!obj.type && obj.message?.role === 'assistant')) && obj.message?.content) {
+          const blocks = obj.message.content;
+          for (const block of blocks) {
+            if (block.type === 'text' && block.text) {
+              messages.push({ role: 'assistant', type: 'text', text: block.text });
+            } else if (block.type === 'tool_use') {
+              messages.push({
+                role: 'assistant',
+                type: 'tool_use',
+                toolName: block.name,
+                toolInput: block.input,
+                toolUseId: block.id
+              });
+            } else if (block.type === 'thinking' && block.thinking) {
+              messages.push({ role: 'assistant', type: 'thinking', text: block.thinking });
+            }
+          }
+        }
+
+        // Tool result
+        if (obj.type === 'tool_result' || (obj.message?.role === 'user' && Array.isArray(obj.message?.content))) {
+          const content = obj.message?.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === 'tool_result') {
+                const output = typeof block.content === 'string' ? block.content
+                  : Array.isArray(block.content) ? block.content.map(b => b.text || '').join('\n') : '';
+                messages.push({
+                  role: 'tool_result',
+                  toolUseId: block.tool_use_id,
+                  output: output.slice(0, 2000) // Limit output size for IPC
+                });
+              }
+            }
+          }
+        }
+      } catch { /* skip malformed lines */ }
+    });
+
+    rl.on('close', () => resolve(messages));
+    rl.on('error', () => resolve([]));
+  });
+}
+
+/**
+ * Read first N lines from a file
+ */
+async function readFirstLines(filePath, n) {
+  return new Promise((resolve) => {
+    const lines = [];
+    const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    rl.on('line', (line) => {
+      lines.push(line);
+      if (lines.length >= n) { rl.close(); stream.destroy(); }
+    });
+    rl.on('close', () => resolve(lines));
+    rl.on('error', () => resolve([]));
+  });
+}
+
+/**
  * Register Claude IPC handlers
  */
 function registerClaudeHandlers() {
   // Get Claude sessions for a project
   ipcMain.handle('claude-sessions', async (event, projectPath) => {
     return getClaudeSessions(projectPath);
+  });
+
+  // Load full session history for chat UI replay
+  ipcMain.handle('chat-load-history', async (event, { projectPath, sessionId }) => {
+    try {
+      return { success: true, messages: await loadSessionHistory(projectPath, sessionId) };
+    } catch (err) {
+      console.error('[chat-load-history] Error:', err.message);
+      return { success: false, error: err.message, messages: [] };
+    }
   });
 }
 
