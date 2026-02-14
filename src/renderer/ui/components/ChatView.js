@@ -7,6 +7,7 @@
 const api = window.electron_api;
 const { escapeHtml, highlight } = require('../../utils');
 const { t } = require('../../i18n');
+const { recordActivity, recordOutputActivity } = require('../../state');
 
 // ── Markdown Renderer ──
 
@@ -353,6 +354,7 @@ function createChatView(wrapperEl, project, options = {}) {
     if (!text || isStreaming || sendLock) return;
 
     sendLock = true;
+    if (project?.id) recordActivity(project.id);
     appendUserMessage(text);
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -1389,6 +1391,15 @@ function createChatView(wrapperEl, project, options = {}) {
   });
   unsubscribers.push(unsubMessage);
 
+  // Throttled output activity tracker (max 1 call/sec)
+  let outputActivityThrottled = false;
+  function trackOutputActivity() {
+    if (!project?.id || outputActivityThrottled) return;
+    recordOutputActivity(project.id);
+    outputActivityThrottled = true;
+    setTimeout(() => { outputActivityThrottled = false; }, 1000);
+  }
+
   function handleStreamEvent(event) {
     switch (event.type) {
       case 'message_start':
@@ -1444,6 +1455,7 @@ function createChatView(wrapperEl, project, options = {}) {
           if (!currentStreamEl) startStreamBlock();
           appendStreamDelta(delta.text);
           turnHadAssistantContent = true;
+          trackOutputActivity();
         } else if (delta.type === 'thinking_delta') {
           currentThinkingText += delta.thinking;
         } else if (delta.type === 'input_json_delta') {
