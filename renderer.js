@@ -6829,19 +6829,25 @@ api.app.getVersion().then(version => {
 }).catch(() => {});
 
 // ========== USAGE MONITOR ==========
+let usageResetTargets = { session: null, weekly: null, sonnet: null };
+let usageResetInterval = null;
+
 const usageElements = {
   container: document.getElementById('titlebar-usage'),
   session: {
     bar: document.getElementById('usage-bar-session'),
-    percent: document.getElementById('usage-percent-session')
+    percent: document.getElementById('usage-percent-session'),
+    reset: document.getElementById('usage-reset-session')
   },
   weekly: {
     bar: document.getElementById('usage-bar-weekly'),
-    percent: document.getElementById('usage-percent-weekly')
+    percent: document.getElementById('usage-percent-weekly'),
+    reset: document.getElementById('usage-reset-weekly')
   },
   sonnet: {
     bar: document.getElementById('usage-bar-sonnet'),
-    percent: document.getElementById('usage-percent-sonnet')
+    percent: document.getElementById('usage-percent-sonnet'),
+    reset: document.getElementById('usage-reset-sonnet')
   }
 };
 
@@ -6852,7 +6858,7 @@ function updateUsageBar(elements, percent) {
   if (!elements.bar || !elements.percent) return;
 
   if (percent === null || percent === undefined) {
-    elements.percent.textContent = '--%';
+    elements.percent.textContent = '--';
     elements.bar.style.width = '0%';
     elements.bar.classList.remove('warning', 'danger');
     return;
@@ -6883,6 +6889,9 @@ function updateUsageDisplay(usageData) {
     updateUsageBar(usageElements.session, null);
     updateUsageBar(usageElements.weekly, null);
     updateUsageBar(usageElements.sonnet, null);
+    updateResetEl(usageElements.session.reset, null);
+    updateResetEl(usageElements.weekly.reset, null);
+    updateResetEl(usageElements.sonnet.reset, null);
     return;
   }
 
@@ -6892,6 +6901,44 @@ function updateUsageDisplay(usageData) {
   updateUsageBar(usageElements.session, data.session);
   updateUsageBar(usageElements.weekly, data.weekly);
   updateUsageBar(usageElements.sonnet, data.sonnet);
+
+  // Set reset targets for each category
+  usageResetTargets.session = data.sessionReset ? new Date(data.sessionReset) : null;
+  usageResetTargets.weekly = data.weeklyReset ? new Date(data.weeklyReset) : null;
+  usageResetTargets.sonnet = data.sonnetReset ? new Date(data.sonnetReset) : null;
+  startResetCountdown();
+}
+
+function startResetCountdown() {
+  updateAllResets();
+  if (!usageResetInterval) {
+    usageResetInterval = setInterval(updateAllResets, 60000);
+  }
+}
+
+function updateAllResets() {
+  updateResetEl(usageElements.session.reset, usageResetTargets.session);
+  updateResetEl(usageElements.weekly.reset, usageResetTargets.weekly);
+  updateResetEl(usageElements.sonnet.reset, usageResetTargets.sonnet);
+}
+
+function updateResetEl(el, target) {
+  if (!el) return;
+  if (!target) { el.textContent = ''; return; }
+  const remaining = target.getTime() - Date.now();
+  if (remaining <= 0) { el.textContent = ''; return; }
+  const lang = getCurrentLanguage();
+  const d = Math.floor(remaining / 86400000);
+  const h = Math.floor((remaining % 86400000) / 3600000);
+  const m = Math.floor((remaining % 3600000) / 60000);
+  const dU = lang === 'fr' ? 'j' : 'd';
+  if (d > 0) {
+    el.textContent = `${d}${dU} ${h}h`;
+  } else if (h > 0) {
+    el.textContent = `${h}h ${String(m).padStart(2, '0')}min`;
+  } else {
+    el.textContent = `${m}min`;
+  }
 }
 
 /**

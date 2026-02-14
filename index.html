@@ -19,25 +19,31 @@
     <!-- Usage Display -->
     <div class="titlebar-usage" id="titlebar-usage" data-i18n-title="common.refresh">
       <div class="usage-item" data-type="session">
-        <span class="usage-label" data-i18n="ui.session">Session</span>
+        <div class="usage-header">
+          <span class="usage-label" data-i18n="ui.session">Session</span>
+          <span class="usage-value"><span class="usage-percent" id="usage-percent-session">--</span><span class="usage-reset" id="usage-reset-session"></span></span>
+        </div>
         <div class="usage-bar-container">
           <div class="usage-bar" id="usage-bar-session" style="width: 0%"></div>
         </div>
-        <span class="usage-percent" id="usage-percent-session">--%</span>
       </div>
       <div class="usage-item" data-type="weekly">
-        <span class="usage-label" data-i18n="ui.weekly">Weekly</span>
+        <div class="usage-header">
+          <span class="usage-label" data-i18n="ui.weekly">Weekly</span>
+          <span class="usage-value"><span class="usage-percent" id="usage-percent-weekly">--</span><span class="usage-reset" id="usage-reset-weekly"></span></span>
+        </div>
         <div class="usage-bar-container">
           <div class="usage-bar" id="usage-bar-weekly" style="width: 0%"></div>
         </div>
-        <span class="usage-percent" id="usage-percent-weekly">--%</span>
       </div>
       <div class="usage-item" data-type="sonnet">
-        <span class="usage-label">Sonnet</span>
+        <div class="usage-header">
+          <span class="usage-label">Sonnet</span>
+          <span class="usage-value"><span class="usage-percent" id="usage-percent-sonnet">--</span><span class="usage-reset" id="usage-reset-sonnet"></span></span>
+        </div>
         <div class="usage-bar-container">
           <div class="usage-bar" id="usage-bar-sonnet" style="width: 0%"></div>
         </div>
-        <span class="usage-percent" id="usage-percent-sonnet">--%</span>
       </div>
     </div>
     <!-- Time Tracking Display -->
