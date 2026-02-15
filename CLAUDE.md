@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude Terminal is a Windows-only Electron desktop application (v0.8.5) for managing Claude Code projects with an integrated terminal, chat UI, git management, and plugin ecosystem. Built for Windows 10/11 with NSIS installer distribution.
+Claude Terminal is a Windows-only Electron desktop application (v0.9.2) for managing Claude Code projects with an integrated terminal, chat UI, git management, and plugin ecosystem. Built for Windows 10/11 with NSIS installer distribution.
 
 **Repository:** `github.com/Sterll/claude-terminal` | **License:** GPL-3.0 | **Author:** Yanis
 
