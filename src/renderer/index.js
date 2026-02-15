@@ -28,6 +28,10 @@ const events = require('./events');
  * Initialize all renderer modules
  */
 function initialize() {
+  // Tag platform on body for CSS targeting (macOS traffic lights, etc.)
+  const platform = window.electron_nodeModules?.process?.platform || 'win32';
+  document.body.classList.add(`platform-${platform}`);
+
   // Ensure directories exist
   utils.ensureDirectories();
 

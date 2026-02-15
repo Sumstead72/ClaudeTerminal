@@ -11,7 +11,7 @@ const { settingsFile } = require('../utils/paths');
 // Default settings
 const defaultSettings = {
   editor: 'code', // 'code', 'cursor', 'webstorm', 'idea'
-  shortcut: 'Ctrl+Shift+P',
+  shortcut: typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? 'Cmd+Shift+P' : 'Ctrl+Shift+P',
   skipPermissions: false,
   accentColor: '#d97706',
   notificationsEnabled: true,

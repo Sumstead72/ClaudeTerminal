@@ -97,6 +97,19 @@ textarea::placeholder {
   user-select: none;
 }
 
+/* macOS: native traffic lights replace custom window buttons */
+body.platform-darwin .titlebar {
+  padding-left: 78px;
+}
+
+body.platform-darwin .titlebar-controls {
+  display: none;
+}
+
+body.platform-darwin .titlebar-drag {
+  padding-left: 4px;
+}
+
 .titlebar-drag {
   display: flex;
   align-items: center;

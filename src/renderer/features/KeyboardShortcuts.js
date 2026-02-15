@@ -104,26 +104,29 @@ function initKeyboardShortcuts() {
  * @param {Object} handlers
  */
 function registerCommonShortcuts(handlers) {
+  const isMac = navigator.platform?.includes('Mac') || navigator.userAgent?.includes('Mac');
+  const mod = isMac ? 'Meta' : 'Ctrl';
+
   if (handlers.newTerminal) {
-    registerShortcut('Ctrl+T', handlers.newTerminal);
+    registerShortcut(`${mod}+T`, handlers.newTerminal);
   }
   if (handlers.closeTerminal) {
-    registerShortcut('Ctrl+W', handlers.closeTerminal);
+    registerShortcut(`${mod}+W`, handlers.closeTerminal);
   }
   if (handlers.quickPicker) {
-    registerShortcut('Ctrl+P', handlers.quickPicker);
+    registerShortcut(`${mod}+P`, handlers.quickPicker);
   }
   if (handlers.settings) {
-    registerShortcut('Ctrl+,', handlers.settings);
+    registerShortcut(`${mod}+,`, handlers.settings);
   }
   if (handlers.escape) {
     registerShortcut('Escape', handlers.escape, { global: true });
   }
   if (handlers.nextTerminal) {
-    registerShortcut('Ctrl+Tab', handlers.nextTerminal);
+    registerShortcut(`${mod}+Tab`, handlers.nextTerminal);
   }
   if (handlers.prevTerminal) {
-    registerShortcut('Ctrl+Shift+Tab', handlers.prevTerminal);
+    registerShortcut(`${mod}+Shift+Tab`, handlers.prevTerminal);
   }
 }
 
