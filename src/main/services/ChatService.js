@@ -42,10 +42,13 @@ function resolveNodeExecutable() {
 
   const isWin = process.platform === 'win32';
 
-  // 1. Try the current process — in dev mode, process.execPath IS node
-  if (!app.isPackaged && fs.existsSync(process.execPath)) {
-    resolvedNodePath = process.execPath;
-    return resolvedNodePath;
+  // 1. In dev mode, try process.execPath only if it's actually node (not electron)
+  if (!app.isPackaged) {
+    const execName = path.basename(process.execPath).toLowerCase();
+    if (execName === 'node' || execName === 'node.exe') {
+      resolvedNodePath = process.execPath;
+      return resolvedNodePath;
+    }
   }
 
   // 2. Ask a login shell where node is (works on macOS/Linux even when Finder doesn't have PATH)
@@ -66,11 +69,23 @@ function resolveNodeExecutable() {
     }
   }
 
+  // 2b. On Windows, try to find node via where.exe (most reliable)
+  if (isWin) {
+    try {
+      const result = execFileSync('where.exe', ['node'], {
+        encoding: 'utf8', timeout: 5000
+      }).trim().split(/\r?\n/)[0];
+      if (result && fs.existsSync(result)) {
+        resolvedNodePath = result;
+        return resolvedNodePath;
+      }
+    } catch { /* continue */ }
+  }
+
   // 3. Check common install locations
   const candidates = isWin
     ? [
         path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'node.exe'),
-        path.join(process.env.LOCALAPPDATA || '', 'fnm_multishells', '**', 'node.exe'),
       ]
     : [
         '/usr/local/bin/node',
@@ -270,12 +285,19 @@ class ChatService {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session ${sessionId} not found`);
 
-    session.messageQueue.push({
-      type: 'user',
-      message: { role: 'user', content: this._buildContent(text, images, mentions) },
-      parent_tool_use_id: null,
-      session_id: sessionId
-    });
+    try {
+      session.messageQueue.push({
+        type: 'user',
+        message: { role: 'user', content: this._buildContent(text, images, mentions) },
+        parent_tool_use_id: null,
+        session_id: sessionId
+      });
+    } catch (err) {
+      console.error(`[ChatService] sendMessage error (transport not ready):`, err.message);
+      // Session transport died — clean up
+      this.closeSession(sessionId);
+      throw new Error('Session has ended. Please start a new chat.');
+    }
   }
 
   /**
@@ -525,13 +547,25 @@ class ChatService {
           resolve(name || null);
         };
 
-        this._namingQueue.push({
-          type: 'user',
-          message: { role: 'user', content: `Title for: "${userMessage.slice(0, 200)}"` }
-        });
+        try {
+          this._namingQueue.push({
+            type: 'user',
+            message: { role: 'user', content: `Title for: "${userMessage.slice(0, 200)}"` }
+          });
+        } catch (pushErr) {
+          // Transport died — reset naming session so next call recreates it
+          console.error('[ChatService] Naming transport dead, resetting:', pushErr.message);
+          this._namingReady = false;
+          this._namingStarting = null;
+          this._namingQueue = null;
+          clearTimeout(timeout);
+          resolve(null);
+        }
       });
     } catch (err) {
       console.error('[ChatService] generateTabName error:', err.message);
+      this._namingReady = false;
+      this._namingStarting = null;
       return null;
     }
   }
