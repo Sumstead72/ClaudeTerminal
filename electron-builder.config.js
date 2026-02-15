@@ -80,9 +80,9 @@ module.exports = {
       Terminal: "false"
     }
   },
-  publish: process.env.UPDATE_SERVER_URL ? {
-    provider: "generic",
-    url: process.env.UPDATE_SERVER_URL,
-    useMultipleRangeRequest: false
-  } : null
+  publish: {
+    provider: "github",
+    owner: "Sterll",
+    repo: "claude-terminal"
+  }
 };

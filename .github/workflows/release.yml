@@ -20,19 +20,10 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm test
-      - name: Build Windows installer
-        run: npx electron-builder --win --publish never --config electron-builder.config.js
+      - name: Build and publish Windows installer
+        run: npx electron-builder --win --publish always --config electron-builder.config.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPDATE_SERVER_URL: https://placeholder.local
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            build/*.exe
-            build/*.exe.blockmap
-            build/*.yml
-          draft: true
-          generate_release_notes: true
 
   build-macos:
     runs-on: macos-latest
@@ -45,19 +36,10 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm test
-      - name: Build macOS DMG
-        run: npx electron-builder --mac --publish never --config electron-builder.config.js
+      - name: Build and publish macOS DMG
+        run: npx electron-builder --mac --publish always --config electron-builder.config.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPDATE_SERVER_URL: https://placeholder.local
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            build/*.dmg
-            build/*.dmg.blockmap
-            build/*.yml
-          draft: true
-          generate_release_notes: true
 
   build-linux:
     runs-on: ubuntu-latest
@@ -70,15 +52,7 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm test
-      - name: Build Linux AppImage
-        run: npx electron-builder --linux --publish never --config electron-builder.config.js
+      - name: Build and publish Linux AppImage
+        run: npx electron-builder --linux --publish always --config electron-builder.config.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPDATE_SERVER_URL: https://placeholder.local
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            build/*.AppImage
-            build/*.yml
-          draft: true
-          generate_release_notes: true
