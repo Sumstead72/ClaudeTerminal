@@ -48,6 +48,104 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  merge-mac-yml:
+    needs: build-macos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for release assets to settle
+        run: sleep 10
+
+      - name: Download both latest-mac.yml from release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          RELEASE=$(gh api repos/${{ github.repository }}/releases/tags/$TAG)
+
+          # Get all DMG assets info from the release
+          echo "$RELEASE" | jq -r '.assets[] | select(.name | endswith(".dmg")) | "\(.name) \(.browser_download_url)"' > dmg_assets.txt
+
+          # Download the latest-mac.yml that was uploaded (by whichever build finished last)
+          ASSET_URL=$(echo "$RELEASE" | jq -r '.assets[] | select(.name == "latest-mac.yml") | .url')
+          if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
+            echo "No latest-mac.yml found, skipping merge"
+            exit 0
+          fi
+
+          gh api -H "Accept: application/octet-stream" "$ASSET_URL" > latest-mac.yml
+          echo "=== Current latest-mac.yml ==="
+          cat latest-mac.yml
+
+      - name: Build merged latest-mac.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          RELEASE=$(gh api repos/${{ github.repository }}/releases/tags/$TAG)
+
+          # Extract version and releaseDate from existing yml
+          VERSION=$(grep '^version:' latest-mac.yml | awk '{print $2}')
+          RELEASE_DATE=$(grep '^releaseDate:' latest-mac.yml | cut -d' ' -f2-)
+
+          # Get DMG assets as JSON array
+          echo "$RELEASE" | jq -c '[.assets[] | select(.name | endswith(".dmg"))]' > dmg_list.json
+          COUNT=$(jq 'length' dmg_list.json)
+
+          # Start building merged yml
+          echo "version: $VERSION" > merged.yml
+          echo "files:" >> merged.yml
+
+          # Process each DMG asset
+          for i in $(seq 0 $(( COUNT - 1 ))); do
+            NAME=$(jq -r ".[$i].name" dmg_list.json)
+            SIZE=$(jq -r ".[$i].size" dmg_list.json)
+            DOWNLOAD_URL=$(jq -r ".[$i].browser_download_url" dmg_list.json)
+
+            # Download DMG to compute sha512
+            curl -sL "$DOWNLOAD_URL" -o "$NAME"
+            SHA512=$(sha512sum "$NAME" | awk '{print $1}' | xxd -r -p | base64 -w0)
+            rm "$NAME"
+
+            echo "  - url: $NAME" >> merged.yml
+            echo "    sha512: $SHA512" >> merged.yml
+            echo "    size: $SIZE" >> merged.yml
+          done
+
+          # Use the x64 DMG as default path/sha512 (electron-updater picks the right one from files array)
+          X64_NAME=$(jq -r '[.[] | select(.name | contains("arm64") | not)] | .[0].name' dmg_list.json)
+          if [ -z "$X64_NAME" ] || [ "$X64_NAME" = "null" ]; then
+            X64_NAME=$(jq -r '.[0].name' dmg_list.json)
+          fi
+          X64_SHA=$(grep -A1 "url: $X64_NAME" merged.yml | grep sha512 | awk '{print $2}')
+
+          echo "path: $X64_NAME" >> merged.yml
+          echo "sha512: $X64_SHA" >> merged.yml
+          echo "releaseDate: $RELEASE_DATE" >> merged.yml
+
+          echo "=== Merged latest-mac.yml ==="
+          cat merged.yml
+
+      - name: Upload merged latest-mac.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          # Delete the old latest-mac.yml asset
+          ASSET_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG | jq '.assets[] | select(.name == "latest-mac.yml") | .id')
+          if [ -n "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
+            gh api -X DELETE repos/${{ github.repository }}/releases/assets/$ASSET_ID
+          fi
+
+          # Upload merged yml
+          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG | jq '.id')
+          gh api -X POST \
+            -H "Content-Type: text/yaml" \
+            "https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=latest-mac.yml" \
+            --input merged.yml
+
+          echo "Successfully uploaded merged latest-mac.yml"
+
   build-linux:
     runs-on: ubuntu-latest
     steps:
