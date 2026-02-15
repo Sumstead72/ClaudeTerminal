@@ -67,9 +67,10 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
 
-          # Wait for the release to be available (electron-builder creates it)
+          # Find release by tag (including drafts — electron-builder creates drafts)
           for i in 1 2 3 4 5; do
-            RELEASE=$(gh api repos/${{ github.repository }}/releases/tags/$TAG 2>/dev/null) && break
+            RELEASE=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.tag_name == \"$TAG\")" 2>/dev/null)
+            [ -n "$RELEASE" ] && break
             echo "Release not found yet, waiting 15s... (attempt $i/5)"
             sleep 15
           done
@@ -98,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          RELEASE=$(gh api repos/${{ github.repository }}/releases/tags/$TAG)
+          RELEASE=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.tag_name == \"$TAG\")")
 
           # Extract version and releaseDate from existing yml
           VERSION=$(grep '^version:' latest-mac.yml | awk '{print $2}')
@@ -147,15 +148,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
+          RELEASE_JSON=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.tag_name == \"$TAG\")")
 
           # Delete the old latest-mac.yml asset
-          ASSET_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG | jq '.assets[] | select(.name == "latest-mac.yml") | .id')
+          ASSET_ID=$(echo "$RELEASE_JSON" | jq '.assets[] | select(.name == "latest-mac.yml") | .id')
           if [ -n "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
             gh api -X DELETE repos/${{ github.repository }}/releases/assets/$ASSET_ID
           fi
 
           # Upload merged yml
-          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/$TAG | jq '.id')
+          RELEASE_ID=$(echo "$RELEASE_JSON" | jq '.id')
           gh api -X POST \
             -H "Content-Type: text/yaml" \
             "https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=latest-mac.yml" \
