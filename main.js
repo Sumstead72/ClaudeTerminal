@@ -6,6 +6,23 @@
 const { app, globalShortcut } = require('electron');
 
 // ============================================
+// FIX PATH on macOS/Linux - Apps launched from Finder/Dock have a minimal PATH
+// ============================================
+if (process.platform !== 'win32') {
+  const { execFileSync } = require('child_process');
+  try {
+    const shell = process.env.SHELL || '/bin/zsh';
+    const shellPath = execFileSync(shell, ['-lc', 'echo $PATH'], {
+      encoding: 'utf8',
+      timeout: 5000,
+    }).trim();
+    if (shellPath) {
+      process.env.PATH = shellPath;
+    }
+  } catch { /* keep existing PATH */ }
+}
+
+// ============================================
 // DEV MODE - Allow running alongside production
 // ============================================
 const isDev = process.argv.includes('--dev');

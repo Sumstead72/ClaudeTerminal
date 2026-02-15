@@ -5,9 +5,12 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const { app } = require('electron');
+const { execFileSync } = require('child_process');
 
 let sdkPromise = null;
+let resolvedNodePath = null;
 
 async function loadSDK() {
   if (!sdkPromise) {
@@ -26,6 +29,72 @@ function getSdkCliPath() {
     return path.join(app.getAppPath().replace('app.asar', 'app.asar.unpacked'), sdkRelative);
   }
   return path.join(app.getAppPath(), sdkRelative);
+}
+
+/**
+ * Resolve the absolute path to the `node` executable.
+ * On macOS, apps launched from Finder/Dock don't inherit the shell PATH,
+ * so `spawn("node", ...)` fails with ENOENT. This resolves node's path
+ * via shell lookup and common install locations.
+ */
+function resolveNodeExecutable() {
+  if (resolvedNodePath) return resolvedNodePath;
+
+  const isWin = process.platform === 'win32';
+
+  // 1. Try the current process — in dev mode, process.execPath IS node
+  if (!app.isPackaged && fs.existsSync(process.execPath)) {
+    resolvedNodePath = process.execPath;
+    return resolvedNodePath;
+  }
+
+  // 2. Ask a login shell where node is (works on macOS/Linux even when Finder doesn't have PATH)
+  if (!isWin) {
+    for (const shell of ['/bin/zsh', '/bin/bash', '/bin/sh']) {
+      if (!fs.existsSync(shell)) continue;
+      try {
+        const result = execFileSync(shell, ['-lc', 'which node'], {
+          encoding: 'utf8',
+          timeout: 5000,
+          env: { ...process.env, HOME: process.env.HOME || require('os').homedir() }
+        }).trim();
+        if (result && fs.existsSync(result)) {
+          resolvedNodePath = result;
+          return resolvedNodePath;
+        }
+      } catch { /* continue */ }
+    }
+  }
+
+  // 3. Check common install locations
+  const candidates = isWin
+    ? [
+        path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'node.exe'),
+        path.join(process.env.LOCALAPPDATA || '', 'fnm_multishells', '**', 'node.exe'),
+      ]
+    : [
+        '/usr/local/bin/node',
+        '/opt/homebrew/bin/node',          // Homebrew on Apple Silicon
+        '/usr/local/opt/node/bin/node',    // Homebrew on Intel
+        path.join(process.env.HOME || '', '.nvm/current/bin/node'),
+        path.join(process.env.HOME || '', '.volta/bin/node'),
+        path.join(process.env.HOME || '', '.fnm/aliases/default/bin/node'),
+        path.join(process.env.HOME || '', '.local/share/fnm/aliases/default/bin/node'),
+        '/usr/bin/node',
+      ];
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        resolvedNodePath = candidate;
+        return resolvedNodePath;
+      }
+    } catch { /* skip */ }
+  }
+
+  // 4. Fallback — let the SDK try "node" and hope for the best
+  resolvedNodePath = 'node';
+  return resolvedNodePath;
 }
 
 /**
@@ -140,12 +209,16 @@ class ChatService {
     delete process.env.CLAUDECODE;
 
     try {
+      const nodeExe = resolveNodeExecutable();
+      console.log(`[ChatService] Using node executable: ${nodeExe}`);
+
       const options = {
         cwd,
         abortController,
         maxTurns: 100,
         includePartialMessages: true,
         permissionMode,
+        executable: nodeExe,
         pathToClaudeCodeExecutable: getSdkCliPath(),
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         settingSources: ['user', 'project', 'local'],
@@ -353,7 +426,11 @@ class ChatService {
         this._send('chat-done', { sessionId, aborted: true });
       } else {
         console.error(`[ChatService] Stream error after ${msgCount} msgs:`, err.message);
-        this._send('chat-error', { sessionId, error: err.message });
+        let errorMsg = err.message;
+        if (errorMsg && errorMsg.includes('ENOENT')) {
+          errorMsg = 'Node.js not found. Please ensure Node.js is installed and available in your PATH, then restart the app.\n\nOn macOS: brew install node\nOn Windows: https://nodejs.org';
+        }
+        this._send('chat-error', { sessionId, error: errorMsg });
       }
     } finally {
       if (session) session.interrupting = false;
@@ -390,6 +467,7 @@ class ChatService {
           maxTurns: 1,
           allowedTools: [],
           model: 'haiku',
+          executable: resolveNodeExecutable(),
           pathToClaudeCodeExecutable: getSdkCliPath(),
           systemPrompt: 'You generate very short tab titles (2-4 words, no quotes, no punctuation). Reply in the SAME language as the user message. Only output the title, nothing else.'
         }
