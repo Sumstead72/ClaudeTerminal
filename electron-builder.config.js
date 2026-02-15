@@ -60,9 +60,7 @@ module.exports = {
     include: "build-assets/installer-custom.nsh"
   },
   mac: {
-    target: [
-      { target: "dmg", arch: ["x64", "arm64"] }
-    ],
+    target: "dmg",
     icon: "assets/icon.png",
     category: "public.app-category.developer-tools",
     darkModeSupport: true

@@ -26,7 +26,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-13
+            arch: x64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,8 +43,8 @@ jobs:
       - run: npm ci
       - run: npm run build:renderer
       - run: npm test
-      - name: Build and publish macOS DMG
-        run: npx electron-builder --mac --publish always --config electron-builder.config.js
+      - name: Build and publish macOS DMG (${{ matrix.arch }})
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish always --config electron-builder.config.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
