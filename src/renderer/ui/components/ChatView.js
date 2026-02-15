@@ -1366,14 +1366,18 @@ function createChatView(wrapperEl, project, options = {}) {
       const inputData = JSON.parse(card.dataset.toolInput || '{}');
       const result = { behavior: 'allow', updatedInput: inputData };
       if (action === 'always-allow') {
-        // Tell SDK to switch session to bypassPermissions mode
-        result.updatedPermissions = [{
-          type: 'setMode',
-          mode: 'bypassPermissions',
-          destination: 'session'
-        }];
-        // Also set alwaysAllow flag on ChatService as fallback
-        api.chat.alwaysAllow({ sessionId });
+        // Use SDK suggestions for granular permissions (e.g. acceptEdits)
+        // Fallback to bypassPermissions only if no suggestions available
+        const suggestions = JSON.parse(card.dataset.suggestions || '[]');
+        if (suggestions.length > 0) {
+          result.updatedPermissions = suggestions;
+        } else {
+          result.updatedPermissions = [{
+            type: 'setMode',
+            mode: 'bypassPermissions',
+            destination: 'session'
+          }];
+        }
       }
       api.chat.respondPermission({ requestId, result });
     } else {
@@ -2118,7 +2122,7 @@ function createChatView(wrapperEl, project, options = {}) {
   }
 
   function appendPermissionCard(data) {
-    const { requestId, toolName, input, decisionReason } = data;
+    const { requestId, toolName, input, decisionReason, suggestions } = data;
 
     // Check if it's AskUserQuestion
     if (toolName === 'AskUserQuestion') {
@@ -2138,6 +2142,7 @@ function createChatView(wrapperEl, project, options = {}) {
     el.dataset.requestId = requestId;
     el.dataset.toolName = toolName;
     el.dataset.toolInput = JSON.stringify(input || {});
+    el.dataset.suggestions = JSON.stringify(suggestions || []);
 
     const allowText = t('chat.allow') || 'Allow';
     const alwaysAllowText = t('chat.alwaysAllow') || 'Always Allow';
