@@ -17472,6 +17472,7 @@ select:focus-visible {
   height: 100%;
   background: var(--bg-primary);
   overflow: hidden;
+  position: relative;
 }
 
 /* ── Messages area ── */
@@ -17483,6 +17484,46 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Scroll to bottom button */
+.chat-scroll-to-bottom {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-scroll-to-bottom:hover {
+  background: var(--bg-secondary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.chat-scroll-to-bottom svg {
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
+}
+
+.chat-scroll-to-bottom:hover svg {
+  color: var(--text-primary);
+}
+
+.chat-scroll-to-bottom.has-new-messages {
+  animation: pulse 2s infinite;
 }
 
 .chat-messages > * {

@@ -1244,6 +1244,9 @@ function createChatView(wrapperEl, project, options = {}) {
     sendLock = true;
     if (project?.id) recordActivity(project.id);
 
+    // Reset scroll detection when user sends a message
+    resetScrollDetection();
+
     // Snapshot images and mentions, then clear pending
     const images = hasImages ? pendingImages.splice(0) : [];
     const mentions = hasMentions ? pendingMentions.splice(0) : [];
@@ -2314,12 +2317,62 @@ function createChatView(wrapperEl, project, options = {}) {
     if (totalCost > 0) statusCost.textContent = `$${totalCost.toFixed(4)}`;
   }
 
+  let userHasScrolled = false;
+  let hasNewMessages = false;
+
+  // Create scroll-to-bottom button
+  const scrollButton = document.createElement('button');
+  scrollButton.className = 'chat-scroll-to-bottom';
+  scrollButton.style.display = 'none';
+  scrollButton.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  `;
+  scrollButton.title = 'New messages below';
+  chatView.appendChild(scrollButton);
+
+  scrollButton.addEventListener('click', () => {
+    userHasScrolled = false;
+    hasNewMessages = false;
+    scrollButton.classList.remove('has-new-messages');
+    scrollButton.style.display = 'none';
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+
+  // Detect when user manually scrolls
+  messagesEl.addEventListener('scroll', () => {
+    const isAtBottom = messagesEl.scrollTop + messagesEl.clientHeight >= messagesEl.scrollHeight - 50;
+    userHasScrolled = !isAtBottom && messagesEl.scrollHeight > messagesEl.clientHeight;
+
+    if (isAtBottom) {
+      userHasScrolled = false;
+      hasNewMessages = false;
+      scrollButton.classList.remove('has-new-messages');
+      scrollButton.style.display = 'none';
+    }
+  });
+
   function scrollToBottom() {
-    requestAnimationFrame(() => {
+    // Only auto-scroll if user hasn't manually scrolled away
+    if (!userHasScrolled) {
       requestAnimationFrame(() => {
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        requestAnimationFrame(() => {
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        });
       });
-    });
+    } else {
+      // Show scroll button with new messages indicator
+      hasNewMessages = true;
+      scrollButton.classList.add('has-new-messages');
+      scrollButton.style.display = '';
+    }
+  }
+
+  // Reset scroll detection when user sends a new message
+  function resetScrollDetection() {
+    userHasScrolled = false;
+    scrollToBottom();
   }
 
   // ── IPC: SDK Messages ──
