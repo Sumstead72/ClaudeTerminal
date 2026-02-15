@@ -2474,8 +2474,19 @@ function createChatView(wrapperEl, project, options = {}) {
         removeThinkingIndicator();
         finalizeStreamBlock();
         if (!isAborting) {
-          const errors = message.errors || [];
-          appendError(errors.length ? errors.join('\n') : (message.subtype || 'Unknown error'));
+          let errorMsg;
+          if (message.subtype === 'error_max_turns') {
+            errorMsg = t('chat.errorMaxTurns', { count: 100 });
+          } else if (message.subtype === 'error_max_budget_usd') {
+            errorMsg = t('chat.errorMaxBudget', { cost: message.total_cost_usd?.toFixed(2) || '?' });
+          } else if (message.subtype === 'error_during_execution') {
+            const errors = message.errors || [];
+            errorMsg = errors.length ? errors.join('\n') : t('chat.errorExecution');
+          } else {
+            const errors = message.errors || [];
+            errorMsg = errors.length ? errors.join('\n') : (message.subtype || t('chat.errorOccurred'));
+          }
+          appendError(errorMsg);
         }
         isAborting = false;
         setStreaming(false);

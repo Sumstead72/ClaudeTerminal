@@ -743,7 +743,10 @@
     "mentionNoProjects": "Aucun projet trouvé",
     "queued": "En file",
     "forkSession": "Brancher ici",
-    "forkedFrom": "Conversation branchée"
+    "forkedFrom": "Conversation branchée",
+    "errorMaxTurns": "Claude a atteint la limite de {count} tours. Démarrez une nouvelle session.",
+    "errorMaxBudget": "Limite de budget atteinte ({cost}$). Démarrez une nouvelle session.",
+    "errorExecution": "Une erreur est survenue pendant l'exécution"
   },
   "hooks": {
     "consent": {
