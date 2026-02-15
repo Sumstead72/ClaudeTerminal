@@ -17840,6 +17840,36 @@ select:focus-visible {
 /* Assistant message */
 .chat-msg-assistant {
   padding: 8px 0;
+  position: relative;
+}
+
+/* Fork button — hidden by default, shown on hover */
+.chat-msg-fork-btn {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  opacity: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-2xs);
+}
+
+.chat-msg-assistant:hover .chat-msg-fork-btn {
+  opacity: 0.6;
+}
+
+.chat-msg-fork-btn:hover {
+  opacity: 1 !important;
+  color: var(--accent);
+  border-color: var(--accent-dim);
 }
 
 .chat-msg-content {

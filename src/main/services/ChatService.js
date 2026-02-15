@@ -243,7 +243,7 @@ class ChatService {
    * @param {string} [params.resumeSessionId] - Session ID to resume
    * @returns {Promise<string>} Session ID
    */
-  async startSession({ cwd, prompt, permissionMode = 'default', resumeSessionId = null, sessionId = null, images = [], mentions = [], model = null, enable1MContext = false }) {
+  async startSession({ cwd, prompt, permissionMode = 'default', resumeSessionId = null, sessionId = null, images = [], mentions = [], model = null, enable1MContext = false, forkSession = false, resumeSessionAt = null }) {
     const sdk = await loadSDK();
     if (!sessionId) sessionId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -300,6 +300,12 @@ class ChatService {
       // Resume existing session if requested
       if (resumeSessionId) {
         options.resume = resumeSessionId;
+        if (forkSession) {
+          options.forkSession = true;
+        }
+        if (resumeSessionAt) {
+          options.resumeSessionAt = resumeSessionAt;
+        }
       }
 
       const queryStream = sdk.query({

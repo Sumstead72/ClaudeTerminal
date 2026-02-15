@@ -741,7 +741,9 @@
     "mentionProject": "Joindre les infos d'un projet",
     "mentionNoFiles": "Aucun fichier trouvé",
     "mentionNoProjects": "Aucun projet trouvé",
-    "queued": "En file"
+    "queued": "En file",
+    "forkSession": "Brancher ici",
+    "forkedFrom": "Conversation branchée"
   },
   "hooks": {
     "consent": {

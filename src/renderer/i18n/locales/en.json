@@ -741,7 +741,9 @@
     "mentionProject": "Attach project info",
     "mentionNoFiles": "No files found",
     "mentionNoProjects": "No projects found",
-    "queued": "Queued"
+    "queued": "Queued",
+    "forkSession": "Fork from here",
+    "forkedFrom": "Forked conversation"
   },
   "hooks": {
     "consent": {

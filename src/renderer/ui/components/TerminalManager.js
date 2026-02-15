@@ -3544,7 +3544,7 @@ function focusPrevTerminal() {
  * Create a chat-mode terminal (Claude Agent SDK UI)
  */
 async function createChatTerminal(project, options = {}) {
-  const { skipPermissions = false, name: customName = null, resumeSessionId = null } = options;
+  const { skipPermissions = false, name: customName = null, resumeSessionId = null, forkSession = false, resumeSessionAt = null } = options;
 
   const id = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const projectIndex = getProjectIndex(project.id);
@@ -3596,6 +3596,8 @@ async function createChatTerminal(project, options = {}) {
     terminalId: id,
     skipPermissions,
     resumeSessionId,
+    forkSession,
+    resumeSessionAt,
     onTabRename: (name) => {
       const nameEl = tab.querySelector('.tab-name');
       if (nameEl) nameEl.textContent = name;
@@ -3605,6 +3607,14 @@ async function createChatTerminal(project, options = {}) {
     onStatusChange: (status, substatus) => updateChatTerminalStatus(id, status, substatus),
     onSwitchTerminal: (dir) => callbacks.onSwitchTerminal?.(dir),
     onSwitchProject: (dir) => callbacks.onSwitchProject?.(dir),
+    onForkSession: ({ resumeSessionId: forkSid, resumeSessionAt: forkAt }) => {
+      createChatTerminal(project, {
+        resumeSessionId: forkSid,
+        forkSession: true,
+        resumeSessionAt: forkAt,
+        name: `Fork: ${tabName}`
+      });
+    },
   });
   const storedData = getTerminal(id);
   if (storedData) {

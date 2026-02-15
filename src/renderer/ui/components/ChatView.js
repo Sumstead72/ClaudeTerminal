@@ -137,16 +137,20 @@ function getToolDisplayInfo(toolName, input) {
 // ── Create Chat View ──
 
 function createChatView(wrapperEl, project, options = {}) {
-  const { terminalId = null, resumeSessionId = null, skipPermissions = false, onTabRename = null, onStatusChange = null, onSwitchTerminal = null, onSwitchProject = null } = options;
+  const { terminalId = null, resumeSessionId = null, forkSession = false, resumeSessionAt = null, skipPermissions = false, onTabRename = null, onStatusChange = null, onSwitchTerminal = null, onSwitchProject = null, onForkSession = null } = options;
   let sessionId = null;
   let isStreaming = false;
   let isAborting = false;
   let pendingResumeId = resumeSessionId || null;
+  let pendingForkSession = forkSession || false;
+  let pendingResumeAt = resumeSessionAt || null;
   let tabNamePending = false; // avoid concurrent tab name requests
   let currentStreamEl = null;
   let currentStreamText = '';
   let currentThinkingEl = null;
   let currentThinkingText = '';
+  let currentAssistantMsgEl = null; // tracks the current .chat-msg-assistant wrapper for UUID tagging
+  let sdkSessionId = null; // real SDK session UUID (different from our internal sessionId)
   let model = '';
   let selectedModel = getSetting('chatModel') || MODEL_OPTIONS[0].id;
   let totalCost = 0;
@@ -1298,7 +1302,15 @@ function createChatView(wrapperEl, project, options = {}) {
         };
         if (pendingResumeId) {
           startOpts.resumeSessionId = pendingResumeId;
+          if (pendingForkSession) {
+            startOpts.forkSession = true;
+          }
+          if (pendingResumeAt) {
+            startOpts.resumeSessionAt = pendingResumeAt;
+          }
           pendingResumeId = null;
+          pendingForkSession = false;
+          pendingResumeAt = null;
         }
         const result = await api.chat.start(startOpts);
         if (!result.success) {
@@ -1752,6 +1764,7 @@ function createChatView(wrapperEl, project, options = {}) {
     scrollToBottom();
     currentStreamEl = el.querySelector('.chat-msg-content');
     currentStreamText = '';
+    currentAssistantMsgEl = el;
     return el;
   }
 
@@ -2638,9 +2651,43 @@ function createChatView(wrapperEl, project, options = {}) {
     }
   }
 
+  function forkFromMessage(messageUuid) {
+    // Use the real SDK session UUID, not our internal sessionId
+    const realSid = sdkSessionId || pendingResumeId;
+    if (!realSid || !onForkSession) return;
+    onForkSession({
+      resumeSessionId: realSid,
+      resumeSessionAt: messageUuid
+    });
+  }
+
   function handleAssistantMessage(msg) {
     const content = msg.message?.content;
     if (!content) return;
+
+    // Capture real SDK session UUID (needed for fork/resume)
+    if (msg.session_id) sdkSessionId = msg.session_id;
+
+    // Store message UUID on the assistant DOM element (used for fork)
+    if (msg.uuid) {
+      const target = currentAssistantMsgEl
+        || messagesEl.querySelector('.chat-msg-assistant:last-child');
+      if (target) {
+        target.dataset.messageUuid = msg.uuid;
+        // Add fork button if not already present
+        if (!target.querySelector('.chat-msg-fork-btn')) {
+          const forkBtn = document.createElement('button');
+          forkBtn.className = 'chat-msg-fork-btn';
+          forkBtn.title = t('chat.forkSession') || 'Fork from here';
+          forkBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/><path d="M6 9a9 9 0 0 0 9 9"/></svg>';
+          forkBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            forkFromMessage(msg.uuid);
+          });
+          target.appendChild(forkBtn);
+        }
+      }
+    }
 
     let hasToolUse = false;
     for (const block of content) {
@@ -2787,10 +2834,13 @@ function createChatView(wrapperEl, project, options = {}) {
         renderHistoryMessages(result.messages);
       }
 
-      // Show resume divider
+      // Show resume/fork divider
+      const dividerText = pendingForkSession
+        ? (t('chat.forkedFrom') || 'Forked conversation')
+        : (t('chat.conversationResumed') || 'Conversation resumed');
       const divider = document.createElement('div');
       divider.className = 'chat-history-divider';
-      divider.innerHTML = `<span>${escapeHtml(t('chat.conversationResumed') || 'Conversation resumed')}</span>`;
+      divider.innerHTML = `<span>${escapeHtml(dividerText)}</span>`;
       messagesEl.appendChild(divider);
       scrollToBottom();
     }).catch(() => {
