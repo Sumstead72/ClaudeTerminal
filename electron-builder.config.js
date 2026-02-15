@@ -65,6 +65,12 @@ module.exports = {
     category: "public.app-category.developer-tools",
     darkModeSupport: true
   },
+  dmg: {
+    // Disable background/window customization to avoid hdiutil "Resource busy" on CI
+    background: null,
+    window: { width: 540, height: 380 },
+    writeUpdateInfo: true
+  },
   linux: {
     target: [
       { target: "AppImage", arch: ["x64"] }

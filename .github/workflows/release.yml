@@ -44,7 +44,13 @@ jobs:
       - run: npm run build:renderer
       - run: npm test
       - name: Build and publish macOS DMG (${{ matrix.arch }})
-        run: npx electron-builder --mac --${{ matrix.arch }} --publish always --config electron-builder.config.js
+        # Retry up to 3 times — hdiutil can fail with "Resource busy" on GH Actions runners
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: npx electron-builder --mac --${{ matrix.arch }} --publish always --config electron-builder.config.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
