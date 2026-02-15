@@ -66,7 +66,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          RELEASE=$(gh api repos/${{ github.repository }}/releases/tags/$TAG)
+
+          # Wait for the release to be available (electron-builder creates it)
+          for i in 1 2 3 4 5; do
+            RELEASE=$(gh api repos/${{ github.repository }}/releases/tags/$TAG 2>/dev/null) && break
+            echo "Release not found yet, waiting 15s... (attempt $i/5)"
+            sleep 15
+          done
+
+          if [ -z "$RELEASE" ]; then
+            echo "::error::Release for tag $TAG not found after retries"
+            exit 1
+          fi
 
           # Get all DMG assets info from the release
           echo "$RELEASE" | jq -r '.assets[] | select(.name | endswith(".dmg")) | "\(.name) \(.browser_download_url)"' > dmg_assets.txt
