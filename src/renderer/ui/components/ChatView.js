@@ -1872,6 +1872,11 @@ function createChatView(wrapperEl, project, options = {}) {
       status.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
     }
     el.classList.add('done');
+    // Mark all remaining mini-tools as complete
+    el.querySelectorAll('.sa-tool-status:not(.complete)').forEach(s => {
+      s.classList.add('complete');
+      s.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+    });
     // Clear live activity text
     const activityEl = el.querySelector('.chat-subagent-activity');
     if (activityEl) activityEl.textContent = '';
@@ -1928,6 +1933,7 @@ function createChatView(wrapperEl, project, options = {}) {
           // Add mini tool entry in the subagent body
           const mini = document.createElement('div');
           mini.className = 'sa-tool';
+          if (block.id) mini.dataset.toolUseId = block.id;
           mini.innerHTML = `
             <div class="sa-tool-icon">${getToolIcon(block.name)}</div>
             <span class="sa-tool-name">${escapeHtml(block.name)}</span>
@@ -1969,17 +1975,19 @@ function createChatView(wrapperEl, project, options = {}) {
         const jsonStr = info.subBuffers.get(stopIdx);
         const mini = info.subTools.get(stopIdx);
 
-        if (jsonStr && mini) {
-          info.subBuffers.delete(stopIdx);
-          try {
-            const toolInput = JSON.parse(jsonStr);
-            const name = mini.querySelector('.sa-tool-name')?.textContent || '';
-            const detail = getToolDisplayInfo(name, toolInput);
-            const detailEl = mini.querySelector('.sa-tool-detail');
-            if (detailEl && detail) {
-              detailEl.textContent = detail.length > 60 ? '...' + detail.slice(-57) : detail;
-            }
-          } catch (e) { /* partial JSON */ }
+        if (mini) {
+          if (jsonStr) {
+            info.subBuffers.delete(stopIdx);
+            try {
+              const toolInput = JSON.parse(jsonStr);
+              const name = mini.querySelector('.sa-tool-name')?.textContent || '';
+              const detail = getToolDisplayInfo(name, toolInput);
+              const detailEl = mini.querySelector('.sa-tool-detail');
+              if (detailEl && detail) {
+                detailEl.textContent = detail.length > 60 ? '...' + detail.slice(-57) : detail;
+              }
+            } catch (e) { /* partial JSON */ }
+          }
 
           // Mark mini tool as complete
           const statusEl = mini.querySelector('.sa-tool-status');
@@ -2003,30 +2011,24 @@ function createChatView(wrapperEl, project, options = {}) {
 
     for (const block of content) {
       if (block.type === 'tool_use' && block.name !== 'TodoWrite') {
-        // Update the mini tool card with complete input info if not already done
         const detail = getToolDisplayInfo(block.name, block.input);
-        // Update activity
         info.activityEl.textContent = `${block.name}...`;
 
-        // Check if we already have a mini card for this — if not, add one
+        // Check if we already have a mini card for this tool_use_id
         let found = false;
-        for (const [, mini] of info.subTools) {
-          const nameEl = mini.querySelector('.sa-tool-name');
-          if (nameEl && nameEl.textContent === block.name && !mini.classList.contains('has-detail')) {
-            const detailEl = mini.querySelector('.sa-tool-detail');
-            if (detailEl && detail) {
-              detailEl.textContent = detail.length > 60 ? '...' + detail.slice(-57) : detail;
+        if (block.id) {
+          for (const [, mini] of info.subTools) {
+            if (mini.dataset.toolUseId === block.id) {
+              found = true;
+              break;
             }
-            mini.classList.add('has-detail');
-            found = true;
-            break;
           }
         }
 
         if (!found) {
-          // Subagent tool not yet in body — add it
           const mini = document.createElement('div');
           mini.className = 'sa-tool has-detail';
+          if (block.id) mini.dataset.toolUseId = block.id;
           const truncated = detail && detail.length > 60 ? '...' + detail.slice(-57) : (detail || '');
           mini.innerHTML = `
             <div class="sa-tool-icon">${getToolIcon(block.name)}</div>
@@ -2035,6 +2037,31 @@ function createChatView(wrapperEl, project, options = {}) {
             <div class="sa-tool-status"><div class="chat-tool-spinner"></div></div>
           `;
           info.bodyEl.appendChild(mini);
+          // Track by a unique key
+          const key = block.id || `assistant-${info.subTools.size}`;
+          info.subTools.set(key, mini);
+        }
+      }
+
+      // tool_result → mark the matching mini-tool as complete
+      if (block.type === 'tool_result' && block.tool_use_id) {
+        let matchedMini = null;
+        for (const [, mini] of info.subTools) {
+          if (mini.dataset.toolUseId === block.tool_use_id) {
+            matchedMini = mini;
+            break;
+          }
+        }
+        // Fallback: find in DOM
+        if (!matchedMini) {
+          matchedMini = info.bodyEl.querySelector(`.sa-tool[data-tool-use-id="${CSS.escape(block.tool_use_id)}"]`);
+        }
+        if (matchedMini) {
+          const statusEl = matchedMini.querySelector('.sa-tool-status');
+          if (statusEl && !statusEl.classList.contains('complete')) {
+            statusEl.classList.add('complete');
+            statusEl.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+          }
         }
       }
     }
@@ -2247,6 +2274,43 @@ function createChatView(wrapperEl, project, options = {}) {
     });
   }
 
+  function findPlanFilePath() {
+    const { fs, path, os } = window.electron_nodeModules;
+    const plansDir = path.join(os.homedir(), '.claude', 'plans');
+
+    // Strategy 1: Find Write tool card targeting ~/.claude/plans/
+    const allToolCards = messagesEl.querySelectorAll('.chat-tool-card');
+    for (let i = allToolCards.length - 1; i >= 0; i--) {
+      const card = allToolCards[i];
+      const nameEl = card.querySelector('.chat-tool-name');
+      if (!nameEl || nameEl.textContent !== 'Write') continue;
+      try {
+        const input = JSON.parse(card.dataset.toolInput || '{}');
+        if (input.file_path && input.file_path.replace(/\\/g, '/').includes('.claude/plans/')) {
+          return input.file_path;
+        }
+      } catch {}
+    }
+
+    // Strategy 2: Most recent .md file in ~/.claude/plans/ (< 60s old)
+    try {
+      if (!fs.existsSync(plansDir)) return null;
+      const files = fs.readdirSync(plansDir)
+        .filter(f => f.endsWith('.md'))
+        .map(f => {
+          const fullPath = path.join(plansDir, f);
+          const stat = fs.statSync(fullPath);
+          return { path: fullPath, mtime: stat.mtime };
+        })
+        .sort((a, b) => b.mtime - a.mtime);
+      if (files.length > 0 && Date.now() - files[0].mtime.getTime() < 60000) {
+        return files[0].path;
+      }
+    } catch {}
+
+    return null;
+  }
+
   function appendPlanCard(data) {
     const { requestId, toolName, input } = data;
     const isExit = toolName === 'ExitPlanMode';
@@ -2259,15 +2323,38 @@ function createChatView(wrapperEl, project, options = {}) {
     const icon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM9 13h6v2H9v-2zm6 4H9v2h6v-2zm-2-8h2v2h-2V9z"/></svg>';
 
     if (isExit) {
-      // Grab the last assistant message content and move it into the plan card
       let planContent = '';
-      const allMessages = messagesEl.querySelectorAll('.chat-msg-assistant');
-      if (allMessages.length > 0) {
-        const lastMsg = allMessages[allMessages.length - 1];
-        const contentEl = lastMsg.querySelector('.chat-msg-content');
-        if (contentEl) {
-          planContent = contentEl.innerHTML;
-          lastMsg.style.display = 'none';
+      let planFilePath = null;
+
+      // 1. Try reading plan from disk (~/.claude/plans/)
+      planFilePath = findPlanFilePath();
+      if (planFilePath) {
+        try {
+          const raw = window.electron_nodeModules.fs.readFileSync(planFilePath, 'utf-8');
+          if (raw && raw.trim()) {
+            planContent = renderMarkdown(raw.trim());
+          }
+        } catch {}
+      }
+
+      // 2. Fallback: last assistant message (only if long enough to be a plan)
+      if (!planContent) {
+        const allMessages = messagesEl.querySelectorAll('.chat-msg-assistant');
+        if (allMessages.length > 0) {
+          const lastMsg = allMessages[allMessages.length - 1];
+          const contentEl = lastMsg.querySelector('.chat-msg-content');
+          if (contentEl && contentEl.textContent.trim().length > 100) {
+            planContent = contentEl.innerHTML;
+            lastMsg.style.display = 'none';
+          }
+        }
+      }
+
+      // Hide the transitional assistant message when plan comes from file
+      if (planFilePath && planContent) {
+        const allMessages = messagesEl.querySelectorAll('.chat-msg-assistant');
+        if (allMessages.length > 0) {
+          allMessages[allMessages.length - 1].style.display = 'none';
         }
       }
 
@@ -2277,10 +2364,15 @@ function createChatView(wrapperEl, project, options = {}) {
 
       if (planContent) el.classList.add('has-plan-content');
 
+      const fileInfo = planFilePath
+        ? `<span class="chat-plan-file-path" title="${escapeHtml(planFilePath)}">${escapeHtml(window.electron_nodeModules.path.basename(planFilePath))}</span>`
+        : '';
+
       el.innerHTML = `
         <div class="chat-plan-header">
           <div class="chat-plan-icon">${icon}</div>
           <span>${escapeHtml(t('chat.planReady') || 'Plan ready for review')}</span>
+          ${fileInfo}
         </div>
         ${planPreview}
         <div class="chat-plan-actions">
@@ -2527,7 +2619,6 @@ function createChatView(wrapperEl, project, options = {}) {
         blockIndex = 0;
         currentMsgHasToolUse = false;
         turnHadAssistantContent = false;
-        toolCards.clear();
         // Clear queued badges — this message is now being processed
         for (const qEl of messagesEl.querySelectorAll('.chat-msg-user.queued')) {
           qEl.classList.remove('queued');
@@ -2661,6 +2752,7 @@ function createChatView(wrapperEl, project, options = {}) {
           for (const [, card] of toolCards) {
             completeToolCard(card);
           }
+          toolCards.clear();
           // Complete any remaining subagent cards
           for (const [idx, info] of taskToolIndices) {
             completeSubagentCard(info.card);
@@ -2726,10 +2818,6 @@ function createChatView(wrapperEl, project, options = {}) {
           continue;
         }
         hasToolUse = true;
-        // Mark tool cards as complete
-        for (const [, card] of toolCards) {
-          completeToolCard(card);
-        }
       }
       // tool_result → store output on matching tool card, or mark subagent complete
       if (block.type === 'tool_result') {
@@ -2741,12 +2829,12 @@ function createChatView(wrapperEl, project, options = {}) {
             break;
           }
         }
-        // Regular tool cards — store output for expand view
+        // Regular tool cards — store output and mark complete
         // First try in-memory map (fast path), then fallback to DOM query
-        // (toolCards map is cleared on message_start, but tool_result may arrive in a later turn)
         let matchedCard = null;
-        for (const [, card] of toolCards) {
-          if (card.dataset.toolUseId === block.tool_use_id) { matchedCard = card; break; }
+        let matchedIdx = null;
+        for (const [idx, card] of toolCards) {
+          if (card.dataset.toolUseId === block.tool_use_id) { matchedCard = card; matchedIdx = idx; break; }
         }
         if (!matchedCard && block.tool_use_id) {
           try {
@@ -2757,6 +2845,8 @@ function createChatView(wrapperEl, project, options = {}) {
           const output = typeof block.content === 'string' ? block.content
             : Array.isArray(block.content) ? block.content.map(b => b.text || '').join('\n') : '';
           if (output) matchedCard.dataset.toolOutput = output;
+          completeToolCard(matchedCard);
+          if (matchedIdx !== null) toolCards.delete(matchedIdx);
         }
       }
     }
@@ -2788,6 +2878,13 @@ function createChatView(wrapperEl, project, options = {}) {
     removeThinkingIndicator();
     finalizeStreamBlock();
     resolveAllPendingCards();
+    // Complete all pending tool/subagent cards so spinners don't stay stuck
+    for (const [, card] of toolCards) completeToolCard(card);
+    toolCards.clear();
+    for (const [idx, info] of taskToolIndices) {
+      completeSubagentCard(info.card);
+      taskToolIndices.delete(idx);
+    }
     if (!isAborting) {
       appendError(error);
     }
@@ -2808,6 +2905,7 @@ function createChatView(wrapperEl, project, options = {}) {
     for (const [, card] of toolCards) {
       completeToolCard(card);
     }
+    toolCards.clear();
     // Complete all subagent cards
     for (const [idx, info] of taskToolIndices) {
       completeSubagentCard(info.card);

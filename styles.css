@@ -19063,6 +19063,17 @@ select:focus-visible {
   background: rgba(168, 85, 247, 0.06);
 }
 
+.chat-plan-file-path {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-plan-icon {
   width: 16px;
   height: 16px;
