@@ -746,7 +746,9 @@ function renderResponse(container, result, t) {
     const parsed = JSON.parse(result.body);
     bodyHtml = escapeHtml(JSON.stringify(parsed, null, 2));
     isJson = true;
-  } catch (e) {}
+  } catch (_) {
+    // Body is not JSON — display as raw text
+  }
 
   const headerCount = Object.keys(result.headers || {}).length;
   container.innerHTML = `

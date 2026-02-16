@@ -38,6 +38,12 @@ const BASE_TYPE = {
   // TerminalManager
   getTerminalPanels: (ctx) => [],
 
+  // Console management (type-specific consoles like FiveM, WebApp, API)
+  getConsoleConfig: (project, projectIndex) => null,
+  showErrorOverlay: (projectIndex, error, tmApi) => {},
+  hideErrorOverlay: (projectIndex) => {},
+  onConsoleError: (projectIndex, error, tmApi) => {},
+
   // Wizard creation
   getWizardFields: () => '',
   onWizardTypeSelected: (form, isSelected) => {},
