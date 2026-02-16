@@ -56,6 +56,28 @@ module.exports = createType({
     return require('./renderer/ApiDashboard').getDashboardStats(ctx);
   },
 
+  // Console management (type-specific consoles)
+  getConsoleConfig: (project, projectIndex) => ({
+    typeId: 'api',
+    tabIcon: '⚡',
+    tabClass: 'api-tab',
+    dotClass: 'api-dot',
+    wrapperClass: 'api-wrapper',
+    consoleViewSelector: '.api-console-view',
+    ipcNamespace: 'api',
+    scrollback: 10000,
+    getExistingLogs: (pi) => {
+      try {
+        const { getApiServer } = require('./renderer/ApiState');
+        const server = getApiServer(pi);
+        return (server && server.logs) ? server.logs : [];
+      } catch (e) { return []; }
+    },
+    onCleanup: (wrapper) => {
+      try { require('./renderer/ApiTerminalPanel').cleanup(wrapper); } catch (e) {}
+    }
+  }),
+
   // TerminalManager
   getTerminalPanels: (ctx) => {
     const Panel = require('./renderer/ApiTerminalPanel');

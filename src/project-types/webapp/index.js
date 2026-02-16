@@ -56,6 +56,28 @@ module.exports = createType({
     return require('./renderer/WebAppDashboard').getDashboardStats(ctx);
   },
 
+  // Console management (type-specific consoles)
+  getConsoleConfig: (project, projectIndex) => ({
+    typeId: 'webapp',
+    tabIcon: '🌐',
+    tabClass: 'webapp-tab',
+    dotClass: 'webapp-dot',
+    wrapperClass: 'webapp-wrapper',
+    consoleViewSelector: '.webapp-console-view',
+    ipcNamespace: 'webapp',
+    scrollback: 10000,
+    getExistingLogs: (pi) => {
+      try {
+        const { getWebAppServer } = require('./renderer/WebAppState');
+        const server = getWebAppServer(pi);
+        return (server && server.logs) ? server.logs : [];
+      } catch (e) { return []; }
+    },
+    onCleanup: (wrapper) => {
+      try { require('./renderer/WebAppTerminalPanel').cleanup(wrapper); } catch (e) {}
+    }
+  }),
+
   // TerminalManager
   getTerminalPanels: (ctx) => {
     const Panel = require('./renderer/WebAppTerminalPanel');

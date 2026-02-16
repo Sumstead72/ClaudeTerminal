@@ -19,9 +19,6 @@ const {
   getActiveTerminal,
   projectsState,
   getProjectIndex,
-  getFivemServer,
-  addFivemLog,
-  dismissLastError,
   getFivemErrors,
   clearFivemErrors,
   getFivemResources,
@@ -30,7 +27,6 @@ const {
   getResourceShortcut,
   setResourceShortcut,
   findResourceByShortcut,
-  loadResourceShortcuts,
   getSetting,
   startTracking,
   stopTracking,
@@ -43,7 +39,6 @@ const { escapeHtml, getFileIcon, highlight } = require('../../utils');
 const { t, getCurrentLanguage } = require('../../i18n');
 const {
   CLAUDE_TERMINAL_THEME,
-  FIVEM_TERMINAL_THEME,
   TERMINAL_FONTS,
   getTerminalTheme
 } = require('../themes/terminal-themes');
@@ -74,6 +69,10 @@ const apiConsoleIds = new Map();
 
 // Track error overlays by projectIndex
 const errorOverlays = new Map();
+
+// ── Generic type console tracking ──
+// Key: "${typeId}-${projectIndex}" -> consoleId
+const typeConsoleIds = new Map();
 
 // Anti-spam for paste (Ctrl+Shift+V)
 let lastPasteTime = 0;
@@ -981,13 +980,9 @@ function closeTerminal(id) {
   const closedProjectPath = termData?.project?.path;
   const closedProjectId = termData?.project?.id;
 
-  // Delegate to type-specific close functions
-  if (termData && termData.type === 'fivem') {
-    closeFivemConsole(id, closedProjectIndex);
-    return;
-  }
-  if (termData && termData.type === 'webapp') {
-    closeWebAppConsole(id, closedProjectIndex);
+  // Delegate to type-specific close for console types
+  if (termData && termData.type && typeConsoleIds.has(`${termData.type}-${closedProjectIndex}`)) {
+    closeTypeConsole(id, closedProjectIndex, termData.type);
     return;
   }
 
@@ -1290,31 +1285,77 @@ function getTypePanelDeps(consoleId, projectIndex) {
     t,
     consoleId,
     createTerminalWithPrompt,
-    buildDebugPrompt
+    buildDebugPrompt: (error) => {
+      try {
+        return require('../../../project-types/fivem/renderer/FivemConsoleManager').buildDebugPrompt(error, t);
+      } catch (e) { return ''; }
+    }
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── Generic Type Console API ──
+// Replaces the 3 duplicated create/close/write/get functions
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get the console ID for a given type + projectIndex
+ * @param {number} projectIndex
+ * @param {string} typeId
+ * @returns {string|undefined}
+ */
+function getTypeConsoleId(projectIndex, typeId) {
+  return typeConsoleIds.get(`${typeId}-${projectIndex}`);
+}
+
+/**
+ * Get the TmApi object passed to type modules to avoid circular deps.
+ * @returns {Object}
+ */
+function getTmApi() {
+  return {
+    getTypeConsoleId,
+    getTerminal,
+    getTypePanelDeps,
+    createTerminalWithPrompt,
+    t,
+    escapeHtml,
+    projectsState,
+    api
   };
 }
 
 /**
- * Create a FiveM console as a terminal tab
+ * Create a type-specific console as a terminal tab (generic).
+ * @param {Object} project
+ * @param {number} projectIndex
+ * @returns {string|null} Console ID
  */
-function createFivemConsole(project, projectIndex, options = {}) {
-  // Check if console already exists for this project
-  const existingId = fivemConsoleIds.get(projectIndex);
+function createTypeConsole(project, projectIndex) {
+  const typeHandler = registry.get(project.type);
+  const config = typeHandler.getConsoleConfig(project, projectIndex);
+  if (!config) return null;
+
+  const { typeId, tabIcon, tabClass, dotClass, wrapperClass, consoleViewSelector, ipcNamespace, scrollback } = config;
+
+  // Check if console already exists
+  const mapKey = `${typeId}-${projectIndex}`;
+  const existingId = typeConsoleIds.get(mapKey);
   if (existingId && getTerminal(existingId)) {
     setActiveTerminal(existingId);
     return existingId;
   }
 
-  const id = `fivem-${projectIndex}-${Date.now()}`;
+  const id = `${typeId}-${projectIndex}-${Date.now()}`;
 
-  const fivemThemeId = getSetting('terminalTheme') || 'claude';
+  const themeId = getSetting('terminalTheme') || 'claude';
   const terminal = new Terminal({
-    theme: getTerminalTheme(fivemThemeId),
-    fontFamily: TERMINAL_FONTS.fivem.fontFamily,
-    fontSize: TERMINAL_FONTS.fivem.fontSize,
+    theme: getTerminalTheme(themeId),
+    fontFamily: TERMINAL_FONTS[typeId]?.fontFamily || TERMINAL_FONTS.fivem.fontFamily,
+    fontSize: TERMINAL_FONTS[typeId]?.fontSize || TERMINAL_FONTS.fivem.fontSize,
     cursorBlink: false,
     disableStdin: false,
-    scrollback: 10000
+    scrollback: scrollback || 10000
   });
 
   const fitAddon = new FitAddon();
@@ -1325,40 +1366,43 @@ function createFivemConsole(project, projectIndex, options = {}) {
     fitAddon,
     project,
     projectIndex,
-    name: `🖥️ ${project.name}`,
+    name: `${tabIcon} ${project.name}`,
     status: 'ready',
-    type: 'fivem',
+    type: typeId,
     inputBuffer: '',
-    activeView: 'console' // 'console' or 'errors'
+    activeView: 'console'
   };
 
   addTerminal(id, termData);
-  fivemConsoleIds.set(projectIndex, id);
+  typeConsoleIds.set(mapKey, id);
 
-  // Start time tracking for this project
+  // Also sync to legacy Maps for backward compat during migration
+  if (typeId === 'fivem') fivemConsoleIds.set(projectIndex, id);
+  if (typeId === 'webapp') webappConsoleIds.set(projectIndex, id);
+  if (typeId === 'api') apiConsoleIds.set(projectIndex, id);
+
   startTracking(project.id);
 
   // Create tab
   const tabsContainer = document.getElementById('terminals-tabs');
   const tab = document.createElement('div');
-  tab.className = 'terminal-tab fivem-tab status-ready';
+  tab.className = `terminal-tab ${tabClass} status-ready`;
   tab.dataset.id = id;
   tab.tabIndex = 0;
   tab.setAttribute('role', 'tab');
   tab.innerHTML = `
-    <span class="status-dot fivem-dot"></span>
-    <span class="tab-name">${escapeHtml(`🖥️ ${project.name}`)}</span>
+    <span class="status-dot ${dotClass}"></span>
+    <span class="tab-name">${escapeHtml(`${tabIcon} ${project.name}`)}</span>
     <button class="tab-close"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>`;
   tabsContainer.appendChild(tab);
 
-  // Create wrapper with internal tabs
+  // Create wrapper
   const container = document.getElementById('terminals-container');
   const wrapper = document.createElement('div');
-  wrapper.className = 'terminal-wrapper fivem-wrapper';
+  wrapper.className = `terminal-wrapper ${wrapperClass}`;
   wrapper.dataset.id = id;
 
   // Get panel HTML from type handler
-  const typeHandler = registry.get(project.type);
   const panels = typeHandler.getTerminalPanels({ project, projectIndex });
   const panel = panels && panels.length > 0 ? panels[0] : null;
   if (panel) {
@@ -1370,19 +1414,19 @@ function createFivemConsole(project, projectIndex, options = {}) {
   document.getElementById('empty-terminals').style.display = 'none';
 
   // Open terminal in console view container
-  const consoleView = wrapper.querySelector('.fivem-console-view');
+  const consoleView = wrapper.querySelector(consoleViewSelector);
   terminal.open(consoleView);
   loadWebglAddon(terminal);
   setTimeout(() => fitAddon.fit(), 100);
   setActiveTerminal(id);
 
   // Prevent double-paste issue
-  setupPasteHandler(consoleView, projectIndex, 'fivem-input');
+  setupPasteHandler(consoleView, projectIndex, `${typeId}-input`);
 
   // Write existing logs
-  const server = getFivemServer(projectIndex);
-  if (server && server.logs && server.logs.length > 0) {
-    terminal.write(server.logs.join(''));
+  const existingLogs = config.getExistingLogs(projectIndex);
+  if (existingLogs && existingLogs.length > 0) {
+    terminal.write(existingLogs.join(''));
   }
 
   // Setup panel via type handler
@@ -1391,18 +1435,18 @@ function createFivemConsole(project, projectIndex, options = {}) {
     panel.setupPanel(wrapper, id, projectIndex, project, panelDeps);
   }
 
-  // Custom key handler for global shortcuts, copy/paste, and resource shortcuts
-  terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(terminal, projectIndex, 'fivem-input'));
+  // Custom key handler
+  terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(terminal, projectIndex, `${typeId}-input`));
 
-  // Handle input to FiveM console
+  // Handle input
   terminal.onData(data => {
-    api.fivem.input({ projectIndex, data });
+    api[ipcNamespace].input({ projectIndex, data });
   });
 
   // Resize handling
   const resizeObserver = new ResizeObserver(() => {
     fitAddon.fit();
-    api.fivem.resize({
+    api[ipcNamespace].resize({
       projectIndex,
       cols: terminal.cols,
       rows: terminal.rows
@@ -1410,14 +1454,13 @@ function createFivemConsole(project, projectIndex, options = {}) {
   });
   resizeObserver.observe(consoleView);
 
-  // Store ResizeObserver for cleanup
-  const storedFivemTermData = getTerminal(id);
-  if (storedFivemTermData) {
-    storedFivemTermData.resizeObserver = resizeObserver;
+  const storedTermData = getTerminal(id);
+  if (storedTermData) {
+    storedTermData.resizeObserver = resizeObserver;
   }
 
   // Send initial size
-  api.fivem.resize({
+  api[ipcNamespace].resize({
     projectIndex,
     cols: terminal.cols,
     rows: terminal.rows
@@ -1431,461 +1474,40 @@ function createFivemConsole(project, projectIndex, options = {}) {
   // Tab events
   tab.onclick = (e) => { if (!e.target.closest('.tab-close') && !e.target.closest('.tab-name-input')) setActiveTerminal(id); };
   tab.querySelector('.tab-name').ondblclick = (e) => { e.stopPropagation(); startRenameTab(id); };
-  tab.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeFivemConsole(id, projectIndex); };
+  tab.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeTypeConsole(id, projectIndex, typeId); };
 
-  // Enable drag & drop reordering
   setupTabDragDrop(tab);
 
   return id;
 }
 
 /**
- * Setup FiveM view switcher (Console / Errors / Resources)
+ * Close a type-specific console (generic).
+ * @param {string} id - Console terminal ID
+ * @param {number} projectIndex
+ * @param {string} typeId
  */
-function setupFivemViewSwitcher(wrapper, terminalId, projectIndex, project) {
-  const viewTabs = wrapper.querySelectorAll('.fivem-view-tab');
-  const consoleView = wrapper.querySelector('.fivem-console-view');
-  const errorsView = wrapper.querySelector('.fivem-errors-view');
-  const resourcesView = wrapper.querySelector('.fivem-resources-view');
-  const clearBtn = wrapper.querySelector('.fivem-clear-errors');
-  const refreshBtn = wrapper.querySelector('.fivem-refresh-resources');
-  const searchInput = wrapper.querySelector('.fivem-resources-search-input');
-
-  viewTabs.forEach(tab => {
-    tab.onclick = () => {
-      const view = tab.dataset.view;
-      viewTabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-
-      // Hide all views
-      consoleView.style.display = 'none';
-      errorsView.style.display = 'none';
-      resourcesView.style.display = 'none';
-
-      if (view === 'console') {
-        consoleView.style.display = '';
-        // Refit terminal
-        const termData = getTerminal(terminalId);
-        if (termData) {
-          setTimeout(() => termData.fitAddon.fit(), 50);
-        }
-      } else if (view === 'errors') {
-        errorsView.style.display = '';
-        renderFivemErrorsList(wrapper, projectIndex, project);
-      } else if (view === 'resources') {
-        resourcesView.style.display = '';
-        // Load resources if not already loaded
-        const { resources, lastScan } = getFivemResources(projectIndex);
-        if (!lastScan || resources.length === 0) {
-          scanAndRenderResources(wrapper, projectIndex, project);
-        } else {
-          renderFivemResourcesList(wrapper, projectIndex, project);
-        }
-      }
-
-      // Update state
-      const termData = getTerminal(terminalId);
-      if (termData) {
-        termData.activeView = view;
-      }
-    };
-  });
-
-  // Clear errors button
-  clearBtn.onclick = () => {
-    clearFivemErrors(projectIndex);
-    updateFivemErrorBadge(wrapper, projectIndex);
-    renderFivemErrorsList(wrapper, projectIndex, project);
-  };
-
-  // Refresh resources button
-  refreshBtn.onclick = () => {
-    scanAndRenderResources(wrapper, projectIndex, project);
-  };
-
-  // Search resources
-  searchInput.oninput = () => {
-    renderFivemResourcesList(wrapper, projectIndex, project, searchInput.value);
-  };
-}
-
-/**
- * Update FiveM error badge count
- */
-function updateFivemErrorBadge(wrapper, projectIndex) {
-  const badge = wrapper.querySelector('.fivem-error-badge');
-  if (!badge) return;
-
-  const { errors } = getFivemErrors(projectIndex);
-  const count = errors.length;
-
-  if (count > 0) {
-    badge.textContent = count > 99 ? '99+' : count;
-    badge.style.display = '';
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-/**
- * Render FiveM errors list
- */
-function renderFivemErrorsList(wrapper, projectIndex, project) {
-  const list = wrapper.querySelector('.fivem-errors-list');
-  const empty = wrapper.querySelector('.fivem-errors-empty');
-  const { errors } = getFivemErrors(projectIndex);
-
-  if (errors.length === 0) {
-    list.style.display = 'none';
-    empty.style.display = 'flex';
-    return;
-  }
-
-  list.style.display = '';
-  empty.style.display = 'none';
-
-  list.innerHTML = errors.map((error, index) => {
-    const time = new Date(error.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const preview = escapeHtml(error.message.split('\n')[0].substring(0, 100));
-
-    return `
-      <div class="fivem-error-item" data-index="${index}">
-        <div class="fivem-error-item-header">
-          <span class="fivem-error-time">${time}</span>
-          <button class="fivem-error-debug-btn" data-index="${index}" title="${t('fivem.debugWithClaude')}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            Debug
-          </button>
-        </div>
-        <div class="fivem-error-preview">${preview}</div>
-        <pre class="fivem-error-detail" style="display: none;">${escapeHtml(error.message)}</pre>
-      </div>
-    `;
-  }).reverse().join(''); // Most recent first
-
-  // Add click handlers
-  list.querySelectorAll('.fivem-error-item').forEach(item => {
-    const detail = item.querySelector('.fivem-error-detail');
-    const preview = item.querySelector('.fivem-error-preview');
-
-    // Toggle detail on click
-    item.onclick = (e) => {
-      if (e.target.closest('.fivem-error-debug-btn')) return;
-      const isExpanded = detail.style.display !== 'none';
-      detail.style.display = isExpanded ? 'none' : 'block';
-      preview.style.display = isExpanded ? '' : 'none';
-      item.classList.toggle('expanded', !isExpanded);
-    };
-  });
-
-  // Debug buttons
-  list.querySelectorAll('.fivem-error-debug-btn').forEach(btn => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const index = parseInt(btn.dataset.index);
-      const error = errors[index];
-      if (error && project) {
-        const prompt = buildDebugPrompt(error);
-        await createTerminalWithPrompt(project, prompt);
-      }
-    };
-  });
-}
-
-/**
- * Add error to FiveM console and update UI
- */
-function addFivemErrorToConsole(projectIndex, error) {
-  const consoleId = fivemConsoleIds.get(projectIndex);
-  if (!consoleId) return;
-
-  const wrapper = document.querySelector(`.terminal-wrapper[data-id="${consoleId}"]`);
-  if (!wrapper) return;
-
-  const termData = getTerminal(consoleId);
-  if (!termData) return;
-
-  // Delegate to type handler panel
-  const typeHandler = registry.get(termData.project?.type || 'standalone');
-  const panels = typeHandler.getTerminalPanels({ project: termData.project, projectIndex });
-  const panel = panels && panels.length > 0 ? panels[0] : null;
-  if (panel && panel.onNewError) {
-    const panelDeps = getTypePanelDeps(consoleId, projectIndex);
-    panel.onNewError(wrapper, projectIndex, panelDeps);
-  }
-}
-
-/**
- * Scan and render FiveM resources
- */
-async function scanAndRenderResources(wrapper, projectIndex, project) {
-  const list = wrapper.querySelector('.fivem-resources-list');
-  const empty = wrapper.querySelector('.fivem-resources-empty');
-  const loading = wrapper.querySelector('.fivem-resources-loading');
-  const refreshBtn = wrapper.querySelector('.fivem-refresh-resources');
-
-  // Show loading state
-  list.style.display = 'none';
-  empty.style.display = 'none';
-  loading.style.display = 'flex';
-  refreshBtn.classList.add('spinning');
-
-  setFivemResourcesLoading(projectIndex, true);
-
-  try {
-    const result = await api.fivem.scanResources({ projectPath: project.path });
-
-    if (result.success) {
-      setFivemResources(projectIndex, result.resources);
-      updateFivemResourceBadge(wrapper, result.resources.length);
-      renderFivemResourcesList(wrapper, projectIndex, project);
-    } else {
-      empty.style.display = 'flex';
-    }
-  } catch (e) {
-    console.error('Error scanning resources:', e);
-    empty.style.display = 'flex';
-  } finally {
-    loading.style.display = 'none';
-    refreshBtn.classList.remove('spinning');
-    setFivemResourcesLoading(projectIndex, false);
-  }
-}
-
-/**
- * Update FiveM resource badge count
- */
-function updateFivemResourceBadge(wrapper, count) {
-  const badge = wrapper.querySelector('.fivem-resource-badge');
-  if (!badge) return;
-
-  if (count > 0) {
-    badge.textContent = count > 99 ? '99+' : count;
-    badge.style.display = '';
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-/**
- * Render FiveM resources list
- */
-function renderFivemResourcesList(wrapper, projectIndex, project, searchFilter = '') {
-  const list = wrapper.querySelector('.fivem-resources-list');
-  const empty = wrapper.querySelector('.fivem-resources-empty');
-  const loading = wrapper.querySelector('.fivem-resources-loading');
-  const { resources } = getFivemResources(projectIndex);
-
-  loading.style.display = 'none';
-
-  // Filter resources by search
-  const filteredResources = searchFilter
-    ? resources.filter(r => r.name.toLowerCase().includes(searchFilter.toLowerCase()))
-    : resources;
-
-  if (filteredResources.length === 0) {
-    list.style.display = 'none';
-    empty.style.display = 'flex';
-    return;
-  }
-
-  list.style.display = '';
-  empty.style.display = 'none';
-
-  // Group by category
-  const grouped = {};
-  for (const resource of filteredResources) {
-    const cat = resource.category || 'root';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(resource);
-  }
-
-  // Sort categories
-  const sortedCategories = Object.keys(grouped).sort((a, b) => {
-    if (a === 'root') return -1;
-    if (b === 'root') return 1;
-    return a.localeCompare(b);
-  });
-
-  list.innerHTML = sortedCategories.map(category => {
-    const categoryResources = grouped[category];
-    return `
-      <div class="fivem-resource-category collapsed">
-        <div class="fivem-resource-category-header">
-          <svg class="category-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path d="M4.5 2.5l3.5 3.5-3.5 3.5"/></svg>
-          <span class="category-name">${escapeHtml(category === 'root' ? 'resources/' : category)}</span>
-          <span class="category-count">${categoryResources.length}</span>
-        </div>
-        <div class="fivem-resource-items">
-          ${categoryResources.map(resource => {
-            const shortcut = getResourceShortcut(projectIndex, resource.name);
-            return `
-            <div class="fivem-resource-item ${resource.ensured ? 'ensured' : ''}" data-name="${escapeHtml(resource.name)}" data-path="${escapeHtml(resource.path)}">
-              <div class="fivem-resource-info">
-                <span class="fivem-resource-name">${escapeHtml(resource.name)}</span>
-                <span class="fivem-resource-status ${resource.ensured ? 'active' : 'inactive'}">
-                  ${resource.ensured ? t('fivem.ensuredInCfg') : t('fivem.notEnsured')}
-                </span>
-              </div>
-              <div class="fivem-resource-actions">
-                <button class="fivem-resource-btn shortcut ${shortcut ? 'has-shortcut' : ''}" title="${shortcut ? shortcut + ' - ' + t('fivem.removeShortcut') : t('fivem.setShortcut')}" data-action="shortcut" data-resource="${escapeHtml(resource.name)}">
-                  ${shortcut ? `<span class="shortcut-key">${escapeHtml(shortcut)}</span>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h8M6 16h.01M18 16h.01"/></svg>`}
-                </button>
-                <button class="fivem-resource-btn ensure" title="${t('fivem.ensure')}" data-action="ensure" data-resource="${escapeHtml(resource.name)}">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                </button>
-                <button class="fivem-resource-btn restart" title="${t('fivem.restart')}" data-action="restart" data-resource="${escapeHtml(resource.name)}">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                </button>
-                <button class="fivem-resource-btn stop" title="${t('fivem.stop')}" data-action="stop" data-resource="${escapeHtml(resource.name)}">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="6" width="12" height="12"/></svg>
-                </button>
-                <button class="fivem-resource-btn folder" title="${t('fivem.openFolder')}" data-action="folder" data-path="${escapeHtml(resource.path)}">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </button>
-              </div>
-            </div>
-          `;}).join('')}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  // Add click handlers for resource actions
-  list.querySelectorAll('.fivem-resource-btn').forEach(btn => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const action = btn.dataset.action;
-      const resourceName = btn.dataset.resource;
-      const resourcePath = btn.dataset.path;
-
-      if (action === 'folder') {
-        api.dialog.openInExplorer(resourcePath);
-        return;
-      }
-
-      if (action === 'shortcut') {
-        const currentShortcut = getResourceShortcut(projectIndex, resourceName);
-        if (currentShortcut) {
-          // Remove shortcut
-          setResourceShortcut(projectIndex, resourceName, null);
-          renderFivemResourcesList(wrapper, projectIndex, project, wrapper.querySelector('.fivem-resources-search-input')?.value || '');
-        } else {
-          // Capture new shortcut
-          captureResourceShortcut(btn, projectIndex, resourceName, wrapper, project);
-        }
-        return;
-      }
-
-      let command = '';
-      if (action === 'ensure') {
-        command = `ensure ${resourceName}`;
-      } else if (action === 'restart') {
-        command = `restart ${resourceName}`;
-      } else if (action === 'stop') {
-        command = `stop ${resourceName}`;
-      }
-
-      if (command) {
-        btn.classList.add('executing');
-        try {
-          // Let main process check if server is running
-          const result = await api.fivem.resourceCommand({ projectIndex, command });
-          if (result.success) {
-            btn.classList.add('success');
-            setTimeout(() => {
-              btn.classList.remove('executing');
-              btn.classList.remove('success');
-            }, 500);
-          } else {
-            // Server not running or command failed
-            btn.classList.remove('executing');
-            btn.classList.add('error');
-            setTimeout(() => btn.classList.remove('error'), 500);
-          }
-        } catch (e) {
-          console.error('Resource command error:', e);
-          btn.classList.remove('executing');
-          btn.classList.add('error');
-          setTimeout(() => btn.classList.remove('error'), 500);
-        }
-      }
-    };
-  });
-
-  // Category collapse/expand
-  list.querySelectorAll('.fivem-resource-category-header').forEach(header => {
-    header.onclick = () => {
-      header.parentElement.classList.toggle('collapsed');
-    };
-  });
-}
-
-/**
- * Capture a keyboard shortcut for a resource
- */
-function captureResourceShortcut(btn, projectIndex, resourceName, wrapper, project) {
-  // Change button to capture mode
-  btn.innerHTML = `<span class="shortcut-capturing">${t('fivem.pressKey')}</span>`;
-  btn.classList.add('capturing');
-
-  const handleKeyDown = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Ignore modifier-only keys
-    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
-      return;
-    }
-
-    // Build shortcut string
-    let shortcut = '';
-    if (e.ctrlKey) shortcut += 'Ctrl+';
-    if (e.altKey) shortcut += 'Alt+';
-    if (e.shiftKey) shortcut += 'Shift+';
-
-    // Handle special keys
-    if (e.key === 'Escape') {
-      // Cancel capture
-      cleanup();
-      renderFivemResourcesList(wrapper, projectIndex, project, wrapper.querySelector('.fivem-resources-search-input')?.value || '');
-      return;
-    }
-
-    // Get key name
-    let keyName = e.key;
-    if (keyName === ' ') keyName = 'Space';
-    else if (keyName.length === 1) keyName = keyName.toUpperCase();
-
-    shortcut += keyName;
-
-    // Save shortcut
-    setResourceShortcut(projectIndex, resourceName, shortcut);
-    cleanup();
-    renderFivemResourcesList(wrapper, projectIndex, project, wrapper.querySelector('.fivem-resources-search-input')?.value || '');
-  };
-
-  const cleanup = () => {
-    document.removeEventListener('keydown', handleKeyDown, true);
-    btn.classList.remove('capturing');
-  };
-
-  document.addEventListener('keydown', handleKeyDown, true);
-}
-
-/**
- * Close FiveM console
- */
-function closeFivemConsole(id, projectIndex) {
+function closeTypeConsole(id, projectIndex, typeId) {
   const termData = getTerminal(id);
   const closedProjectPath = termData?.project?.path;
 
-  // Cleanup resources (ResizeObserver, terminal)
+  // Type-specific cleanup
+  const typeHandler = registry.get(typeId);
+  const config = typeHandler.getConsoleConfig(null, projectIndex);
+  if (config && config.onCleanup) {
+    const wrapper = document.querySelector(`.terminal-wrapper[data-id="${id}"]`);
+    if (wrapper) config.onCleanup(wrapper);
+  }
+
   cleanupTerminalResources(termData);
   removeTerminal(id);
-  fivemConsoleIds.delete(projectIndex);
+  typeConsoleIds.delete(`${typeId}-${projectIndex}`);
+
+  // Also clean legacy Maps
+  if (typeId === 'fivem') fivemConsoleIds.delete(projectIndex);
+  if (typeId === 'webapp') webappConsoleIds.delete(projectIndex);
+  if (typeId === 'api') apiConsoleIds.delete(projectIndex);
+
   document.querySelector(`.terminal-tab[data-id="${id}"]`)?.remove();
   document.querySelector(`.terminal-wrapper[data-id="${id}"]`)?.remove();
 
@@ -1901,220 +1523,6 @@ function closeFivemConsole(id, projectIndex) {
   }
 
   if (sameProjectTerminalId) {
-    // Switch to another terminal of the same project
-    setActiveTerminal(sameProjectTerminalId);
-    const selectedFilter = projectsState.get().selectedProjectFilter;
-    filterByProject(selectedFilter);
-  } else if (projectIndex !== null && projectIndex !== undefined) {
-    // No more terminals for this project - stay on project filter to show sessions panel
-    projectsState.setProp('selectedProjectFilter', projectIndex);
-    filterByProject(projectIndex);
-  } else {
-    const selectedFilter = projectsState.get().selectedProjectFilter;
-    filterByProject(selectedFilter);
-  }
-
-  if (callbacks.onRenderProjects) callbacks.onRenderProjects();
-}
-
-/**
- * Get FiveM console terminal for a project
- */
-function getFivemConsoleTerminal(projectIndex) {
-  const id = fivemConsoleIds.get(projectIndex);
-  if (id) {
-    const termData = getTerminal(id);
-    if (termData) {
-      return termData.terminal;
-    }
-  }
-  return null;
-}
-
-/**
- * Write data to FiveM console
- */
-function writeFivemConsole(projectIndex, data) {
-  const terminal = getFivemConsoleTerminal(projectIndex);
-  if (terminal) {
-    terminal.write(data);
-  }
-}
-
-// ── WebApp Console Functions ──
-
-/**
- * Create a WebApp console as a terminal tab
- */
-function createWebAppConsole(project, projectIndex, options = {}) {
-  const existingId = webappConsoleIds.get(projectIndex);
-  if (existingId && getTerminal(existingId)) {
-    setActiveTerminal(existingId);
-    return existingId;
-  }
-
-  const id = `webapp-${projectIndex}-${Date.now()}`;
-
-  const themeId = getSetting('terminalTheme') || 'claude';
-  const terminal = new Terminal({
-    theme: getTerminalTheme(themeId),
-    fontFamily: 'Consolas, "Courier New", monospace',
-    fontSize: 13,
-    cursorBlink: false,
-    disableStdin: false,
-    scrollback: 10000
-  });
-
-  const fitAddon = new FitAddon();
-  terminal.loadAddon(fitAddon);
-
-  const termData = {
-    terminal,
-    fitAddon,
-    project,
-    projectIndex,
-    name: `🌐 ${project.name}`,
-    status: 'ready',
-    type: 'webapp',
-    inputBuffer: '',
-    activeView: 'console'
-  };
-
-  addTerminal(id, termData);
-  webappConsoleIds.set(projectIndex, id);
-
-  startTracking(project.id);
-
-  // Create tab
-  const tabsContainer = document.getElementById('terminals-tabs');
-  const tab = document.createElement('div');
-  tab.className = 'terminal-tab webapp-tab status-ready';
-  tab.dataset.id = id;
-  tab.innerHTML = `
-    <span class="status-dot webapp-dot"></span>
-    <span class="tab-name">${escapeHtml(`🌐 ${project.name}`)}</span>
-    <button class="tab-close"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>`;
-  tabsContainer.appendChild(tab);
-
-  // Create wrapper with internal tabs
-  const container = document.getElementById('terminals-container');
-  const wrapper = document.createElement('div');
-  wrapper.className = 'terminal-wrapper webapp-wrapper';
-  wrapper.dataset.id = id;
-
-  // Get panel HTML from type handler
-  const typeHandler = registry.get(project.type);
-  const panels = typeHandler.getTerminalPanels({ project, projectIndex });
-  const panel = panels && panels.length > 0 ? panels[0] : null;
-  if (panel) {
-    wrapper.innerHTML = panel.getWrapperHtml();
-  }
-
-  container.appendChild(wrapper);
-
-  document.getElementById('empty-terminals').style.display = 'none';
-
-  // Open terminal in console view container
-  const consoleView = wrapper.querySelector('.webapp-console-view');
-  terminal.open(consoleView);
-  loadWebglAddon(terminal);
-  setTimeout(() => fitAddon.fit(), 100);
-  setActiveTerminal(id);
-
-  // Prevent double-paste issue
-  setupPasteHandler(consoleView, projectIndex, 'webapp-input');
-
-  // Write existing logs from WebAppState
-  try {
-    const { getWebAppServer } = require('../../../project-types/webapp/renderer/WebAppState');
-    const server = getWebAppServer(projectIndex);
-    if (server && server.logs && server.logs.length > 0) {
-      terminal.write(server.logs.join(''));
-    }
-  } catch (e) { /* WebApp module not available */ }
-
-  // Setup panel via type handler
-  if (panel && panel.setupPanel) {
-    const panelDeps = getTypePanelDeps(id, projectIndex);
-    panel.setupPanel(wrapper, id, projectIndex, project, panelDeps);
-  }
-
-  // Custom key handler
-  terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(terminal, projectIndex, 'webapp-input'));
-
-  // Handle input to WebApp console
-  terminal.onData(data => {
-    api.webapp.input({ projectIndex, data });
-  });
-
-  // Resize handling
-  const resizeObserver = new ResizeObserver(() => {
-    fitAddon.fit();
-    api.webapp.resize({
-      projectIndex,
-      cols: terminal.cols,
-      rows: terminal.rows
-    });
-  });
-  resizeObserver.observe(consoleView);
-
-  const storedTermData = getTerminal(id);
-  if (storedTermData) {
-    storedTermData.resizeObserver = resizeObserver;
-  }
-
-  // Send initial size
-  api.webapp.resize({
-    projectIndex,
-    cols: terminal.cols,
-    rows: terminal.rows
-  });
-
-  // Filter and render
-  const selectedFilter = projectsState.get().selectedProjectFilter;
-  filterByProject(selectedFilter);
-  if (callbacks.onRenderProjects) callbacks.onRenderProjects();
-
-  // Tab events
-  tab.onclick = (e) => { if (!e.target.closest('.tab-close') && !e.target.closest('.tab-name-input')) setActiveTerminal(id); };
-  tab.querySelector('.tab-name').ondblclick = (e) => { e.stopPropagation(); startRenameTab(id); };
-  tab.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeWebAppConsole(id, projectIndex); };
-
-  setupTabDragDrop(tab);
-
-  return id;
-}
-
-/**
- * Close WebApp console
- */
-function closeWebAppConsole(id, projectIndex) {
-  const termData = getTerminal(id);
-  const closedProjectPath = termData?.project?.path;
-
-  // Cleanup preview iframe and poll timers
-  const wrapper = document.querySelector(`.terminal-wrapper[data-id="${id}"]`);
-  if (wrapper) {
-    try { require('../../../project-types/webapp/renderer/WebAppTerminalPanel').cleanup(wrapper); } catch (e) {}
-  }
-
-  cleanupTerminalResources(termData);
-  removeTerminal(id);
-  webappConsoleIds.delete(projectIndex);
-  document.querySelector(`.terminal-tab[data-id="${id}"]`)?.remove();
-  wrapper?.remove();
-
-  let sameProjectTerminalId = null;
-  if (closedProjectPath) {
-    const terminals = terminalsState.get().terminals;
-    terminals.forEach((td, termId) => {
-      if (!sameProjectTerminalId && td.project?.path === closedProjectPath) {
-        sameProjectTerminalId = termId;
-      }
-    });
-  }
-
-  if (sameProjectTerminalId) {
     setActiveTerminal(sameProjectTerminalId);
     const selectedFilter = projectsState.get().selectedProjectFilter;
     filterByProject(selectedFilter);
@@ -2130,221 +1538,13 @@ function closeWebAppConsole(id, projectIndex) {
 }
 
 /**
- * Get WebApp console terminal for a project
+ * Get the xterm Terminal instance for a type console.
+ * @param {number} projectIndex
+ * @param {string} typeId
+ * @returns {Terminal|null}
  */
-function getWebAppConsoleTerminal(projectIndex) {
-  const id = webappConsoleIds.get(projectIndex);
-  if (id) {
-    const termData = getTerminal(id);
-    if (termData) {
-      return termData.terminal;
-    }
-  }
-  return null;
-}
-
-/**
- * Write data to WebApp console
- */
-function writeWebAppConsole(projectIndex, data) {
-  const terminal = getWebAppConsoleTerminal(projectIndex);
-  if (terminal) {
-    terminal.write(data);
-  }
-}
-
-// ── API Console Functions ──
-
-/**
- * Create an API console as a terminal tab
- */
-function createApiConsole(project, projectIndex) {
-  const existingId = apiConsoleIds.get(projectIndex);
-  if (existingId && getTerminal(existingId)) {
-    setActiveTerminal(existingId);
-    return existingId;
-  }
-
-  const id = `api-${projectIndex}-${Date.now()}`;
-
-  const themeId = getSetting('terminalTheme') || 'claude';
-  const terminal = new Terminal({
-    theme: getTerminalTheme(themeId),
-    fontFamily: 'Consolas, "Courier New", monospace',
-    fontSize: 13,
-    cursorBlink: false,
-    disableStdin: false,
-    scrollback: 10000
-  });
-
-  const fitAddon = new FitAddon();
-  terminal.loadAddon(fitAddon);
-
-  const termData = {
-    terminal,
-    fitAddon,
-    project,
-    projectIndex,
-    name: `⚡ ${project.name}`,
-    status: 'ready',
-    type: 'api',
-    inputBuffer: '',
-    activeView: 'console'
-  };
-
-  addTerminal(id, termData);
-  apiConsoleIds.set(projectIndex, id);
-
-  startTracking(project.id);
-
-  // Create tab
-  const tabsContainer = document.getElementById('terminals-tabs');
-  const tab = document.createElement('div');
-  tab.className = 'terminal-tab api-tab status-ready';
-  tab.dataset.id = id;
-  tab.innerHTML = `
-    <span class="status-dot api-dot"></span>
-    <span class="tab-name">${escapeHtml(`⚡ ${project.name}`)}</span>
-    <button class="tab-close"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>`;
-  tabsContainer.appendChild(tab);
-
-  // Create wrapper
-  const container = document.getElementById('terminals-container');
-  const wrapper = document.createElement('div');
-  wrapper.className = 'terminal-wrapper api-wrapper';
-  wrapper.dataset.id = id;
-
-  // Get panel HTML from type handler
-  const typeHandler = registry.get(project.type);
-  const panels = typeHandler.getTerminalPanels({ project, projectIndex });
-  const panel = panels && panels.length > 0 ? panels[0] : null;
-  if (panel) {
-    wrapper.innerHTML = panel.getWrapperHtml();
-  }
-
-  container.appendChild(wrapper);
-
-  document.getElementById('empty-terminals').style.display = 'none';
-
-  // Open terminal in console view container
-  const consoleView = wrapper.querySelector('.api-console-view');
-  terminal.open(consoleView);
-  loadWebglAddon(terminal);
-  setTimeout(() => fitAddon.fit(), 100);
-  setActiveTerminal(id);
-
-  // Prevent double-paste
-  setupPasteHandler(consoleView, projectIndex, 'api-input');
-
-  // Write existing logs from ApiState
-  try {
-    const { getApiServer } = require('../../../project-types/api/renderer/ApiState');
-    const server = getApiServer(projectIndex);
-    if (server && server.logs && server.logs.length > 0) {
-      terminal.write(server.logs.join(''));
-    }
-  } catch (e) { /* API module not available */ }
-
-  // Setup panel via type handler
-  if (panel && panel.setupPanel) {
-    const panelDeps = getTypePanelDeps(id, projectIndex);
-    panel.setupPanel(wrapper, id, projectIndex, project, panelDeps);
-  }
-
-  // Custom key handler
-  terminal.attachCustomKeyEventHandler(createTerminalKeyHandler(terminal, projectIndex, 'api-input'));
-
-  // Handle input to API console
-  terminal.onData(data => {
-    api.api.input({ projectIndex, data });
-  });
-
-  // Resize handling
-  const resizeObserver = new ResizeObserver(() => {
-    fitAddon.fit();
-    api.api.resize({
-      projectIndex,
-      cols: terminal.cols,
-      rows: terminal.rows
-    });
-  });
-  resizeObserver.observe(consoleView);
-
-  const storedTermData = getTerminal(id);
-  if (storedTermData) {
-    storedTermData.resizeObserver = resizeObserver;
-  }
-
-  // Send initial size
-  api.api.resize({
-    projectIndex,
-    cols: terminal.cols,
-    rows: terminal.rows
-  });
-
-  // Filter and render
-  const selectedFilter = projectsState.get().selectedProjectFilter;
-  filterByProject(selectedFilter);
-  if (callbacks.onRenderProjects) callbacks.onRenderProjects();
-
-  // Tab events
-  tab.onclick = (e) => { if (!e.target.closest('.tab-close') && !e.target.closest('.tab-name-input')) setActiveTerminal(id); };
-  tab.querySelector('.tab-name').ondblclick = (e) => { e.stopPropagation(); startRenameTab(id); };
-  tab.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeApiConsole(id, projectIndex); };
-
-  setupTabDragDrop(tab);
-
-  return id;
-}
-
-/**
- * Close API console
- */
-function closeApiConsole(id, projectIndex) {
-  const termData = getTerminal(id);
-  const closedProjectPath = termData?.project?.path;
-
-  const wrapper = document.querySelector(`.terminal-wrapper[data-id="${id}"]`);
-  if (wrapper) {
-    try { require('../../../project-types/api/renderer/ApiTerminalPanel').cleanup(wrapper); } catch (e) {}
-  }
-
-  cleanupTerminalResources(termData);
-  removeTerminal(id);
-  apiConsoleIds.delete(projectIndex);
-  document.querySelector(`.terminal-tab[data-id="${id}"]`)?.remove();
-  wrapper?.remove();
-
-  let sameProjectTerminalId = null;
-  if (closedProjectPath) {
-    const terminals = terminalsState.get().terminals;
-    terminals.forEach((td, termId) => {
-      if (!sameProjectTerminalId && td.project?.path === closedProjectPath) {
-        sameProjectTerminalId = termId;
-      }
-    });
-  }
-
-  if (sameProjectTerminalId) {
-    setActiveTerminal(sameProjectTerminalId);
-    const selectedFilter = projectsState.get().selectedProjectFilter;
-    filterByProject(selectedFilter);
-  } else if (projectIndex !== null && projectIndex !== undefined) {
-    projectsState.setProp('selectedProjectFilter', projectIndex);
-    filterByProject(projectIndex);
-  } else {
-    const selectedFilter = projectsState.get().selectedProjectFilter;
-    filterByProject(selectedFilter);
-  }
-
-  if (callbacks.onRenderProjects) callbacks.onRenderProjects();
-}
-
-/**
- * Get API console terminal for a project
- */
-function getApiConsoleTerminal(projectIndex) {
-  const id = apiConsoleIds.get(projectIndex);
+function getTypeConsoleTerminal(projectIndex, typeId) {
+  const id = typeConsoleIds.get(`${typeId}-${projectIndex}`);
   if (id) {
     const termData = getTerminal(id);
     if (termData) return termData.terminal;
@@ -2353,11 +1553,70 @@ function getApiConsoleTerminal(projectIndex) {
 }
 
 /**
- * Write data to API console
+ * Write data to a type console.
+ * @param {number} projectIndex
+ * @param {string} typeId
+ * @param {string} data
  */
-function writeApiConsole(projectIndex, data) {
-  const terminal = getApiConsoleTerminal(projectIndex);
+function writeTypeConsole(projectIndex, typeId, data) {
+  const terminal = getTypeConsoleTerminal(projectIndex, typeId);
   if (terminal) terminal.write(data);
+}
+
+/**
+ * Handle a new console error for a project (delegates to type handler).
+ * @param {number} projectIndex
+ * @param {Object} error
+ */
+function handleTypeConsoleError(projectIndex, error) {
+  const projects = projectsState.get().projects;
+  const project = projects[projectIndex];
+  if (!project) return;
+
+  const typeHandler = registry.get(project.type);
+  typeHandler.onConsoleError(projectIndex, error, getTmApi());
+}
+
+/**
+ * Show type-specific error overlay (delegates to type handler).
+ * @param {number} projectIndex
+ * @param {Object} error
+ */
+function showTypeErrorOverlay(projectIndex, error) {
+  const projects = projectsState.get().projects;
+  const project = projects[projectIndex];
+  if (!project) return;
+
+  const typeHandler = registry.get(project.type);
+  typeHandler.showErrorOverlay(projectIndex, error, getTmApi());
+}
+
+// ── Legacy wrappers (thin redirects to generic API) ──
+function createFivemConsole(project, projectIndex) { return createTypeConsole(project, projectIndex); }
+function createWebAppConsole(project, projectIndex) { return createTypeConsole(project, projectIndex); }
+function createApiConsole(project, projectIndex) { return createTypeConsole(project, projectIndex); }
+
+function closeFivemConsole(id, projectIndex) { return closeTypeConsole(id, projectIndex, 'fivem'); }
+function closeWebAppConsole(id, projectIndex) { return closeTypeConsole(id, projectIndex, 'webapp'); }
+function closeApiConsole(id, projectIndex) { return closeTypeConsole(id, projectIndex, 'api'); }
+
+function getFivemConsoleTerminal(projectIndex) { return getTypeConsoleTerminal(projectIndex, 'fivem'); }
+function getWebAppConsoleTerminal(projectIndex) { return getTypeConsoleTerminal(projectIndex, 'webapp'); }
+function getApiConsoleTerminal(projectIndex) { return getTypeConsoleTerminal(projectIndex, 'api'); }
+
+function writeFivemConsole(projectIndex, data) { return writeTypeConsole(projectIndex, 'fivem', data); }
+function writeWebAppConsole(projectIndex, data) { return writeTypeConsole(projectIndex, 'webapp', data); }
+function writeApiConsole(projectIndex, data) { return writeTypeConsole(projectIndex, 'api', data); }
+
+function addFivemErrorToConsole(projectIndex, error) { return handleTypeConsoleError(projectIndex, error); }
+function showFivemErrorOverlay(projectIndex, error) { return showTypeErrorOverlay(projectIndex, error); }
+function hideErrorOverlay(projectIndex) {
+  const projects = projectsState.get().projects;
+  const project = projects[projectIndex];
+  if (project) {
+    const typeHandler = registry.get(project.type);
+    typeHandler.hideErrorOverlay(projectIndex);
+  }
 }
 
 /**
@@ -2706,23 +1965,18 @@ function buildSessionCardHtml(s, index) {
   const pinTitle = s.pinned ? (t('sessions.unpin') || 'Unpin') : (t('sessions.pin') || 'Pin');
 
   return `<div class="session-card${freshClass}${pinnedClass}${animClass}" data-sid="${s.sessionId}" style="--ci:${index < MAX_ANIMATED ? index : 0}">
-<div class="session-card-accent"></div>
+<div class="session-card-icon${skillClass}"><svg width="16" height="16"><use href="#${iconId}"/></svg></div>
 <div class="session-card-body">
-<div class="session-card-top">
-<div class="session-card-icon${skillClass}"><svg><use href="#${iconId}"/></svg></div>
-<div class="session-card-content">
 <span class="session-card-title${titleSkillClass}">${escapeHtml(truncateText(s.displayTitle, 80))}</span>
 ${s.displaySubtitle ? `<span class="session-card-subtitle">${escapeHtml(truncateText(s.displaySubtitle, 120))}</span>` : ''}
 </div>
-<button class="session-card-pin" data-pin-sid="${s.sessionId}" title="${pinTitle}"><svg><use href="#s-pin"/></svg></button>
-<div class="session-card-arrow"><svg><use href="#s-arrow"/></svg></div>
-</div>
 <div class="session-card-meta">
-<span class="session-meta-item"><svg><use href="#s-msg"/></svg>${s.messageCount}</span>
-<span class="session-meta-item"><svg><use href="#s-clock"/></svg>${formatRelativeTime(s.modified)}</span>
-${s.gitBranch ? `<span class="session-meta-branch"><svg><use href="#s-branch"/></svg>${escapeHtml(s.gitBranch)}</span>` : ''}
+<span class="session-meta-item"><svg width="11" height="11"><use href="#s-msg"/></svg>${s.messageCount}</span>
+<span class="session-meta-item"><svg width="11" height="11"><use href="#s-clock"/></svg>${formatRelativeTime(s.modified)}</span>
+${s.gitBranch ? `<span class="session-meta-branch"><svg width="10" height="10"><use href="#s-branch"/></svg>${escapeHtml(s.gitBranch)}</span>` : ''}
 </div>
-</div>
+<button class="session-card-pin" data-pin-sid="${s.sessionId}" title="${pinTitle}"><svg width="13" height="13"><use href="#s-pin"/></svg></button>
+<div class="session-card-arrow"><svg width="12" height="12"><use href="#s-arrow"/></svg></div>
 </div>`;
 }
 
@@ -2738,12 +1992,12 @@ async function renderSessionsPanel(project, emptyState) {
         <div class="sessions-empty-state">
           <div class="sessions-empty-icon">
             ${SESSION_SVG_DEFS}
-            <svg><use href="#s-chat"/></svg>
+            <svg width="28" height="28"><use href="#s-chat"/></svg>
           </div>
           <p class="sessions-empty-title">${t('terminals.noTerminals')}</p>
           <p class="sessions-empty-hint">${t('terminals.createHint')}</p>
           <button class="sessions-empty-btn" id="sessions-empty-create">
-            <svg><use href="#s-plus"/></svg>
+            <svg width="15" height="15"><use href="#s-plus"/></svg>
             ${t('terminals.newConversation') || (getCurrentLanguage() === 'fr' ? 'Nouvelle conversation' : 'New conversation')}
           </button>
         </div>`;
@@ -2795,11 +2049,11 @@ async function renderSessionsPanel(project, emptyState) {
           </div>
           <div class="sessions-header-right">
             <div class="sessions-search-wrapper">
-              <svg class="sessions-search-icon"><use href="#s-search"/></svg>
+              <svg class="sessions-search-icon" width="13" height="13"><use href="#s-search"/></svg>
               <input type="text" class="sessions-search" placeholder="${t('common.search')}..." />
             </div>
             <button class="sessions-new-btn" title="${t('terminals.newConversation') || (getCurrentLanguage() === 'fr' ? 'Nouvelle conversation' : 'New conversation')}">
-              <svg><use href="#s-plus"/></svg>
+              <svg width="14" height="14"><use href="#s-plus"/></svg>
               ${t('common.new')}
             </button>
           </div>
@@ -3106,110 +2360,6 @@ async function resumeSession(project, sessionId, options = {}) {
   setupTabDragDrop(tab);
 
   return id;
-}
-
-/**
- * Show FiveM error overlay with debug button
- * @param {number} projectIndex
- * @param {Object} error - Error object { timestamp, message, context }
- */
-function showFivemErrorOverlay(projectIndex, error) {
-  const consoleId = fivemConsoleIds.get(projectIndex);
-  if (!consoleId) return;
-
-  const wrapper = document.querySelector(`.terminal-wrapper[data-id="${consoleId}"]`);
-  if (!wrapper) return;
-
-  // Remove existing overlay if any
-  const existing = wrapper.querySelector('.fivem-error-overlay');
-  if (existing) existing.remove();
-
-  // Create overlay
-  const overlay = document.createElement('div');
-  overlay.className = 'fivem-error-overlay';
-  overlay.innerHTML = `
-    <div class="fivem-error-content">
-      <span class="fivem-error-icon">⚠️</span>
-      <span class="fivem-error-text">${t('fivem.errorDetected')}</span>
-      <button class="fivem-debug-btn" title="${t('fivem.debugWithClaude')}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        ${t('fivem.debugWithClaude')}
-      </button>
-      <button class="fivem-error-dismiss" title="${t('common.close')}">
-        <svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-      </button>
-    </div>
-  `;
-
-  wrapper.appendChild(overlay);
-  errorOverlays.set(projectIndex, overlay);
-
-  // Get project info
-  const projects = projectsState.get().projects;
-  const project = projects[projectIndex];
-
-  // Debug button click - open Claude terminal with error
-  overlay.querySelector('.fivem-debug-btn').onclick = async () => {
-    if (!project) return;
-
-    // Create the debug prompt
-    const prompt = buildDebugPrompt(error);
-
-    // Create a new Claude terminal
-    const terminalId = await createTerminalWithPrompt(project, prompt);
-
-    // Hide the overlay after opening
-    hideErrorOverlay(projectIndex);
-  };
-
-  // Dismiss button
-  overlay.querySelector('.fivem-error-dismiss').onclick = () => {
-    hideErrorOverlay(projectIndex);
-  };
-
-  // Auto-hide after 30 seconds
-  setTimeout(() => {
-    hideErrorOverlay(projectIndex);
-  }, 30000);
-}
-
-/**
- * Build debug prompt from error
- * @param {Object} error
- * @returns {string}
- */
-function buildDebugPrompt(error) {
-  let prompt = t('fivem.debugPrompt');
-  prompt += '```\n';
-  prompt += error.message;
-  prompt += '\n```\n';
-
-  if (error.context && error.context !== error.message) {
-    prompt += t('fivem.debugContext');
-    prompt += '```\n';
-    prompt += error.context;
-    prompt += '\n```';
-  }
-
-  return prompt;
-}
-
-/**
- * Hide error overlay for a project
- * @param {number} projectIndex
- */
-function hideErrorOverlay(projectIndex) {
-  const overlay = errorOverlays.get(projectIndex);
-  if (overlay) {
-    overlay.classList.add('hiding');
-    setTimeout(() => {
-      overlay.remove();
-      errorOverlays.delete(projectIndex);
-    }, 300);
-  }
-  dismissLastError(projectIndex);
 }
 
 /**
@@ -3907,21 +3057,25 @@ module.exports = {
   focusPrevTerminal,
   // File tab functions
   openFileTab,
-  // FiveM console functions
+  // Generic type console API
+  createTypeConsole,
+  closeTypeConsole,
+  getTypeConsoleTerminal,
+  writeTypeConsole,
+  handleTypeConsoleError,
+  showTypeErrorOverlay,
+  // Legacy wrappers (backward compat)
   createFivemConsole,
   closeFivemConsole,
   getFivemConsoleTerminal,
   writeFivemConsole,
-  // FiveM error handling
   addFivemErrorToConsole,
   showFivemErrorOverlay,
   hideErrorOverlay,
-  // WebApp console functions
   createWebAppConsole,
   closeWebAppConsole,
   getWebAppConsoleTerminal,
   writeWebAppConsole,
-  // API console functions
   createApiConsole,
   closeApiConsole,
   getApiConsoleTerminal,

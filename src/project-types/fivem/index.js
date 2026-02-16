@@ -71,6 +71,27 @@ module.exports = createType({
     return FivemDashboard.getDashboardStats(ctx);
   },
 
+  // Console management (type-specific consoles)
+  getConsoleConfig: (project, projectIndex) => {
+    const FivemConsoleManager = require('./renderer/FivemConsoleManager');
+    return FivemConsoleManager.getConsoleConfig(project, projectIndex);
+  },
+
+  showErrorOverlay: (projectIndex, error, tmApi) => {
+    const FivemConsoleManager = require('./renderer/FivemConsoleManager');
+    FivemConsoleManager.showErrorOverlay(projectIndex, error, tmApi);
+  },
+
+  hideErrorOverlay: (projectIndex) => {
+    const FivemConsoleManager = require('./renderer/FivemConsoleManager');
+    FivemConsoleManager.hideErrorOverlay(projectIndex);
+  },
+
+  onConsoleError: (projectIndex, error, tmApi) => {
+    const FivemConsoleManager = require('./renderer/FivemConsoleManager');
+    FivemConsoleManager.onConsoleError(projectIndex, error, tmApi);
+  },
+
   // TerminalManager
   getTerminalPanels: (ctx) => {
     // Return panel config for FiveM console

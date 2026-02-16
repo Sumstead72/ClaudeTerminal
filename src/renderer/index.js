@@ -81,7 +81,7 @@ async function initialize() {
     // onError callback
     (projectIndex, error) => {
       // FiveM error detected - show debug button
-      ui.TerminalManager.showFivemErrorOverlay(projectIndex, error);
+      ui.TerminalManager.showTypeErrorOverlay(projectIndex, error);
     }
   );
 
