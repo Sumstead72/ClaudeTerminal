@@ -1622,7 +1622,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
       const activeId = terminalsState.get().activeTerminal;
       if (activeId) {
         const termData = terminalsState.get().terminals.get(activeId);
-        if (termData) termData.fitAddon.fit();
+        if (termData?.fitAddon) termData.fitAddon.fit();
       }
     }
   };

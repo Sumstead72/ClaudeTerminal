@@ -3786,6 +3786,18 @@ async function switchTerminalMode(id) {
       skipPermissions: getSetting('skipPermissions') || false
     });
 
+    // Handle creation failure
+    if (result && typeof result === 'object' && result.success === false) {
+      console.error('Failed to create terminal on mode switch:', result.error);
+      terminal.dispose();
+      wrapper.innerHTML = `<div class="terminal-error-state"><p>${escapeHtml(result.error || t('terminals.createError'))}</p></div>`;
+      updateTerminal(id, { mode: 'terminal', chatView: null, terminal: null, fitAddon: null, status: 'error' });
+      if (callbacks.onNotification) {
+        callbacks.onNotification(`❌ ${t('common.error')}`, result.error || t('terminals.createError'), null);
+      }
+      return;
+    }
+
     const ptyId = (result && typeof result === 'object') ? result.id : result;
 
     terminal.open(wrapper);
