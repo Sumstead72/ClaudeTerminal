@@ -381,7 +381,7 @@
     },
     "advanced": "Advanced",
     "enable1MContext": "1M Token Context",
-    "enable1MContextDesc": "Enable 1 million token context window for Opus and Sonnet (beta)"
+    "enable1MContextDesc": "Enable 1 million token context window for Opus and Sonnet (API only, beta)"
   },
   "ui": {
     "notifications": "Notifications",
