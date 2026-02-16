@@ -4,7 +4,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/github/downloads/Sterll/claude-terminal/total?color=d97706&label=downloads" alt="Downloads" />
-  <img src="https://img.shields.io/badge/version-0.9.2-orange" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.9.3-orange" alt="Version" />
   <img src="https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-blue" alt="Platform" />
   <img src="https://img.shields.io/badge/license-GPL--3.0-green" alt="License" />
   <img src="https://img.shields.io/badge/electron-28-purple" alt="Electron" />
@@ -37,6 +37,10 @@
 - **Image attachments**: paste, drag-drop, or pick PNG/JPEG/GIF/WebP images (up to 20MB)
 - **Slash commands**: auto-completing commands (/compact, /clear, /help, custom skills)
 - **Cost tracking**: model name, token count, and USD cost in the status bar
+- **1M context window**: extended context for larger codebases (API mode only)
+- **Pin conversations**: keep important sessions at the top of the list
+- **Fork sessions**: branch from any message to explore alternative paths
+- Type @project to attach README.md and file tree from any project as context
 - Interrupt streaming mid-turn, auto-generated tab names via haiku model
 
 ### Terminals
