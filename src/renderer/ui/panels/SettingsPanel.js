@@ -813,15 +813,16 @@ async function renderSettingsTab(initialTab = 'general') {
   const customColorInput = document.getElementById('custom-color-input');
   const customSwatch = container.querySelector('.color-swatch-custom');
   if (customColorInput && customSwatch) {
-    let customColorDebounce = null;
+    // Live preview while picking (no save)
     customColorInput.oninput = (e) => {
       const color = e.target.value;
       customSwatch.style.background = color;
       container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
       customSwatch.classList.add('selected');
-      clearTimeout(customColorDebounce);
-      customColorDebounce = setTimeout(() => saveSettingsHandler(), 100);
+      ctx.applyAccentColor(color);
     };
+    // Save only when picker closes
+    customColorInput.onchange = () => saveSettingsHandler();
     customSwatch.onclick = (e) => {
       if (e.target === customColorInput) return;
       customColorInput.click();
