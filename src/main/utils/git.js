@@ -1065,6 +1065,8 @@ function gitStashSave(projectPath, message) {
 }
 
 module.exports = {
+  parseGitStatus,
+  parseDiffNumstat,
   execGit,
   getGitInfo,
   getGitInfoFull,
