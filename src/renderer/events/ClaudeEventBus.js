@@ -15,7 +15,8 @@ const EVENT_TYPES = {
   CLAUDE_PERMISSION: 'claude:permission',
   NOTIFICATION: 'notification',
   SUBAGENT_START: 'subagent:start',
-  SUBAGENT_STOP: 'subagent:stop'
+  SUBAGENT_STOP: 'subagent:stop',
+  COMPACTING: 'claude:compacting'
 };
 
 class ClaudeEventBus {

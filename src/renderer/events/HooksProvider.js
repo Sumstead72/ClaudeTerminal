@@ -163,8 +163,11 @@ function handleHookEvent(raw) {
       eventBus.emit(EVENT_TYPES.CLAUDE_DONE, { message: stdin.message || null }, meta);
       break;
 
-    // Ignored events
     case 'PreCompact':
+      eventBus.emit(EVENT_TYPES.COMPACTING, {}, meta);
+      break;
+
+    // Ignored events
     case 'Setup':
     case 'TeammateIdle':
       break;

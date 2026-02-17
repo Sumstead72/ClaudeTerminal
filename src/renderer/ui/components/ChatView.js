@@ -1896,6 +1896,24 @@ function createChatView(wrapperEl, project, options = {}) {
     if (indicator) indicator.remove();
   }
 
+  function appendCompactingIndicator() {
+    removeCompactingIndicator();
+    removeThinkingIndicator();
+    const el = document.createElement('div');
+    el.className = 'chat-compacting-indicator';
+    el.innerHTML = `
+      <span class="chat-compacting-icon">&#9879;</span>
+      <span class="chat-compacting-label">${escapeHtml(t('chat.compacting') || 'Compacting conversation...')}</span>
+    `;
+    messagesEl.appendChild(el);
+    scrollToBottom();
+  }
+
+  function removeCompactingIndicator() {
+    const indicator = messagesEl.querySelector('.chat-compacting-indicator');
+    if (indicator) indicator.remove();
+  }
+
   function startStreamBlock() {
     removeThinkingIndicator();
     const el = document.createElement('div');
@@ -2681,7 +2699,12 @@ function createChatView(wrapperEl, project, options = {}) {
         if (message.slash_commands && Array.isArray(message.slash_commands)) {
           slashCommands = message.slash_commands;
         }
+      } else if (message.subtype === 'status' && message.status === 'compacting') {
+        removeThinkingIndicator();
+        appendCompactingIndicator();
+        setStatus('thinking', t('chat.compacting') || 'Compacting...');
       } else if (message.subtype === 'compact_boundary') {
+        removeCompactingIndicator();
         removeThinkingIndicator();
         const preTokens = message.compact_metadata?.pre_tokens;
         const notice = preTokens

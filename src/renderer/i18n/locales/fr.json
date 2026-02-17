@@ -842,6 +842,7 @@
     "todoAllDone": "Terminé",
     "subagentLaunching": "Lancement de l'agent...",
     "subagentRunning": "Agent en cours...",
+    "compacting": "Compaction de la conversation...",
     "compacted": "Conversation compactée ({tokens} tokens avant)",
     "compactedSimple": "Conversation compactée",
     "slashCompact": "Compacter l'historique",

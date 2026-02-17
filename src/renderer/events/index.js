@@ -258,6 +258,16 @@ function wireTerminalStatusConsumer() {
         const TerminalManager = require('../ui/components/TerminalManager');
         TerminalManager.updateTerminalStatus(terminalId, 'ready');
       } catch (err) { /* TerminalManager not ready */ }
+    }),
+
+    // PreCompact → show compacting notification for terminal-mode projects
+    eventBus.on(EVENT_TYPES.COMPACTING, (e) => {
+      if (e.source !== 'hooks' || !e.projectId) return;
+      const projectName = resolveProjectName(e.projectId);
+      if (notificationFn) {
+        const { t } = require('../i18n');
+        notificationFn('info', projectName || 'Claude Terminal', t('chat.compacting') || 'Compacting conversation...', resolveTerminalId(e.projectId));
+      }
     })
   );
 }
