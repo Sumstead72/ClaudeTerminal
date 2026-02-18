@@ -1425,13 +1425,17 @@
 /* Worktree badge in project list */
 .project-worktree-badge {
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent);
   background: var(--accent-dim);
-  padding: 1px 4px;
+  padding: 1px 5px;
   border-radius: 3px;
   margin-left: 4px;
-  letter-spacing: 0.5px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Merge conflict banner */
