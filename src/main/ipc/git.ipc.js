@@ -169,7 +169,8 @@ function registerGitHandlers() {
     }
   });
 
-  // Generate commit message from file statuses and diff async (event, { projectPath, files, useAi }) => {
+  // Generate commit message from file statuses and diff
+  ipcMain.handle('git-generate-commit-message', async (event, { projectPath, files, useAi }) => {
     try {
       const path = require('path');
       const fs = require('fs');

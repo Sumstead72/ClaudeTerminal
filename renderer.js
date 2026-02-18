@@ -359,7 +359,7 @@ function showToast({ type = 'info', title, message, duration = 5000 }) {
       <div class="toast-title">${escapeHtml(title)}</div>
       ${formattedMessage ? `<div class="toast-message">${formattedMessage}</div>` : ''}
     </div>
-    <button class="toast-close" aria-label="Fermer">
+    <button class="toast-close" aria-label="${t('common.close')}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   `;
@@ -411,11 +411,11 @@ function showGitToast({ success, title, message, details = [], duration = 5000 }
 function parseGitPullOutput(output) {
   const details = [];
 
-  if (!output) return { message: 'Déjà à jour', details };
+  if (!output) return { message: t('git.alreadyUpToDate'), details };
 
   // Already up to date
   if (output.includes('Already up to date') || output.includes('Déjà à jour')) {
-    return { message: 'Déjà à jour', details: [{ icon: '✓', text: 'Aucune modification' }] };
+    return { message: t('git.alreadyUpToDate'), details: [{ icon: '✓', text: t('git.noChangesFound') }] };
   }
 
   // Fast-forward merge
@@ -425,13 +425,13 @@ function parseGitPullOutput(output) {
   const commits = output.match(/(\d+) commits?/);
 
   if (filesChanged) {
-    details.push({ icon: '📄', text: `${filesChanged[1]} fichier${filesChanged[1] > 1 ? 's' : ''} modifié${filesChanged[1] > 1 ? 's' : ''}` });
+    details.push({ icon: '📄', text: t('git.filesModified', { count: filesChanged[1] }) });
   }
   if (insertions) {
-    details.push({ icon: '+', text: `${insertions[1]} insertion${insertions[1] > 1 ? 's' : ''}` });
+    details.push({ icon: '+', text: t('git.insertionsCount', { count: insertions[1] }) });
   }
   if (deletions) {
-    details.push({ icon: '-', text: `${deletions[1]} suppression${deletions[1] > 1 ? 's' : ''}` });
+    details.push({ icon: '-', text: t('git.deletionsCount', { count: deletions[1] }) });
   }
 
   return { message: '', details };
@@ -440,11 +440,11 @@ function parseGitPullOutput(output) {
 function parseGitPushOutput(output) {
   const details = [];
 
-  if (!output) return { message: 'Modifications envoyées', details };
+  if (!output) return { message: t('git.changesSent'), details };
 
   // Everything up-to-date
   if (output.includes('Everything up-to-date')) {
-    return { message: 'Déjà synchronisé', details: [{ icon: '✓', text: 'Aucune modification à envoyer' }] };
+    return { message: t('git.alreadySynced'), details: [{ icon: '✓', text: t('git.noChangesToSend') }] };
   }
 
   // Extract branch info
@@ -453,7 +453,7 @@ function parseGitPushOutput(output) {
     details.push({ icon: '↑', text: `${branchMatch[3]} → ${branchMatch[4]}` });
   }
 
-  return { message: 'Modifications envoyées', details };
+  return { message: t('git.changesSent'), details };
 }
 
 // ========== GIT OPERATIONS ==========
@@ -517,8 +517,8 @@ async function gitPull(projectId) {
 
       showGitToast({
         success: false,
-        title: 'Conflits de merge',
-        message: `${result.conflicts?.length || 0} fichier(s) en conflit — Résolvez les conflits ou annulez le merge depuis le dashboard`,
+        title: t('git.mergeConflicts'),
+        message: t('git.conflictResolveHint', { count: result.conflicts?.length || 0 }),
         duration: 8000
       });
 
@@ -534,7 +534,7 @@ async function gitPull(projectId) {
       const parsed = parseGitPullOutput(result.output);
       showGitToast({
         success: true,
-        title: 'Pull réussi',
+        title: t('git.pullSuccessful'),
         message: parsed.message,
         details: parsed.details,
         duration: 4000
@@ -545,8 +545,8 @@ async function gitPull(projectId) {
     } else {
       showGitToast({
         success: false,
-        title: 'Erreur lors du pull',
-        message: result.error || 'Une erreur est survenue',
+        title: t('git.pullError'),
+        message: result.error || t('git.errorOccurred'),
         duration: 6000
       });
     }
@@ -555,8 +555,8 @@ async function gitPull(projectId) {
     ProjectList.render();
     showGitToast({
       success: false,
-      title: 'Erreur lors du pull',
-      message: e.message || 'Une erreur est survenue',
+      title: t('git.pullError'),
+      message: e.message || t('git.errorOccurred'),
       duration: 6000
     });
   }
@@ -576,7 +576,7 @@ async function gitPush(projectId) {
       const parsed = parseGitPushOutput(result.output);
       showGitToast({
         success: true,
-        title: 'Push réussi',
+        title: t('git.pushSuccessful'),
         message: parsed.message,
         details: parsed.details,
         duration: 4000
@@ -587,8 +587,8 @@ async function gitPush(projectId) {
     } else {
       showGitToast({
         success: false,
-        title: 'Erreur lors du push',
-        message: result.error || 'Une erreur est survenue',
+        title: t('git.pushError'),
+        message: result.error || t('git.errorOccurred'),
         duration: 6000
       });
     }
@@ -597,8 +597,8 @@ async function gitPush(projectId) {
     ProjectList.render();
     showGitToast({
       success: false,
-      title: 'Erreur lors du push',
-      message: e.message || 'Une erreur est survenue',
+      title: t('git.pushError'),
+      message: e.message || t('git.errorOccurred'),
       duration: 6000
     });
   }
@@ -623,8 +623,8 @@ async function gitMergeAbort(projectId) {
 
       showGitToast({
         success: true,
-        title: 'Merge annulé',
-        message: 'Le merge a été annulé avec succès',
+        title: t('git.mergeAborted'),
+        message: t('git.mergeAbortedSuccess'),
         duration: 4000
       });
 
@@ -633,16 +633,16 @@ async function gitMergeAbort(projectId) {
     } else {
       showGitToast({
         success: false,
-        title: 'Erreur lors de l\'annulation',
-        message: result.error || 'Une erreur est survenue',
+        title: t('git.abortError'),
+        message: result.error || t('git.errorOccurred'),
         duration: 6000
       });
     }
   } catch (e) {
     showGitToast({
       success: false,
-      title: 'Erreur lors de l\'annulation',
-      message: e.message || 'Une erreur est survenue',
+      title: t('git.abortError'),
+      message: e.message || t('git.errorOccurred'),
       duration: 6000
     });
   }
@@ -961,7 +961,7 @@ function _preprocessModalSessions(sessions) {
     if (summaryResult.text) { displayTitle = summaryResult.text; displaySubtitle = promptResult.text; }
     else if (promptResult.text) { displayTitle = promptResult.text; }
     else if (skillName) { displayTitle = '/' + skillName; isSkill = true; }
-    else { displayTitle = getCurrentLanguage() === 'fr' ? 'Conversation sans titre' : 'Untitled conversation'; }
+    else { displayTitle = t('ui.untitledConversation'); }
     const hoursAgo = (now - new Date(session.modified).getTime()) / 3600000;
     const freshness = hoursAgo < 1 ? 'hot' : hoursAgo < 24 ? 'warm' : '';
     const searchText = (displayTitle + ' ' + displaySubtitle + ' ' + (session.gitBranch || '')).toLowerCase();
@@ -1337,32 +1337,32 @@ function handleWindowClose() {
 function showCloseDialog() {
   const content = `
     <div class="close-dialog-content">
-      <p>Que souhaitez-vous faire ?</p>
+      <p>${t('ui.whatToDo')}</p>
       <div class="close-dialog-options">
         <button class="close-option-btn" id="close-minimize">
           <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
             <path d="M19 13H5v-2h14v2z"/>
           </svg>
-          <span>Minimiser dans le tray</span>
-          <small>L'application reste accessible depuis la barre des tâches</small>
+          <span>${t('ui.minimizeToTray')}</span>
+          <small>${t('ui.minimizeToTrayDesc')}</small>
         </button>
         <button class="close-option-btn close-option-quit" id="close-quit">
           <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
           </svg>
-          <span>Quitter complètement</span>
-          <small>Ferme l'application et tous les terminaux</small>
+          <span>${t('ui.quitCompletely')}</span>
+          <small>${t('ui.quitCompletelyDesc')}</small>
         </button>
       </div>
       <label class="close-dialog-remember">
         <input type="checkbox" id="close-remember">
         <span class="close-dialog-toggle"></span>
-        <span class="close-dialog-remember-text">Se souvenir de mon choix</span>
+        <span class="close-dialog-remember-text">${t('ui.rememberChoice')}</span>
       </label>
     </div>
   `;
 
-  showModal('Fermer l\'application', content);
+  showModal(t('ui.closeApp'), content);
 
   // Add event handlers
   document.getElementById('close-minimize').onclick = () => {
@@ -1489,27 +1489,27 @@ function setupContextMenuHandlers() {
 function showContextMenuForFolder(x, y, folderId) {
   const menu = document.getElementById('context-menu');
   menu.innerHTML = `
-    <div class="context-menu-item" data-action="new-subfolder">Nouveau sous-dossier</div>
-    <div class="context-menu-item" data-action="rename">Renommer</div>
+    <div class="context-menu-item" data-action="new-subfolder">${t('projects.newSubfolder')}</div>
+    <div class="context-menu-item" data-action="rename">${t('common.rename')}</div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item danger" data-action="delete">Supprimer le dossier</div>`;
+    <div class="context-menu-item danger" data-action="delete">${t('projects.deleteFolder')}</div>`;
   showContextMenuAt(menu, x, y, { type: 'folder', id: folderId });
 }
 
 function showContextMenuForProject(x, y, projectId) {
   const menu = document.getElementById('context-menu');
   menu.innerHTML = `
-    <div class="context-menu-item" data-action="move-to-root">Deplacer a la racine</div>
+    <div class="context-menu-item" data-action="move-to-root">${t('projects.moveToRoot')}</div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item danger" data-action="delete">Supprimer</div>`;
+    <div class="context-menu-item danger" data-action="delete">${t('common.delete')}</div>`;
   showContextMenuAt(menu, x, y, { type: 'project', id: projectId });
 }
 
 function showContextMenuEmpty(x, y) {
   const menu = document.getElementById('context-menu');
   menu.innerHTML = `
-    <div class="context-menu-item" data-action="new-folder">Nouveau dossier</div>
-    <div class="context-menu-item" data-action="new-project">Nouveau projet</div>`;
+    <div class="context-menu-item" data-action="new-folder">${t('projects.newFolder')}</div>
+    <div class="context-menu-item" data-action="new-project">${t('projects.newProject')}</div>`;
   showContextMenuAt(menu, x, y, { type: 'empty', id: null });
 }
 
@@ -1599,7 +1599,7 @@ function showInputModal(title, defaultValue = '') {
 }
 
 async function promptCreateFolder(parentId) {
-  const name = await showInputModal('Nom du dossier:');
+  const name = await showInputModal(t('projects.folderName'));
   if (name && name.trim()) {
     createFolder(name.trim(), parentId);
     ProjectList.render();
@@ -1609,7 +1609,7 @@ async function promptCreateFolder(parentId) {
 async function promptRenameFolder(folderId) {
   const folder = getFolder(folderId);
   if (!folder) return;
-  const name = await showInputModal('Nouveau nom:', folder.name);
+  const name = await showInputModal(t('projects.newName'), folder.name);
   if (name && name.trim()) {
     renameFolder(folderId, name.trim());
     ProjectList.render();
@@ -1619,7 +1619,7 @@ async function promptRenameFolder(folderId) {
 async function renameProjectUI(projectId) {
   const project = getProject(projectId);
   if (!project) return;
-  const name = await showInputModal('Nouveau nom du projet:', project.name);
+  const name = await showInputModal(t('projects.newProjectName'), project.name);
   if (name && name.trim()) {
     renameProject(projectId, name.trim());
     ProjectList.render();
@@ -1643,7 +1643,7 @@ function populateDashboardProjects() {
   const { projects, folders, rootOrder } = state;
 
   if (projects.length === 0) {
-    list.innerHTML = `<div class="dashboard-projects-empty">Aucun projet</div>`;
+    list.innerHTML = `<div class="dashboard-projects-empty">${t('projects.noProjects')}</div>`;
     return;
   }
 
@@ -1910,7 +1910,7 @@ document.getElementById('btn-new-project').onclick = () => {
           <div class="wizard-field">
             <label class="wizard-label" id="label-path">${t('newProject.projectPath')}</label>
             <div class="wizard-input-row">
-              <input type="text" class="wizard-input" id="inp-path" placeholder="C:\\chemin\\projet" required>
+              <input type="text" class="wizard-input" id="inp-path" placeholder="${t('newProject.pathPlaceholder')}" required>
               <button type="button" class="wizard-browse-btn" id="btn-browse">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
               </button>
@@ -2035,10 +2035,10 @@ document.getElementById('btn-new-project').onclick = () => {
         updateGitHubHint();
       } else if (isCreate) {
         document.getElementById('label-path').textContent = t('newProject.parentFolder');
-        document.getElementById('inp-path').placeholder = 'C:\\chemin\\parent';
+        document.getElementById('inp-path').placeholder = t('newProject.parentPlaceholder');
       } else {
         document.getElementById('label-path').textContent = t('newProject.projectPath');
-        document.getElementById('inp-path').placeholder = 'C:\\chemin\\projet';
+        document.getElementById('inp-path').placeholder = t('newProject.pathPlaceholder');
       }
     };
   });
@@ -2077,7 +2077,7 @@ document.getElementById('btn-new-project').onclick = () => {
         try {
           fs.mkdirSync(projPath, { recursive: true });
         } catch (err) {
-          showToast('Impossible de creer le dossier: ' + err.message, 'error');
+          showToast(t('projects.cannotCreateFolder') + ': ' + err.message, 'error');
           return;
         }
       }
@@ -2088,7 +2088,7 @@ document.getElementById('btn-new-project').onclick = () => {
       projPath = path.join(projPath, name);
       try {
         if (fs.existsSync(projPath)) {
-          showToast('Ce dossier existe deja', 'error');
+          showToast(t('projects.folderAlreadyExists'), 'error');
           return;
         }
         fs.mkdirSync(projPath, { recursive: true });
@@ -2110,14 +2110,14 @@ document.getElementById('btn-new-project').onclick = () => {
                 ''
               ].join('\n'));
             } else {
-              showToast('Dossier cree mais erreur git init: ' + (gitResult.error || 'unknown'), 'error');
+              showToast('Folder created but git init failed: ' + (gitResult.error || 'unknown'), 'error');
             }
           } catch (gitErr) {
-            showToast('Dossier cree mais erreur git init: ' + gitErr.message, 'error');
+            showToast('Folder created but git init failed: ' + gitErr.message, 'error');
           }
         }
       } catch (err) {
-        showToast('Impossible de creer le dossier: ' + err.message, 'error');
+        showToast(t('projects.cannotCreateFolder') + ': ' + err.message, 'error');
         return;
       }
     }
@@ -2287,7 +2287,7 @@ filterBtnBranch.onclick = async (e) => {
     const useCache = branchCache.projectId === currentFilterProjectId && branchCache.data;
 
     if (!useCache) {
-      branchDropdownList.innerHTML = '<div class="branch-dropdown-loading">Chargement...</div>';
+      branchDropdownList.innerHTML = `<div class="branch-dropdown-loading">${t('git.loadingBranches')}</div>`;
     }
 
     try {
@@ -2306,7 +2306,7 @@ filterBtnBranch.onclick = async (e) => {
       const { local = [], remote = [] } = branchesData;
 
       if (local.length === 0 && remote.length === 0) {
-        branchDropdownList.innerHTML = '<div class="branch-dropdown-loading">Aucune branche trouvée</div>';
+        branchDropdownList.innerHTML = `<div class="branch-dropdown-loading">${t('git.noBranchFound')}</div>`;
         return;
       }
 
@@ -2315,32 +2315,32 @@ filterBtnBranch.onclick = async (e) => {
       // Header with create branch button
       html += `<div class="branch-dropdown-header-row">
         <span>Branches</span>
-        <button class="branch-create-btn" id="branch-create-toggle" title="Nouvelle branche">
+        <button class="branch-create-btn" id="branch-create-toggle" title="${t('git.newBranchBtn')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
       </div>`;
 
       // Create branch input (hidden by default)
       html += `<div class="branch-create-input-row" id="branch-create-row" style="display:none">
-        <input type="text" class="branch-create-input" id="branch-create-input" placeholder="Nom de la branche..." spellcheck="false" />
-        <button class="branch-create-confirm" id="branch-create-confirm" title="Créer">
+        <input type="text" class="branch-create-input" id="branch-create-input" placeholder="${t('git.branchNamePlaceholder')}" spellcheck="false" />
+        <button class="branch-create-confirm" id="branch-create-confirm" title="${t('git.createBtn')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
       </div>`;
 
       // Local branches section
       if (local.length > 0) {
-        html += '<div class="branch-dropdown-section-title">Branches locales</div>';
+        html += `<div class="branch-dropdown-section-title">${t('git.localBranchesSection')}</div>`;
         html += local.map(branch => {
           const isCurrent = branch === currentBranch;
           return `
           <div class="branch-dropdown-item ${isCurrent ? 'current' : ''}" data-branch="${escapeHtml(branch)}">
             <span class="branch-dropdown-item-name">${escapeHtml(branch)}</span>
             ${!isCurrent ? `<div class="branch-dropdown-actions">
-              <button class="branch-action-btn branch-merge-btn" data-action="merge" data-branch="${escapeHtml(branch)}" title="Merge dans ${escapeHtml(currentBranch)}">
+              <button class="branch-action-btn branch-merge-btn" data-action="merge" data-branch="${escapeHtml(branch)}" title="${t('git.mergeIntoBtn', { name: escapeHtml(currentBranch) })}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
               </button>
-              <button class="branch-action-btn branch-delete-btn" data-action="delete" data-branch="${escapeHtml(branch)}" title="Supprimer la branche">
+              <button class="branch-action-btn branch-delete-btn" data-action="delete" data-branch="${escapeHtml(branch)}" title="${t('git.deleteBranchBtn')}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
             </div>` : ''}
@@ -2350,7 +2350,7 @@ filterBtnBranch.onclick = async (e) => {
 
       // Remote branches section
       if (remote.length > 0) {
-        html += '<div class="branch-dropdown-section-title remote">Branches distantes</div>';
+        html += `<div class="branch-dropdown-section-title remote">${t('git.remoteBranchesSection')}</div>`;
         html += remote.map(branch => `
           <div class="branch-dropdown-item remote" data-branch="${escapeHtml(branch)}" data-remote="true">
             <svg class="branch-remote-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
@@ -2383,12 +2383,12 @@ filterBtnBranch.onclick = async (e) => {
         if (result.success) {
           filterBranchName.textContent = name;
           branchCache = { projectId: null, data: null };
-          showGitToast({ success: true, title: 'Branche créée', message: `Passé sur ${name}`, duration: 3000 });
+          showGitToast({ success: true, title: t('git.branchCreated'), message: t('git.switchedTo', { name }), duration: 3000 });
           branchDropdown.classList.remove('active');
           filterBtnBranch.classList.remove('open');
           refreshDashboardAsync(currentFilterProjectId);
         } else {
-          showGitToast({ success: false, title: 'Erreur', message: result.error || 'Impossible de créer la branche', duration: 5000 });
+          showGitToast({ success: false, title: t('common.error'), message: result.error || t('git.createBranchError'), duration: 5000 });
           createConfirm.disabled = false;
           createInput.disabled = false;
         }
@@ -2410,12 +2410,12 @@ filterBtnBranch.onclick = async (e) => {
             const result = await api.git.merge({ projectPath: project.path, branch: targetBranch });
             if (result.success) {
               branchCache = { projectId: null, data: null };
-              showGitToast({ success: true, title: 'Merge réussi', message: `${targetBranch} mergé dans ${currentBranch}`, duration: 3000 });
+              showGitToast({ success: true, title: t('git.mergeSuccessful'), message: t('git.mergedInto', { source: targetBranch, target: currentBranch }), duration: 3000 });
               branchDropdown.classList.remove('active');
               filterBtnBranch.classList.remove('open');
               refreshDashboardAsync(currentFilterProjectId);
             } else {
-              showGitToast({ success: false, title: 'Erreur de merge', message: result.error || 'Merge échoué', duration: 5000 });
+              showGitToast({ success: false, title: t('git.mergeError'), message: result.error || t('git.mergeFailed'), duration: 5000 });
               btn.disabled = false;
             }
           }
@@ -2426,14 +2426,14 @@ filterBtnBranch.onclick = async (e) => {
             const nameSpan = item.querySelector('.branch-dropdown-item-name');
             const actionsDiv = item.querySelector('.branch-dropdown-actions');
             actionsDiv.style.display = 'none';
-            nameSpan.innerHTML = `Supprimer <strong>${escapeHtml(targetBranch)}</strong> ?`;
+            nameSpan.innerHTML = t('git.deleteBranchConfirm', { name: escapeHtml(targetBranch) });
             item.classList.add('confirm-delete');
 
             const confirmRow = document.createElement('div');
             confirmRow.className = 'branch-delete-confirm-row';
             confirmRow.innerHTML = `
-              <button class="branch-confirm-yes">Supprimer</button>
-              <button class="branch-confirm-no">Annuler</button>
+              <button class="branch-confirm-yes">${t('common.delete')}</button>
+              <button class="branch-confirm-no">${t('common.cancel')}</button>
             `;
             item.appendChild(confirmRow);
 
@@ -2442,12 +2442,12 @@ filterBtnBranch.onclick = async (e) => {
               const result = await api.git.deleteBranch({ projectPath: project.path, branch: targetBranch });
               if (result.success) {
                 branchCache = { projectId: null, data: null };
-                showGitToast({ success: true, title: 'Branche supprimée', message: `${targetBranch} supprimée`, duration: 3000 });
+                showGitToast({ success: true, title: t('git.branchDeleted'), message: t('git.branchDeletedMsg', { name: targetBranch }), duration: 3000 });
                 // Re-render the dropdown
                 item.remove();
                 refreshDashboardAsync(currentFilterProjectId);
               } else {
-                showGitToast({ success: false, title: 'Erreur', message: result.error || 'Suppression échouée', duration: 5000 });
+                showGitToast({ success: false, title: t('common.error'), message: result.error || t('git.deleteFailed'), duration: 5000 });
                 // Restore UI
                 confirmRow.remove();
                 item.classList.remove('confirm-delete');
@@ -2494,16 +2494,16 @@ filterBtnBranch.onclick = async (e) => {
             branchCache = { projectId: null, data: null };
             showGitToast({
               success: true,
-              title: 'Branche changée',
-              message: `Passé sur ${branch}`,
+              title: t('git.branchChanged'),
+              message: t('git.switchedTo', { name: branch }),
               duration: 3000
             });
             refreshDashboardAsync(currentFilterProjectId);
           } else {
             showGitToast({
               success: false,
-              title: 'Erreur',
-              message: result.error || 'Impossible de changer de branche',
+              title: t('common.error'),
+              message: result.error || t('git.switchBranchError'),
               duration: 5000
             });
           }
@@ -2513,7 +2513,7 @@ filterBtnBranch.onclick = async (e) => {
         };
       });
     } catch (e) {
-      branchDropdownList.innerHTML = '<div class="branch-dropdown-loading">Erreur de chargement</div>';
+      branchDropdownList.innerHTML = `<div class="branch-dropdown-loading">${t('git.loadingError')}</div>`;
     }
   }
 };
@@ -2666,15 +2666,13 @@ function openCreateModal(type) {
   const description = document.getElementById('create-modal-description');
   const projectSelect = document.getElementById('create-modal-project');
 
-  title.textContent = type === 'skill' ? 'Nouveau Skill' : 'Nouvel Agent';
+  title.textContent = type === 'skill' ? t('ui.newSkill') : t('ui.newAgent');
   description.value = '';
-  description.placeholder = type === 'skill'
-    ? 'Ex: Un skill qui genere des tests unitaires pour du code TypeScript en utilisant Vitest...'
-    : 'Ex: Un agent qui review le code pour trouver des problemes de securite et de performance...';
+  description.placeholder = t('ui.skillPlaceholder');
 
   // Populate projects dropdown
   const projects = projectsState.get().projects;
-  projectSelect.innerHTML = '<option value="">Selectionnez un projet...</option>' +
+  projectSelect.innerHTML = `<option value="">${t('ui.selectProject')}</option>` +
     '<option value="global">Global (~/.claude)</option>' +
     projects.map((p, i) => `<option value="${i}">${escapeHtml(p.name)}</option>`).join('');
 
@@ -2964,7 +2962,7 @@ api.updates.onStatus((data) => {
 
       updateState.available = true;
       updateState.version = data.version;
-      updateMessage.textContent = `Nouvelle version disponible: v${data.version}`;
+      updateMessage.textContent = t('ui.newVersionAvailable', { version: data.version });
       updateProgressContainer.style.display = 'flex';
       updateBtn.style.display = 'none';
       updateBanner.classList.remove('downloaded');
@@ -2979,11 +2977,11 @@ api.updates.onStatus((data) => {
       updateState.downloaded = true;
       updateState.downloadedVersion = data.version;  // Track actual downloaded version
       updateState.version = data.version;  // Update to actual version
-      updateMessage.textContent = `v${data.version} prete a installer`;
+      updateMessage.textContent = t('ui.readyToInstall', { version: data.version });
       updateProgressContainer.style.display = 'none';
       updateBtn.style.display = 'block';
       updateBtn.disabled = false;  // Re-enable button
-      updateBtn.textContent = 'Redémarrer pour mettre à jour';  // Reset button text
+      updateBtn.textContent = t('ui.restartToUpdateBtn');  // Reset button text
       updateBanner.classList.add('downloaded');
       showUpdateBanner();
       break;
@@ -3011,7 +3009,7 @@ api.updates.onStatus((data) => {
 updateBtn.addEventListener('click', () => {
   // Disable button and show installing state
   updateBtn.disabled = true;
-  updateBtn.textContent = 'Installation...';
+  updateBtn.textContent = t('ui.installingUpdate');
   api.app.installUpdate();
 });
 
