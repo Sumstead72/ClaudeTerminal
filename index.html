@@ -96,7 +96,7 @@
       <svg class="update-icon" viewBox="0 0 24 24" fill="currentColor">
         <path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.12 0-12.6 3.51-3.47 9.14-3.47 12.65 0L21 3v7.12z"/>
       </svg>
-      <span class="update-message" id="update-message" data-i18n="ui.newVersion">Une nouvelle version est disponible</span>
+      <span class="update-message" id="update-message" data-i18n="ui.newVersion">New version available</span>
       <div class="update-progress-container" id="update-progress-container" style="display: none;">
         <div class="update-progress-bar" id="update-progress-bar"></div>
         <span class="update-progress-text" id="update-progress-text">0%</span>
@@ -280,7 +280,7 @@
                     <!-- Branch Dropdown -->
                     <div class="branch-dropdown" id="branch-dropdown">
                       <div class="branch-dropdown-header">
-                        <span data-i18n="ui.switchBranch">Changer de branche</span>
+                        <span data-i18n="ui.switchBranch">Switch branch</span>
                       </div>
                       <div class="branch-dropdown-list" id="branch-dropdown-list"></div>
                     </div>
@@ -335,7 +335,7 @@
                   <div class="git-changes-stats" id="git-changes-stats"></div>
                 </div>
                 <div class="git-changes-list" id="git-changes-list">
-                  <div class="git-changes-loading" data-i18n="common.loading">Chargement...</div>
+                  <div class="git-changes-loading" data-i18n="common.loading">Loading...</div>
                 </div>
                 <div class="git-commit-section">
                   <div class="git-commit-header">
@@ -345,7 +345,7 @@
                       <span data-i18n="ui.generate">Generate</span>
                     </button>
                   </div>
-                  <textarea id="git-commit-message" placeholder="feat: description des changements..." rows="3"></textarea>
+                  <textarea id="git-commit-message" placeholder="feat: describe changes..." rows="3"></textarea>
                   <div class="git-commit-actions">
                     <button class="btn-primary" id="btn-commit-selected" disabled>
                       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
@@ -665,7 +665,7 @@
               </div>
             </div>
             <div class="memory-content" id="memory-content">
-              <div class="memory-loading" data-i18n="common.loading">Chargement...</div>
+              <div class="memory-loading" data-i18n="common.loading">Loading...</div>
             </div>
           </div>
         </div>
@@ -680,7 +680,7 @@
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal" id="modal">
       <div class="modal-header">
-        <h3 id="modal-title">Titre</h3>
+        <h3 id="modal-title"></h3>
         <button class="btn-icon modal-close" id="modal-close">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
@@ -713,11 +713,11 @@
   <!-- Input Modal -->
   <div class="modal-overlay" id="input-modal">
     <div class="modal-content">
-      <div class="modal-header" id="input-modal-title">Titre</div>
+      <div class="modal-header" id="input-modal-title"></div>
       <input type="text" class="modal-input" id="input-modal-input" placeholder="">
       <div class="modal-actions">
         <button class="btn-secondary" id="input-modal-cancel" data-i18n="common.cancel">Cancel</button>
-        <button class="btn-primary" id="input-modal-confirm" data-i18n="common.confirm">Confirmer</button>
+        <button class="btn-primary" id="input-modal-confirm" data-i18n="common.confirm">Confirm</button>
       </div>
     </div>
   </div>

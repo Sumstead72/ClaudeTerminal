@@ -23,7 +23,10 @@
     "today": "Today",
     "total": "Total",
     "noDescription": "No description",
-    "browse": "Browse"
+    "browse": "Browse",
+    "errorOccurred": "An error occurred",
+    "stop": "Stop",
+    "remove": "Remove"
   },
   "projects": {
     "title": "Projects",
@@ -95,7 +98,39 @@
     "resolveConflicts": "Resolve conflicts manually then commit, or click \"Abort Merge\" to cancel.",
     "branches": "branch(es)",
     "stashes": "stash(es)",
-    "commits": "commits"
+    "commits": "commits",
+    "alreadyUpToDate": "Already up to date",
+    "noChanges": "No changes",
+    "filesChanged": "{count} file(s) changed",
+    "insertions": "{count} insertion(s)",
+    "deletions": "{count} deletion(s)",
+    "changesPushed": "Changes pushed",
+    "alreadySynchronized": "Already synchronized",
+    "noChangesToPush": "No changes to push",
+    "mergeConflicts": "Merge conflicts",
+    "conflictHint": "{count} file(s) in conflict — Resolve conflicts or abort merge from the dashboard",
+    "pullSuccessful": "Pull successful",
+    "pullError": "Pull error",
+    "pushSuccessful": "Push successful",
+    "pushError": "Push error",
+    "mergeAborted": "Merge aborted",
+    "mergeAbortedSuccess": "The merge has been successfully aborted",
+    "abortError": "Abort error",
+    "branchCreated": "Branch created",
+    "switchedToBranch": "Switched to {name}",
+    "unableToCreateBranch": "Unable to create branch",
+    "mergeSuccessful": "Merge successful",
+    "mergedInto": "{source} merged into {target}",
+    "mergeError": "Merge error",
+    "mergeFailed": "Merge failed",
+    "confirmDeleteBranch": "Delete {name}?",
+    "branchDeleted": "Branch deleted",
+    "branchDeletedMsg": "{name} deleted",
+    "deletionFailed": "Deletion failed",
+    "branchChanged": "Branch changed",
+    "unableToSwitchBranch": "Unable to switch branch",
+    "loadingError": "Loading error",
+    "noBranchesFound": "No branches found"
   },
   "gitTab": {
     "selectProject": "Select a project to view git information",
@@ -185,7 +220,31 @@
     "worktreePath": "Worktree path",
     "noAvailableBranches": "All branches already have worktrees",
     "compareWorktrees": "Compare branches",
-    "mergeWorktreeBranch": "Merge branch"
+    "mergeWorktreeBranch": "Merge branch",
+    "pathRequired": "Path is required",
+    "branchNameRequired": "Branch name is required",
+    "commitMessageRequired": "Commit message is required",
+    "commitCreated": "Commit created",
+    "noDiffAvailable": "No diff available (new or binary file)",
+    "commitDetail": "Commit {hash}",
+    "cherryPickTitle": "Cherry-pick",
+    "cherryPickSuccess": "Cherry-pick successful",
+    "revertTitle": "Revert",
+    "revertSuccess": "Revert successful",
+    "fetchingMessage": "Fetching...",
+    "fetchComplete": "Fetch complete",
+    "switchedTo": "Switched to {name}",
+    "branchCreatedMsg": "Created {name}",
+    "mergeTitle": "Merge",
+    "mergeConfirmMessage": "Merge \"{source}\" into \"{target}\"?",
+    "mergeSuccess": "Merge successful",
+    "mergeAbortedSuccess": "Merge aborted",
+    "mergeCompletedSuccess": "Merge completed",
+    "stashAppliedSuccess": "Stash applied",
+    "stashDroppedSuccess": "Stash dropped",
+    "prTitleRequired": "PR title is required",
+    "prCreated": "PR #{number} created",
+    "noProjects": "No projects"
   },
   "dashboard": {
     "openFolder": "Open folder",
@@ -313,6 +372,50 @@
     "newProject": "New project",
     "newTerminal": "New terminal",
     "toggleFileExplorer": "Toggle file explorer"
+  },
+  "contextMenu": {
+    "newSubfolder": "New subfolder",
+    "rename": "Rename",
+    "deleteFolder": "Delete folder",
+    "moveToRoot": "Move to root",
+    "delete": "Delete",
+    "newFolder": "New folder",
+    "newProject": "New project"
+  },
+  "closeDialog": {
+    "whatToDo": "What would you like to do?",
+    "minimizeToTray": "Minimize to tray",
+    "minimizeDesc": "The app stays accessible from the taskbar",
+    "quitCompletely": "Quit completely",
+    "quitDesc": "Closes the app and all terminals",
+    "rememberChoice": "Remember my choice",
+    "title": "Close application"
+  },
+  "dialog": {
+    "folderName": "Folder name:",
+    "newName": "New name:",
+    "newProjectName": "New project name:"
+  },
+  "branches": {
+    "title": "Branches",
+    "localBranches": "Local branches",
+    "remoteBranches": "Remote branches",
+    "newBranch": "New branch",
+    "branchName": "Branch name...",
+    "create": "Create"
+  },
+  "updates": {
+    "newVersionAvailable": "New version available: v{version}",
+    "readyToInstall": "v{version} ready to install",
+    "restartToUpdate": "Restart to update",
+    "installing": "Installing..."
+  },
+  "ci": {
+    "passed": "Passed",
+    "cancelled": "Cancelled",
+    "failed": "Failed",
+    "queued": "Queued",
+    "running": "Running"
   },
   "quickPicker": {
     "searchProjects": "Search projects...",
@@ -723,6 +826,15 @@
     "parentFolder": "Parent folder",
     "initGit": "Initialize a Git repo",
     "cloning": "Cloning...",
+    "githubConnected": "GitHub connected ({login})",
+    "githubPrivateUnavailable": "Private repos unavailable — connect GitHub",
+    "destFolderPlaceholder": "C:\\path\\to\\destination",
+    "parentFolderPlaceholder": "C:\\path\\to\\parent",
+    "projectFolderPlaceholder": "C:\\path\\to\\project",
+    "unableToCreateFolder": "Unable to create folder: {error}",
+    "folderAlreadyExists": "This folder already exists",
+    "folderCreatedGitInitError": "Folder created but git init failed: {error}",
+    "untitledConversation": "Untitled conversation",
     "categories": {
       "general": "General",
       "gameDev": "Game Dev"

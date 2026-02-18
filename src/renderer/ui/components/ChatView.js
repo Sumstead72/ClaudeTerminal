@@ -27,7 +27,7 @@ function renderMarkdown(text) {
     const decoded = code.trim();
     const highlighted = lang ? highlight(decoded, lang) : escapeHtml(decoded);
     const placeholder = `%%CODEBLOCK_${codeBlocks.length}%%`;
-    codeBlocks.push(`<div class="chat-code-block"><div class="chat-code-header"><span class="chat-code-lang">${lang || 'text'}</span><button class="chat-code-copy" title="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div><pre><code>${highlighted}</code></pre></div>`);
+    codeBlocks.push(`<div class="chat-code-block"><div class="chat-code-header"><span class="chat-code-lang">${lang || 'text'}</span><button class="chat-code-copy" title="${t('common.copy')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div><pre><code>${highlighted}</code></pre></div>`);
     return placeholder;
   });
 
@@ -180,7 +180,7 @@ function createChatView(wrapperEl, project, options = {}) {
       <div class="chat-messages">
         <div class="chat-welcome">
           <img class="chat-welcome-logo" src="assets/claude-mascot.svg" alt="" draggable="false" />
-          <div class="chat-welcome-text">${escapeHtml(t('chat.welcomeMessage') || 'How can I help?')}</div>
+          <div class="chat-welcome-text">${escapeHtml(t('chat.welcomeMessage'))}</div>
         </div>
       </div>
       <div class="chat-input-area">
@@ -189,13 +189,13 @@ function createChatView(wrapperEl, project, options = {}) {
         <div class="chat-mention-chips" style="display:none"></div>
         <div class="chat-image-preview" style="display:none"></div>
         <div class="chat-input-wrapper">
-          <button class="chat-attach-btn" title="${escapeHtml(t('chat.attachImage') || 'Attach image')}">
+          <button class="chat-attach-btn" title="${escapeHtml(t('chat.attachImage'))}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
           </button>
           <textarea class="chat-input" placeholder="${escapeHtml(t('chat.placeholder'))}" rows="1"></textarea>
           <input type="file" class="chat-file-input" accept="image/png,image/jpeg,image/gif,image/webp" multiple style="display:none" />
           <div class="chat-input-actions">
-            <button class="chat-stop-btn" title="Stop" style="display:none">
+            <button class="chat-stop-btn" title="${t('common.stop')}" style="display:none">
               <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
             </button>
             <button class="chat-send-btn" title="${escapeHtml(t('chat.sendMessage'))}">
@@ -206,7 +206,7 @@ function createChatView(wrapperEl, project, options = {}) {
         <div class="chat-input-footer">
           <div class="chat-footer-left">
             <span class="chat-status-dot"></span>
-            <span class="chat-status-text">${escapeHtml(t('chat.ready') || 'Ready')}</span>
+            <span class="chat-status-text">${escapeHtml(t('chat.ready'))}</span>
           </div>
           <div class="chat-footer-right">
             <div class="chat-model-selector">
@@ -358,7 +358,7 @@ function createChatView(wrapperEl, project, options = {}) {
     imagePreview.innerHTML = pendingImages.map((img, i) => `
       <div class="chat-image-thumb" data-index="${i}">
         <img src="${img.dataUrl}" alt="${escapeHtml(img.name)}" />
-        <button class="chat-image-remove" data-index="${i}" title="Remove">&times;</button>
+        <button class="chat-image-remove" data-index="${i}" title="${t('common.remove')}">&times;</button>
       </div>
     `).join('');
     imagePreview.querySelectorAll('.chat-image-remove').forEach(btn => {
@@ -543,9 +543,9 @@ function createChatView(wrapperEl, project, options = {}) {
 
   function getSlashCommandDescription(cmd) {
     const descriptions = {
-      '/compact': t('chat.slashCompact') || 'Compact conversation history',
-      '/clear': t('chat.slashClear') || 'Clear conversation',
-      '/help': t('chat.slashHelp') || 'Show help',
+      '/compact': t('chat.slashCompact'),
+      '/clear': t('chat.slashClear'),
+      '/help': t('chat.slashHelp'),
     };
     return descriptions[cmd] || '';
   }
@@ -580,15 +580,15 @@ function createChatView(wrapperEl, project, options = {}) {
   // ── Mention autocomplete ──
 
   const MENTION_TYPES = [
-    { type: 'file', label: '@file', desc: t('chat.mentionFile') || 'Attach a file from your project', icon: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>' },
-    { type: 'git', label: '@git', desc: t('chat.mentionGit') || 'Attach current git diff', icon: '<svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>' },
-    { type: 'terminal', label: '@terminal', desc: t('chat.mentionTerminal') || 'Attach terminal output', icon: '<svg viewBox="0 0 24 24"><polyline points="4,17 10,11 4,5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>' },
-    { type: 'errors', label: '@errors', desc: t('chat.mentionErrors') || 'Attach error lines from terminal', icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' },
-    { type: 'selection', label: '@selection', desc: t('chat.mentionSelection') || 'Attach selected text', icon: '<svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>' },
-    { type: 'todos', label: '@todos', desc: t('chat.mentionTodos') || 'Attach TODO items from project', icon: '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>' },
-    { type: 'project', label: '@project', desc: t('chat.mentionProject') || 'Attach project info', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' },
-    { type: 'context', label: '@context', desc: t('chat.mentionContext') || 'Inject a context pack', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>' },
-    { type: 'prompt', label: '@prompt', desc: t('chat.mentionPrompt') || 'Insert a prompt template', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' },
+    { type: 'file', label: '@file', desc: t('chat.mentionFile'), icon: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>' },
+    { type: 'git', label: '@git', desc: t('chat.mentionGit'), icon: '<svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>' },
+    { type: 'terminal', label: '@terminal', desc: t('chat.mentionTerminal'), icon: '<svg viewBox="0 0 24 24"><polyline points="4,17 10,11 4,5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>' },
+    { type: 'errors', label: '@errors', desc: t('chat.mentionErrors'), icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' },
+    { type: 'selection', label: '@selection', desc: t('chat.mentionSelection'), icon: '<svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>' },
+    { type: 'todos', label: '@todos', desc: t('chat.mentionTodos'), icon: '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>' },
+    { type: 'project', label: '@project', desc: t('chat.mentionProject'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' },
+    { type: 'context', label: '@context', desc: t('chat.mentionContext'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>' },
+    { type: 'prompt', label: '@prompt', desc: t('chat.mentionPrompt'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' },
   ];
 
   // ── Mention picker infrastructure ──
@@ -641,7 +641,7 @@ function createChatView(wrapperEl, project, options = {}) {
       mode: 'file',
       keyword: '@file',
       maxItems: 40,
-      emptyText: () => t('chat.mentionNoFiles') || 'No files found',
+      emptyText: () => t('chat.mentionNoFiles'),
       getData: () => getFileCache(),
       filter: (items, q) => items.filter(f => f.path.toLowerCase().includes(q)),
       renderItem: (item) => `
@@ -661,7 +661,7 @@ function createChatView(wrapperEl, project, options = {}) {
       mode: 'projects',
       keyword: '@project',
       maxItems: 40,
-      emptyText: () => t('chat.mentionNoProjects') || 'No projects found',
+      emptyText: () => t('chat.mentionNoProjects'),
       getData: () => {
         const { projectsState } = require('../../state/projects.state');
         return projectsState.get().projects || [];
@@ -693,7 +693,7 @@ function createChatView(wrapperEl, project, options = {}) {
       mode: 'context',
       keyword: '@context',
       maxItems: 20,
-      emptyText: () => t('chat.mentionNoContextPacks') || 'No context packs found. Create one in Settings > Library.',
+      emptyText: () => t('chat.mentionNoContextPacks'),
       getData: () => {
         const ContextPromptService = require('../../services/ContextPromptService');
         return ContextPromptService.getContextPacks(project?.id);
@@ -719,7 +719,7 @@ function createChatView(wrapperEl, project, options = {}) {
       mode: 'prompt',
       keyword: '@prompt',
       maxItems: 20,
-      emptyText: () => t('chat.mentionNoPrompts') || 'No prompt templates found. Create one in Settings > Library.',
+      emptyText: () => t('chat.mentionNoPrompts'),
       getData: () => {
         const ContextPromptService = require('../../services/ContextPromptService');
         return ContextPromptService.getPromptTemplates(project?.id);
@@ -945,7 +945,7 @@ function createChatView(wrapperEl, project, options = {}) {
         <span class="chat-mention-chip-icon">${chip.icon}</span>
         ${typePrefix}
         <span class="chat-mention-chip-label">${escapeHtml(displayName)}</span>
-        <button class="chat-mention-chip-remove" data-index="${i}" title="Remove">&times;</button>
+        <button class="chat-mention-chip-remove" data-index="${i}" title="${t('common.remove')}">&times;</button>
       </div>`;
     }).join('');
     mentionChipsEl.querySelectorAll('.chat-mention-chip-remove').forEach(btn => {

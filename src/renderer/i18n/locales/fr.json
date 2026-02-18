@@ -23,7 +23,10 @@
     "today": "Aujourd'hui",
     "total": "Total",
     "noDescription": "Aucune description",
-    "browse": "Parcourir"
+    "browse": "Parcourir",
+    "errorOccurred": "Une erreur est survenue",
+    "stop": "Arrêter",
+    "remove": "Retirer"
   },
   "projects": {
     "title": "Projets",
@@ -161,7 +164,39 @@
     "resolveConflicts": "Résolvez les conflits manuellement puis commitez, ou cliquez sur \"Abort Merge\" pour annuler.",
     "branches": "branche(s)",
     "stashes": "stash(es)",
-    "commits": "commits"
+    "commits": "commits",
+    "alreadyUpToDate": "Déjà à jour",
+    "noChanges": "Aucune modification",
+    "filesChanged": "{count} fichier(s) modifié(s)",
+    "insertions": "{count} insertion(s)",
+    "deletions": "{count} suppression(s)",
+    "changesPushed": "Modifications envoyées",
+    "alreadySynchronized": "Déjà synchronisé",
+    "noChangesToPush": "Aucune modification à envoyer",
+    "mergeConflicts": "Conflits de merge",
+    "conflictHint": "{count} fichier(s) en conflit — Résolvez les conflits ou annulez le merge depuis le dashboard",
+    "pullSuccessful": "Pull réussi",
+    "pullError": "Erreur lors du pull",
+    "pushSuccessful": "Push réussi",
+    "pushError": "Erreur lors du push",
+    "mergeAborted": "Merge annulé",
+    "mergeAbortedSuccess": "Le merge a été annulé avec succès",
+    "abortError": "Erreur lors de l'annulation",
+    "branchCreated": "Branche créée",
+    "switchedToBranch": "Passé sur {name}",
+    "unableToCreateBranch": "Impossible de créer la branche",
+    "mergeSuccessful": "Merge réussi",
+    "mergedInto": "{source} mergé dans {target}",
+    "mergeError": "Erreur de merge",
+    "mergeFailed": "Merge échoué",
+    "confirmDeleteBranch": "Supprimer {name} ?",
+    "branchDeleted": "Branche supprimée",
+    "branchDeletedMsg": "{name} supprimée",
+    "deletionFailed": "Suppression échouée",
+    "branchChanged": "Branche changée",
+    "unableToSwitchBranch": "Impossible de changer de branche",
+    "loadingError": "Erreur de chargement",
+    "noBranchesFound": "Aucune branche trouvée"
   },
   "gitTab": {
     "selectProject": "Sélectionnez un projet pour voir les informations git",
@@ -251,7 +286,31 @@
     "worktreePath": "Chemin du worktree",
     "noAvailableBranches": "Toutes les branches ont déjà un worktree",
     "compareWorktrees": "Comparer les branches",
-    "mergeWorktreeBranch": "Fusionner la branche"
+    "mergeWorktreeBranch": "Fusionner la branche",
+    "pathRequired": "Le chemin est requis",
+    "branchNameRequired": "Le nom de la branche est requis",
+    "commitMessageRequired": "Le message de commit est requis",
+    "commitCreated": "Commit créé",
+    "noDiffAvailable": "Aucun diff disponible (fichier binaire ou nouveau)",
+    "commitDetail": "Commit {hash}",
+    "cherryPickTitle": "Cherry-pick",
+    "cherryPickSuccess": "Cherry-pick réussi",
+    "revertTitle": "Revert",
+    "revertSuccess": "Revert réussi",
+    "fetchingMessage": "Fetching...",
+    "fetchComplete": "Fetch terminé",
+    "switchedTo": "Passé sur {name}",
+    "branchCreatedMsg": "{name} créée",
+    "mergeTitle": "Merge",
+    "mergeConfirmMessage": "Fusionner \"{source}\" dans \"{target}\" ?",
+    "mergeSuccess": "Merge réussi",
+    "mergeAbortedSuccess": "Merge annulé",
+    "mergeCompletedSuccess": "Merge terminé",
+    "stashAppliedSuccess": "Stash appliqué",
+    "stashDroppedSuccess": "Stash supprimé",
+    "prTitleRequired": "Le titre de la PR est requis",
+    "prCreated": "PR #{number} créée",
+    "noProjects": "Aucun projet"
   },
   "dashboard": {
     "openFolder": "Ouvrir dossier",
@@ -379,6 +438,50 @@
     "newProject": "Nouveau projet",
     "newTerminal": "Nouveau terminal",
     "toggleFileExplorer": "Explorateur de fichiers"
+  },
+  "contextMenu": {
+    "newSubfolder": "Nouveau sous-dossier",
+    "rename": "Renommer",
+    "deleteFolder": "Supprimer le dossier",
+    "moveToRoot": "Déplacer à la racine",
+    "delete": "Supprimer",
+    "newFolder": "Nouveau dossier",
+    "newProject": "Nouveau projet"
+  },
+  "closeDialog": {
+    "whatToDo": "Que souhaitez-vous faire ?",
+    "minimizeToTray": "Minimiser dans le tray",
+    "minimizeDesc": "L'application reste accessible depuis la barre des tâches",
+    "quitCompletely": "Quitter complètement",
+    "quitDesc": "Ferme l'application et tous les terminaux",
+    "rememberChoice": "Se souvenir de mon choix",
+    "title": "Fermer l'application"
+  },
+  "dialog": {
+    "folderName": "Nom du dossier :",
+    "newName": "Nouveau nom :",
+    "newProjectName": "Nouveau nom du projet :"
+  },
+  "branches": {
+    "title": "Branches",
+    "localBranches": "Branches locales",
+    "remoteBranches": "Branches distantes",
+    "newBranch": "Nouvelle branche",
+    "branchName": "Nom de la branche...",
+    "create": "Créer"
+  },
+  "updates": {
+    "newVersionAvailable": "Nouvelle version disponible : v{version}",
+    "readyToInstall": "v{version} prête à installer",
+    "restartToUpdate": "Redémarrer pour mettre à jour",
+    "installing": "Installation..."
+  },
+  "ci": {
+    "passed": "Réussi",
+    "cancelled": "Annulé",
+    "failed": "Échoué",
+    "queued": "En attente",
+    "running": "En cours"
   },
   "quickPicker": {
     "searchProjects": "Rechercher un projet...",
@@ -723,6 +826,15 @@
     "parentFolder": "Dossier parent",
     "initGit": "Initialiser un repo Git",
     "cloning": "Clonage en cours...",
+    "githubConnected": "GitHub connecté ({login})",
+    "githubPrivateUnavailable": "Repos privés inaccessibles — connecter GitHub",
+    "destFolderPlaceholder": "C:\\chemin\\destination",
+    "parentFolderPlaceholder": "C:\\chemin\\parent",
+    "projectFolderPlaceholder": "C:\\chemin\\projet",
+    "unableToCreateFolder": "Impossible de créer le dossier : {error}",
+    "folderAlreadyExists": "Ce dossier existe déjà",
+    "folderCreatedGitInitError": "Dossier créé mais erreur git init : {error}",
+    "untitledConversation": "Conversation sans titre",
     "categories": {
       "general": "Général",
       "gameDev": "Game Dev"

@@ -361,7 +361,7 @@ function showToast({ type = 'info', title, message, duration = 5000 }) {
       <div class="toast-title">${escapeHtml(title)}</div>
       ${formattedMessage ? `<div class="toast-message">${formattedMessage}</div>` : ''}
     </div>
-    <button class="toast-close" aria-label="Close">
+    <button class="toast-close" aria-label="${t('common.close')}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   `;
@@ -413,11 +413,11 @@ function showGitToast({ success, title, message, details = [], duration = 5000 }
 function parseGitPullOutput(output) {
   const details = [];
 
-  if (!output) return { message: 'Already up to date', details };
+  if (!output) return { message: t('git.alreadyUpToDate'), details };
 
   // Already up to date
   if (output.includes('Already up to date') || output.includes('Déjà à jour')) {
-    return { message: 'Already up to date', details: [{ icon: '✓', text: 'No changes' }] };
+    return { message: t('git.alreadyUpToDate'), details: [{ icon: '✓', text: t('git.noChanges') }] };
   }
 
   // Fast-forward merge
@@ -427,13 +427,13 @@ function parseGitPullOutput(output) {
   const commits = output.match(/(\d+) commits?/);
 
   if (filesChanged) {
-    details.push({ icon: '📄', text: `${filesChanged[1]} file${filesChanged[1] > 1 ? 's' : ''} changed` });
+    details.push({ icon: '📄', text: t('git.filesChanged', { count: filesChanged[1] }) });
   }
   if (insertions) {
-    details.push({ icon: '+', text: `${insertions[1]} insertion${insertions[1] > 1 ? 's' : ''}` });
+    details.push({ icon: '+', text: t('git.insertions', { count: insertions[1] }) });
   }
   if (deletions) {
-    details.push({ icon: '-', text: `${deletions[1]} deletion${deletions[1] > 1 ? 's' : ''}` });
+    details.push({ icon: '-', text: t('git.deletions', { count: deletions[1] }) });
   }
 
   return { message: '', details };
@@ -442,11 +442,11 @@ function parseGitPullOutput(output) {
 function parseGitPushOutput(output) {
   const details = [];
 
-  if (!output) return { message: 'Changes pushed', details };
+  if (!output) return { message: t('git.changesPushed'), details };
 
   // Everything up-to-date
   if (output.includes('Everything up-to-date')) {
-    return { message: 'Already synchronized', details: [{ icon: '✓', text: 'No changes to push' }] };
+    return { message: t('git.alreadySynchronized'), details: [{ icon: '✓', text: t('git.noChangesToPush') }] };
   }
 
   // Extract branch info
@@ -455,7 +455,7 @@ function parseGitPushOutput(output) {
     details.push({ icon: '↑', text: `${branchMatch[3]} → ${branchMatch[4]}` });
   }
 
-  return { message: 'Changes pushed', details };
+  return { message: t('git.changesPushed'), details };
 }
 
 // ========== GIT OPERATIONS ==========
@@ -519,8 +519,8 @@ async function gitPull(projectId) {
 
       showGitToast({
         success: false,
-        title: 'Merge conflicts',
-        message: `${result.conflicts?.length || 0} file(s) in conflict — Resolve conflicts or abort merge from the dashboard`,
+        title: t('git.mergeConflicts'),
+        message: t('git.conflictHint', { count: result.conflicts?.length || 0 }),
         duration: 8000
       });
 
@@ -536,7 +536,7 @@ async function gitPull(projectId) {
       const parsed = parseGitPullOutput(result.output);
       showGitToast({
         success: true,
-        title: 'Pull successful',
+        title: t('git.pullSuccessful'),
         message: parsed.message,
         details: parsed.details,
         duration: 4000
@@ -547,8 +547,8 @@ async function gitPull(projectId) {
     } else {
       showGitToast({
         success: false,
-        title: 'Pull error',
-        message: result.error || 'An error occurred',
+        title: t('git.pullError'),
+        message: result.error || t('common.errorOccurred'),
         duration: 6000
       });
     }
@@ -578,7 +578,7 @@ async function gitPush(projectId) {
       const parsed = parseGitPushOutput(result.output);
       showGitToast({
         success: true,
-        title: 'Push successful',
+        title: t('git.pushSuccessful'),
         message: parsed.message,
         details: parsed.details,
         duration: 4000
@@ -589,8 +589,8 @@ async function gitPush(projectId) {
     } else {
       showGitToast({
         success: false,
-        title: 'Push error',
-        message: result.error || 'An error occurred',
+        title: t('git.pushError'),
+        message: result.error || t('common.errorOccurred'),
         duration: 6000
       });
     }
@@ -625,8 +625,8 @@ async function gitMergeAbort(projectId) {
 
       showGitToast({
         success: true,
-        title: 'Merge aborted',
-        message: 'The merge has been successfully aborted',
+        title: t('git.mergeAborted'),
+        message: t('git.mergeAbortedSuccess'),
         duration: 4000
       });
 
@@ -635,16 +635,16 @@ async function gitMergeAbort(projectId) {
     } else {
       showGitToast({
         success: false,
-        title: 'Abort error',
-        message: result.error || 'An error occurred',
+        title: t('git.abortError'),
+        message: result.error || t('common.errorOccurred'),
         duration: 6000
       });
     }
   } catch (e) {
     showGitToast({
       success: false,
-      title: 'Abort error',
-      message: e.message || 'An error occurred',
+      title: t('git.abortError'),
+      message: e.message || t('common.errorOccurred'),
       duration: 6000
     });
   }
@@ -939,10 +939,10 @@ function _formatModalTime(dateString) {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  if (diffMins < 1) return t('time.justNow') || "a l'instant";
-  if (diffMins < 60) return t('time.minutesAgo', { count: diffMins }) || `il y a ${diffMins}min`;
-  if (diffHours < 24) return t('time.hoursAgo', { count: diffHours }) || `il y a ${diffHours}h`;
-  if (diffDays < 7) return t('time.daysAgo', { count: diffDays }) || `il y a ${diffDays}j`;
+  if (diffMins < 1) return t('time.justNow');
+  if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+  if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
+  if (diffDays < 7) return t('time.daysAgo', { count: diffDays });
   const locale = getCurrentLanguage() === 'fr' ? 'fr-FR' : 'en-US';
   return date.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
@@ -963,7 +963,7 @@ function _preprocessModalSessions(sessions) {
     if (summaryResult.text) { displayTitle = summaryResult.text; displaySubtitle = promptResult.text; }
     else if (promptResult.text) { displayTitle = promptResult.text; }
     else if (skillName) { displayTitle = '/' + skillName; isSkill = true; }
-    else { displayTitle = getCurrentLanguage() === 'fr' ? 'Conversation sans titre' : 'Untitled conversation'; }
+    else { displayTitle = t('newProject.untitledConversation'); }
     const hoursAgo = (now - new Date(session.modified).getTime()) / 3600000;
     const freshness = hoursAgo < 1 ? 'hot' : hoursAgo < 24 ? 'warm' : '';
     const searchText = (displayTitle + ' ' + displaySubtitle + ' ' + (session.gitBranch || '')).toLowerCase();
@@ -974,11 +974,11 @@ function _preprocessModalSessions(sessions) {
 
 function _groupModalSessions(sessions) {
   const groups = {
-    pinned: { key: 'pinned', label: t('sessions.pinned') || 'Pinned', sessions: [] },
-    today: { key: 'today', label: t('sessions.today') || 'Today', sessions: [] },
-    yesterday: { key: 'yesterday', label: t('sessions.yesterday') || 'Yesterday', sessions: [] },
-    thisWeek: { key: 'thisWeek', label: t('sessions.thisWeek') || 'This week', sessions: [] },
-    older: { key: 'older', label: t('sessions.older') || 'Older', sessions: [] }
+    pinned: { key: 'pinned', label: t('sessions.pinned'), sessions: [] },
+    today: { key: 'today', label: t('sessions.today'), sessions: [] },
+    yesterday: { key: 'yesterday', label: t('sessions.yesterday'), sessions: [] },
+    thisWeek: { key: 'thisWeek', label: t('sessions.thisWeek'), sessions: [] },
+    older: { key: 'older', label: t('sessions.older'), sessions: [] }
   };
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1002,7 +1002,7 @@ function _buildModalCardHtml(s, index) {
   const skillClass = s.isSkill ? ' session-card-icon--skill' : '';
   const titleSkillClass = s.isSkill ? ' session-card-title--skill' : '';
   const iconId = s.isSkill ? 'sm-bolt' : 'sm-chat';
-  const pinTitle = s.pinned ? (t('sessions.unpin') || 'Unpin') : (t('sessions.pin') || 'Pin');
+  const pinTitle = s.pinned ? t('sessions.unpin') : t('sessions.pin');
 
   return `<div class="session-card${freshClass}${pinnedClass}${animClass}" data-sid="${s.sessionId}" style="--ci:${index < 10 ? index : 0}">
 <div class="session-card-icon${skillClass}"><svg width="16" height="16"><use href="#${iconId}"/></svg></div>
@@ -1339,32 +1339,32 @@ function handleWindowClose() {
 function showCloseDialog() {
   const content = `
     <div class="close-dialog-content">
-      <p>What would you like to do?</p>
+      <p>${t('closeDialog.whatToDo')}</p>
       <div class="close-dialog-options">
         <button class="close-option-btn" id="close-minimize">
           <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
             <path d="M19 13H5v-2h14v2z"/>
           </svg>
-          <span>Minimize to tray</span>
-          <small>The app stays accessible from the taskbar</small>
+          <span>${t('closeDialog.minimizeToTray')}</span>
+          <small>${t('closeDialog.minimizeDesc')}</small>
         </button>
         <button class="close-option-btn close-option-quit" id="close-quit">
           <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
           </svg>
-          <span>Quit completely</span>
-          <small>Closes the app and all terminals</small>
+          <span>${t('closeDialog.quitCompletely')}</span>
+          <small>${t('closeDialog.quitDesc')}</small>
         </button>
       </div>
       <label class="close-dialog-remember">
         <input type="checkbox" id="close-remember">
         <span class="close-dialog-toggle"></span>
-        <span class="close-dialog-remember-text">Remember my choice</span>
+        <span class="close-dialog-remember-text">${t('closeDialog.rememberChoice')}</span>
       </label>
     </div>
   `;
 
-  showModal('Close application', content);
+  showModal(t('closeDialog.title'), content);
 
   // Add event handlers
   document.getElementById('close-minimize').onclick = () => {
@@ -1491,27 +1491,27 @@ function setupContextMenuHandlers() {
 function showContextMenuForFolder(x, y, folderId) {
   const menu = document.getElementById('context-menu');
   menu.innerHTML = `
-    <div class="context-menu-item" data-action="new-subfolder">New subfolder</div>
-    <div class="context-menu-item" data-action="rename">Rename</div>
+    <div class="context-menu-item" data-action="new-subfolder">${t('contextMenu.newSubfolder')}</div>
+    <div class="context-menu-item" data-action="rename">${t('contextMenu.rename')}</div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item danger" data-action="delete">Delete folder</div>`;
+    <div class="context-menu-item danger" data-action="delete">${t('contextMenu.deleteFolder')}</div>`;
   showContextMenuAt(menu, x, y, { type: 'folder', id: folderId });
 }
 
 function showContextMenuForProject(x, y, projectId) {
   const menu = document.getElementById('context-menu');
   menu.innerHTML = `
-    <div class="context-menu-item" data-action="move-to-root">Move to root</div>
+    <div class="context-menu-item" data-action="move-to-root">${t('contextMenu.moveToRoot')}</div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item danger" data-action="delete">Delete</div>`;
+    <div class="context-menu-item danger" data-action="delete">${t('contextMenu.delete')}</div>`;
   showContextMenuAt(menu, x, y, { type: 'project', id: projectId });
 }
 
 function showContextMenuEmpty(x, y) {
   const menu = document.getElementById('context-menu');
   menu.innerHTML = `
-    <div class="context-menu-item" data-action="new-folder">New folder</div>
-    <div class="context-menu-item" data-action="new-project">New project</div>`;
+    <div class="context-menu-item" data-action="new-folder">${t('contextMenu.newFolder')}</div>
+    <div class="context-menu-item" data-action="new-project">${t('contextMenu.newProject')}</div>`;
   showContextMenuAt(menu, x, y, { type: 'empty', id: null });
 }
 
@@ -1545,8 +1545,8 @@ async function handleContextAction(action) {
     case 'delete':
       if (contextTarget.type === 'folder') {
         ModalComponent.showConfirm({
-          title: t('projects.deleteFolder') || 'Delete folder',
-          message: t('projects.confirmDeleteFolder') || 'Delete this folder? Items will be moved to parent.',
+          title: t('projects.deleteFolder'),
+          message: t('projects.confirmDeleteFolder'),
           confirmLabel: t('common.delete'),
           danger: true
         }).then(confirmed => {
@@ -1601,7 +1601,7 @@ function showInputModal(title, defaultValue = '') {
 }
 
 async function promptCreateFolder(parentId) {
-  const name = await showInputModal('Folder name:');
+  const name = await showInputModal(t('dialog.folderName'));
   if (name && name.trim()) {
     createFolder(name.trim(), parentId);
     ProjectList.render();
@@ -1611,7 +1611,7 @@ async function promptCreateFolder(parentId) {
 async function promptRenameFolder(folderId) {
   const folder = getFolder(folderId);
   if (!folder) return;
-  const name = await showInputModal('New name:', folder.name);
+  const name = await showInputModal(t('dialog.newName'), folder.name);
   if (name && name.trim()) {
     renameFolder(folderId, name.trim());
     ProjectList.render();
@@ -1621,7 +1621,7 @@ async function promptRenameFolder(folderId) {
 async function renameProjectUI(projectId) {
   const project = getProject(projectId);
   if (!project) return;
-  const name = await showInputModal('New project name:', project.name);
+  const name = await showInputModal(t('dialog.newProjectName'), project.name);
   if (name && name.trim()) {
     renameProject(projectId, name.trim());
     ProjectList.render();
@@ -1912,7 +1912,7 @@ document.getElementById('btn-new-project').onclick = () => {
           <div class="wizard-field">
             <label class="wizard-label" id="label-path">${t('newProject.projectPath')}</label>
             <div class="wizard-input-row">
-              <input type="text" class="wizard-input" id="inp-path" placeholder="C:\\chemin\\projet" required>
+              <input type="text" class="wizard-input" id="inp-path" placeholder="${t('newProject.projectFolderPlaceholder')}" required>
               <button type="button" class="wizard-browse-btn" id="btn-browse">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
               </button>
@@ -2007,9 +2007,9 @@ document.getElementById('btn-new-project').onclick = () => {
       const result = await api.github.authStatus();
       githubConnected = result.authenticated;
       if (result.authenticated) {
-        hintEl.innerHTML = `<span class="hint-success"><svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> GitHub connecte (${result.login})</span>`;
+        hintEl.innerHTML = `<span class="hint-success"><svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> ${t('newProject.githubConnected', { login: result.login })}</span>`;
       } else {
-        hintEl.innerHTML = `<span class="hint-warning"><svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> Repos prives inaccessibles - <a href="#" id="link-github-settings">connecter GitHub</a></span>`;
+        hintEl.innerHTML = `<span class="hint-warning"><svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg> ${t('newProject.githubPrivateUnavailable')} - <a href="#" id="link-github-settings">${t('settings.githubConnect')}</a></span>`;
         document.getElementById('link-github-settings')?.addEventListener('click', (e) => {
           e.preventDefault();
           closeModal();
@@ -2033,14 +2033,14 @@ document.getElementById('btn-new-project').onclick = () => {
       document.querySelector('.create-git-config').style.display = isCreate ? 'block' : 'none';
       if (isClone) {
         document.getElementById('label-path').textContent = t('newProject.destFolder');
-        document.getElementById('inp-path').placeholder = 'C:\\chemin\\destination';
+        document.getElementById('inp-path').placeholder = t('newProject.destFolderPlaceholder');
         updateGitHubHint();
       } else if (isCreate) {
         document.getElementById('label-path').textContent = t('newProject.parentFolder');
-        document.getElementById('inp-path').placeholder = 'C:\\chemin\\parent';
+        document.getElementById('inp-path').placeholder = t('newProject.parentFolderPlaceholder');
       } else {
         document.getElementById('label-path').textContent = t('newProject.projectPath');
-        document.getElementById('inp-path').placeholder = 'C:\\chemin\\projet';
+        document.getElementById('inp-path').placeholder = t('newProject.projectFolderPlaceholder');
       }
     };
   });
@@ -2079,7 +2079,7 @@ document.getElementById('btn-new-project').onclick = () => {
         try {
           fs.mkdirSync(projPath, { recursive: true });
         } catch (err) {
-          showToast('Unable to create folder:' + err.message, 'error');
+          showToast(t('newProject.unableToCreateFolder', { error: err.message }), 'error');
           return;
         }
       }
@@ -2090,7 +2090,7 @@ document.getElementById('btn-new-project').onclick = () => {
       projPath = path.join(projPath, name);
       try {
         if (fs.existsSync(projPath)) {
-          showToast('Ce dossier existe deja', 'error');
+          showToast(t('newProject.folderAlreadyExists'), 'error');
           return;
         }
         fs.mkdirSync(projPath, { recursive: true });
@@ -2112,11 +2112,11 @@ document.getElementById('btn-new-project').onclick = () => {
               ''
             ].join('\n'));
           } catch (gitErr) {
-            showToast('Dossier cree mais erreur git init: ' + gitErr.message, 'error');
+            showToast(t('newProject.folderCreatedGitInitError', { error: gitErr.message }), 'error');
           }
         }
       } catch (err) {
-        showToast('Unable to create folder:' + err.message, 'error');
+        showToast(t('newProject.unableToCreateFolder', { error: err.message }), 'error');
         return;
       }
     }
@@ -2129,7 +2129,7 @@ document.getElementById('btn-new-project').onclick = () => {
       const submitBtn = document.getElementById('btn-create-project');
       const cloneStatus = document.querySelector('.clone-status');
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="btn-spinner"></span> Clonage...';
+      submitBtn.innerHTML = `<span class="btn-spinner"></span> ${t('newProject.cloning')}`;
       cloneStatus.style.display = 'block';
 
       try {
@@ -2286,7 +2286,7 @@ filterBtnBranch.onclick = async (e) => {
     const useCache = branchCache.projectId === currentFilterProjectId && branchCache.data;
 
     if (!useCache) {
-      branchDropdownList.innerHTML = '<div class="branch-dropdown-loading">Chargement...</div>';
+      branchDropdownList.innerHTML = `<div class="branch-dropdown-loading">${t('common.loading')}</div>`;
     }
 
     try {
@@ -2305,7 +2305,7 @@ filterBtnBranch.onclick = async (e) => {
       const { local = [], remote = [] } = branchesData;
 
       if (local.length === 0 && remote.length === 0) {
-        branchDropdownList.innerHTML = '<div class="branch-dropdown-loading">No branches found</div>';
+        branchDropdownList.innerHTML = `<div class="branch-dropdown-loading">${t('git.noBranchesFound')}</div>`;
         return;
       }
 
@@ -2313,33 +2313,33 @@ filterBtnBranch.onclick = async (e) => {
 
       // Header with create branch button
       html += `<div class="branch-dropdown-header-row">
-        <span>Branches</span>
-        <button class="branch-create-btn" id="branch-create-toggle" title="New branch">
+        <span>${t('branches.title')}</span>
+        <button class="branch-create-btn" id="branch-create-toggle" title="${t('branches.newBranch')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
       </div>`;
 
       // Create branch input (hidden by default)
       html += `<div class="branch-create-input-row" id="branch-create-row" style="display:none">
-        <input type="text" class="branch-create-input" id="branch-create-input" placeholder="Branch name..." spellcheck="false" />
-        <button class="branch-create-confirm" id="branch-create-confirm" title="Create">
+        <input type="text" class="branch-create-input" id="branch-create-input" placeholder="${t('branches.branchName')}" spellcheck="false" />
+        <button class="branch-create-confirm" id="branch-create-confirm" title="${t('branches.create')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
       </div>`;
 
       // Local branches section
       if (local.length > 0) {
-        html += '<div class="branch-dropdown-section-title">Local branches</div>';
+        html += `<div class="branch-dropdown-section-title">${t('branches.localBranches')}</div>`;
         html += local.map(branch => {
           const isCurrent = branch === currentBranch;
           return `
           <div class="branch-dropdown-item ${isCurrent ? 'current' : ''}" data-branch="${escapeHtml(branch)}">
             <span class="branch-dropdown-item-name">${escapeHtml(branch)}</span>
             ${!isCurrent ? `<div class="branch-dropdown-actions">
-              <button class="branch-action-btn branch-merge-btn" data-action="merge" data-branch="${escapeHtml(branch)}" title="Merge into ${escapeHtml(currentBranch)}">
+              <button class="branch-action-btn branch-merge-btn" data-action="merge" data-branch="${escapeHtml(branch)}" title="${t('git.mergedInto', { source: escapeHtml(branch), target: escapeHtml(currentBranch) })}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
               </button>
-              <button class="branch-action-btn branch-delete-btn" data-action="delete" data-branch="${escapeHtml(branch)}" title="Delete branch">
+              <button class="branch-action-btn branch-delete-btn" data-action="delete" data-branch="${escapeHtml(branch)}" title="${t('git.branchDeleted')}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
             </div>` : ''}
@@ -2349,7 +2349,7 @@ filterBtnBranch.onclick = async (e) => {
 
       // Remote branches section
       if (remote.length > 0) {
-        html += '<div class="branch-dropdown-section-title remote">Remote branches</div>';
+        html += `<div class="branch-dropdown-section-title remote">${t('branches.remoteBranches')}</div>`;
         html += remote.map(branch => `
           <div class="branch-dropdown-item remote" data-branch="${escapeHtml(branch)}" data-remote="true">
             <svg class="branch-remote-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
@@ -2382,12 +2382,12 @@ filterBtnBranch.onclick = async (e) => {
         if (result.success) {
           filterBranchName.textContent = name;
           branchCache = { projectId: null, data: null };
-          showGitToast({ success: true, title: 'Branch created', message: `Switched to ${name}`, duration: 3000 });
+          showGitToast({ success: true, title: t('git.branchCreated'), message: t('git.switchedToBranch', { name }), duration: 3000 });
           branchDropdown.classList.remove('active');
           filterBtnBranch.classList.remove('open');
           refreshDashboardAsync(currentFilterProjectId);
         } else {
-          showGitToast({ success: false, title: 'Error', message: result.error || 'Unable to create branch', duration: 5000 });
+          showGitToast({ success: false, title: t('common.error'), message: result.error || t('git.unableToCreateBranch'), duration: 5000 });
           createConfirm.disabled = false;
           createInput.disabled = false;
         }
@@ -2409,12 +2409,12 @@ filterBtnBranch.onclick = async (e) => {
             const result = await api.git.merge({ projectPath: project.path, branch: targetBranch });
             if (result.success) {
               branchCache = { projectId: null, data: null };
-              showGitToast({ success: true, title: 'Merge successful', message: `${targetBranch} merged into ${currentBranch}`, duration: 3000 });
+              showGitToast({ success: true, title: t('git.mergeSuccessful'), message: t('git.mergedInto', { source: targetBranch, target: currentBranch }), duration: 3000 });
               branchDropdown.classList.remove('active');
               filterBtnBranch.classList.remove('open');
               refreshDashboardAsync(currentFilterProjectId);
             } else {
-              showGitToast({ success: false, title: 'Merge error', message: result.error || 'Merge failed', duration: 5000 });
+              showGitToast({ success: false, title: t('git.mergeError'), message: result.error || t('git.mergeFailed'), duration: 5000 });
               btn.disabled = false;
             }
           }
@@ -2425,14 +2425,14 @@ filterBtnBranch.onclick = async (e) => {
             const nameSpan = item.querySelector('.branch-dropdown-item-name');
             const actionsDiv = item.querySelector('.branch-dropdown-actions');
             actionsDiv.style.display = 'none';
-            nameSpan.innerHTML = `Delete <strong>${escapeHtml(targetBranch)}</strong>?`;
+            nameSpan.innerHTML = `${t('git.confirmDeleteBranch', { name: `<strong>${escapeHtml(targetBranch)}</strong>` })}`;
             item.classList.add('confirm-delete');
 
             const confirmRow = document.createElement('div');
             confirmRow.className = 'branch-delete-confirm-row';
             confirmRow.innerHTML = `
-              <button class="branch-confirm-yes">Delete</button>
-              <button class="branch-confirm-no">Cancel</button>
+              <button class="branch-confirm-yes">${t('common.delete')}</button>
+              <button class="branch-confirm-no">${t('common.cancel')}</button>
             `;
             item.appendChild(confirmRow);
 
@@ -2441,12 +2441,12 @@ filterBtnBranch.onclick = async (e) => {
               const result = await api.git.deleteBranch({ projectPath: project.path, branch: targetBranch });
               if (result.success) {
                 branchCache = { projectId: null, data: null };
-                showGitToast({ success: true, title: 'Branch deleted', message: `${targetBranch} deleted`, duration: 3000 });
+                showGitToast({ success: true, title: t('git.branchDeleted'), message: t('git.branchDeletedMsg', { name: targetBranch }), duration: 3000 });
                 // Re-render the dropdown
                 item.remove();
                 refreshDashboardAsync(currentFilterProjectId);
               } else {
-                showGitToast({ success: false, title: 'Error', message: result.error || 'Deletion failed', duration: 5000 });
+                showGitToast({ success: false, title: t('common.error'), message: result.error || t('git.deletionFailed'), duration: 5000 });
                 // Restore UI
                 confirmRow.remove();
                 item.classList.remove('confirm-delete');
@@ -2493,16 +2493,16 @@ filterBtnBranch.onclick = async (e) => {
             branchCache = { projectId: null, data: null };
             showGitToast({
               success: true,
-              title: 'Branch changed',
-              message: `Switched to ${branch}`,
+              title: t('git.branchChanged'),
+              message: t('git.switchedToBranch', { name: branch }),
               duration: 3000
             });
             refreshDashboardAsync(currentFilterProjectId);
           } else {
             showGitToast({
               success: false,
-              title: 'Error',
-              message: result.error || 'Unable to switch branch',
+              title: t('common.error'),
+              message: result.error || t('git.unableToSwitchBranch'),
               duration: 5000
             });
           }
@@ -2512,7 +2512,7 @@ filterBtnBranch.onclick = async (e) => {
         };
       });
     } catch (e) {
-      branchDropdownList.innerHTML = '<div class="branch-dropdown-loading">Loading error</div>';
+      branchDropdownList.innerHTML = `<div class="branch-dropdown-loading">${t('git.loadingError')}</div>`;
     }
   }
 };
@@ -2963,7 +2963,7 @@ api.updates.onStatus((data) => {
 
       updateState.available = true;
       updateState.version = data.version;
-      updateMessage.textContent = `Nouvelle version disponible: v${data.version}`;
+      updateMessage.textContent = t('updates.newVersionAvailable', { version: data.version });
       updateProgressContainer.style.display = 'flex';
       updateBtn.style.display = 'none';
       updateBanner.classList.remove('downloaded');
@@ -2978,11 +2978,11 @@ api.updates.onStatus((data) => {
       updateState.downloaded = true;
       updateState.downloadedVersion = data.version;  // Track actual downloaded version
       updateState.version = data.version;  // Update to actual version
-      updateMessage.textContent = `v${data.version} ready to install`;
+      updateMessage.textContent = t('updates.readyToInstall', { version: data.version });
       updateProgressContainer.style.display = 'none';
       updateBtn.style.display = 'block';
       updateBtn.disabled = false;  // Re-enable button
-      updateBtn.textContent = 'Restart to update';  // Reset button text
+      updateBtn.textContent = t('updates.restartToUpdate');  // Reset button text
       updateBanner.classList.add('downloaded');
       showUpdateBanner();
       break;
@@ -3010,7 +3010,7 @@ api.updates.onStatus((data) => {
 updateBtn.addEventListener('click', () => {
   // Disable button and show installing state
   updateBtn.disabled = true;
-  updateBtn.textContent = 'Installation...';
+  updateBtn.textContent = t('updates.installing');
   api.app.installUpdate();
 });
 
@@ -3231,13 +3231,13 @@ function showCIStatusBar(run) {
   if (run.status === 'completed') {
     if (run.conclusion === 'success') {
       ciStatusBar.element.classList.add('success');
-      ciStatusBar.statusText.textContent = 'Passed';
+      ciStatusBar.statusText.textContent = t('ci.passed');
     } else {
       ciStatusBar.element.classList.add('failure');
-      ciStatusBar.statusText.textContent = run.conclusion === 'cancelled' ? 'Cancelled' : 'Failed';
+      ciStatusBar.statusText.textContent = run.conclusion === 'cancelled' ? t('ci.cancelled') : t('ci.failed');
     }
   } else {
-    ciStatusBar.statusText.textContent = run.status === 'queued' ? 'Queued' : 'Running';
+    ciStatusBar.statusText.textContent = run.status === 'queued' ? t('ci.queued') : t('ci.running');
   }
 
   // Update duration
