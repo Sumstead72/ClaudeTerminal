@@ -122,13 +122,14 @@ function renderFolderHtml(folder, depth) {
     });
   }
 
-  const colorStyle = folderColor ? `style="color: ${folderColor}"` : '';
-  const colorIndicator = folderColor ? `<span class="color-indicator" style="background: ${folderColor}"></span>` : '';
+  const safeFolderColor = folderColor && /^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/.test(folderColor) ? folderColor : '';
+  const colorStyle = safeFolderColor ? `style="color: ${safeFolderColor}"` : '';
+  const colorIndicator = safeFolderColor ? `<span class="color-indicator" style="background: ${safeFolderColor}"></span>` : '';
   const folderIcon = folder.icon || null;
 
   // Build folder icon HTML - show custom emoji or default folder icon
   const folderIconHtml = folderIcon
-    ? `<span class="folder-emoji-icon">${folderIcon}</span>`
+    ? `<span class="folder-emoji-icon">${escapeHtml(folderIcon)}</span>`
     : `<svg class="folder-icon" viewBox="0 0 24 24" fill="currentColor" ${colorStyle}><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>`;
 
   return `
@@ -179,7 +180,8 @@ function renderProjectHtml(project, depth) {
   // Customize button for menu (opens the CustomizePicker)
   const projectIcon = project.icon || null;
   const customizePreview = projectIcon || '📁';
-  const customizeColorDot = projectColor ? `<span class="customize-preview-dot" style="background: ${projectColor}"></span>` : '';
+  const safeProjectColor = projectColor && /^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/.test(projectColor) ? projectColor : '';
+  const customizeColorDot = safeProjectColor ? `<span class="customize-preview-dot" style="background: ${safeProjectColor}"></span>` : '';
 
   let menuItemsHtml = '';
   const typeMenuItems = typeHandler.getMenuItems ? typeHandler.getMenuItems(typeCtx) : '';
@@ -243,7 +245,7 @@ function renderProjectHtml(project, depth) {
   // Get time tracking data
   const times = getProjectTimes(project.id);
   const hasTime = times.total > 0 || times.today > 0;
-  const iconColorStyle = projectColor ? `style="color: ${projectColor}"` : '';
+  const iconColorStyle = safeProjectColor ? `style="color: ${safeProjectColor}"` : '';
   const gitBranch = gitRepoStatus.get(project.id)?.branch || null;
 
   // Build project icon HTML
@@ -252,7 +254,7 @@ function renderProjectHtml(project, depth) {
   if (typeIcon) {
     projectIconHtml = `${statusIndicator}${typeIcon}`;
   } else if (projectIcon) {
-    projectIconHtml = `<span class="project-emoji-icon">${projectIcon}</span>`;
+    projectIconHtml = `<span class="project-emoji-icon">${escapeHtml(projectIcon)}</span>`;
   } else {
     projectIconHtml = `<svg viewBox="0 0 24 24" fill="currentColor" ${iconColorStyle}><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>`;
   }

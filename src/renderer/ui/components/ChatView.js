@@ -27,7 +27,7 @@ function renderMarkdown(text) {
     const decoded = code.trim();
     const highlighted = lang ? highlight(decoded, lang) : escapeHtml(decoded);
     const placeholder = `%%CODEBLOCK_${codeBlocks.length}%%`;
-    codeBlocks.push(`<div class="chat-code-block"><div class="chat-code-header"><span class="chat-code-lang">${lang || 'text'}</span><button class="chat-code-copy" title="${t('common.copy')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div><pre><code>${highlighted}</code></pre></div>`);
+    codeBlocks.push(`<div class="chat-code-block"><div class="chat-code-header"><span class="chat-code-lang">${escapeHtml(lang || 'text')}</span><button class="chat-code-copy" title="${t('common.copy')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div><pre><code>${highlighted}</code></pre></div>`);
     return placeholder;
   });
 
@@ -674,9 +674,10 @@ function createChatView(wrapperEl, project, options = {}) {
       filter: (items, q) => items.filter(p => (p.name || '').toLowerCase().includes(q) || (p.path || '').toLowerCase().includes(q)),
       renderItem: (p) => {
         const pIcon = p.icon || null;
-        const pColor = p.color || null;
+        const pColorRaw = p.color || null;
+        const pColor = pColorRaw && /^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/.test(pColorRaw) ? pColorRaw : null;
         const iconHtml = pIcon
-          ? `<span class="chat-mention-item-emoji"${pColor ? ` style="color:${pColor}"` : ''}>${pIcon}</span>`
+          ? `<span class="chat-mention-item-emoji"${pColor ? ` style="color:${pColor}"` : ''}>${escapeHtml(pIcon)}</span>`
           : `<span class="chat-mention-item-icon"${pColor ? ` style="color:${pColor}"` : ''}><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg></span>`;
         return `${iconHtml}
         <div class="chat-mention-item-info">
@@ -940,7 +941,8 @@ function createChatView(wrapperEl, project, options = {}) {
     }
     mentionChipsEl.style.display = 'flex';
     mentionChipsEl.innerHTML = pendingMentions.map((chip, i) => {
-      const chipColor = (chip.type === 'project' && chip.data?.color) ? chip.data.color : '';
+      const chipColorRaw = (chip.type === 'project' && chip.data?.color) ? chip.data.color : '';
+      const chipColor = chipColorRaw && /^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/.test(chipColorRaw) ? chipColorRaw : '';
       const colorStyle = chipColor ? ` style="--chip-color: ${chipColor}"` : '';
       const isProject = chip.type === 'project';
       const displayName = isProject && chip.data?.name ? chip.data.name : chip.label;
@@ -1843,9 +1845,10 @@ function createChatView(wrapperEl, project, options = {}) {
     }
     if (mentions.length > 0) {
       html += `<div class="chat-msg-mentions">${mentions.map(m => {
-        const tagColor = (m.type === 'project' && m.data?.color) ? m.data.color : '';
+        const tagColorRaw = (m.type === 'project' && m.data?.color) ? m.data.color : '';
+        const tagColor = tagColorRaw && /^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/.test(tagColorRaw) ? tagColorRaw : '';
         const tagStyle = tagColor ? ` style="--chip-color: ${tagColor}"` : '';
-        return `<span class="chat-msg-mention-tag${tagColor ? ' has-project-color' : ''}"${tagStyle}>${m.icon}<span>${escapeHtml(m.label)}</span></span>`;
+        return `<span class="chat-msg-mention-tag${tagColor ? ' has-project-color' : ''}"${tagStyle}>${escapeHtml(m.icon)}<span>${escapeHtml(m.label)}</span></span>`;
       }).join('')}</div>`;
     }
     if (images.length > 0) {
