@@ -241,6 +241,201 @@ class FivemService {
   }
 
   /**
+   * Build a fxmanifest.lua content string from structured data
+   * @param {Object} data
+   * @returns {string}
+   */
+  _buildManifest({ fxVersion = 'cerulean', game = 'gta5', name = '', description = '', version = '1.0.0', author = '', clientScriptsRaw = '', serverScriptsRaw = '', sharedScriptsRaw = '' , dependenciesRaw = '' } = {}) {
+    const lines = [];
+
+    lines.push(`fx_version '${fxVersion}'`);
+    lines.push(`game '${game}'`);
+    lines.push('');
+
+    if (name) lines.push(`name '${name}'`);
+    if (description) lines.push(`description '${description}'`);
+    if (version) lines.push(`version '${version}'`);
+    if (author) lines.push(`author '${author}'`);
+
+    const formatScripts = (raw, key) => {
+      const entries = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      if (entries.length === 0) return null;
+      return `${key} { ${entries.map(e => `'${e}'`).join(', ')} }`;
+    };
+
+    const formatDeps = (raw) => {
+      const entries = raw.split(/[\n,]/).map(l => l.trim()).filter(Boolean);
+      if (entries.length === 0) return null;
+      return `dependencies { ${entries.map(e => `'${e}'`).join(', ')} }`;
+    };
+
+    const clientLine = formatScripts(clientScriptsRaw, 'client_scripts');
+    const serverLine = formatScripts(serverScriptsRaw, 'server_scripts');
+    const sharedLine = formatScripts(sharedScriptsRaw, 'shared_scripts');
+    const depsLine = formatDeps(dependenciesRaw);
+
+    if (clientLine || serverLine || sharedLine || depsLine) lines.push('');
+    if (clientLine) lines.push(clientLine);
+    if (serverLine) lines.push(serverLine);
+    if (sharedLine) lines.push(sharedLine);
+    if (depsLine) lines.push(depsLine);
+
+    return lines.join('\n') + '\n';
+  }
+
+  /**
+   * Create a new FiveM resource with a template
+   * @param {Object} options
+   * @returns {Object} - { success, resourcePath } or { success: false, error }
+   */
+  createResource({ projectPath, name, template = 'client_server', version = '1.0.0', author = '', description = '', dependencies = '' }) {
+    const fs = require('fs');
+
+    if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
+      return { success: false, error: 'Invalid resource name' };
+    }
+
+    const resourcePath = path.join(projectPath, 'resources', name);
+    if (fs.existsSync(resourcePath)) {
+      return { success: false, error: 'Resource already exists' };
+    }
+
+    try {
+      fs.mkdirSync(resourcePath, { recursive: true });
+
+      // Build script file lists based on template
+      let clientScriptsRaw = '';
+      let serverScriptsRaw = '';
+
+      const clientStub = '-- Client script\nlocal PlayerData = {}\n\nAddEventHandler(\'onClientGameTypeStart\', function()\n  -- Resource started\nend)\n';
+      const serverStub = '-- Server script\n\nAddEventHandler(\'onResourceStart\', function(resourceName)\n  if GetCurrentResourceName() == resourceName then\n    print("Resource started")\n  end\nend)\n';
+      const esxClientStub = '-- ESX Client script\nlocal ESX = exports[\'es_extended\']:getSharedObject()\n\nAddEventHandler(\'onClientGameTypeStart\', function()\n  -- Resource started\nend)\n';
+      const esxServerStub = '-- ESX Server script\nlocal ESX = exports[\'es_extended\']:getSharedObject()\n\nAddEventHandler(\'onResourceStart\', function(resourceName)\n  if GetCurrentResourceName() == resourceName then\n    print("Resource started")\n  end\nend)\n';
+      const qbClientStub = '-- QB-Core Client script\nlocal QBCore = exports[\'qb-core\']:GetCoreObject()\n\nAddEventHandler(\'onClientGameTypeStart\', function()\n  -- Resource started\nend)\n';
+      const qbServerStub = '-- QB-Core Server script\nlocal QBCore = exports[\'qb-core\']:GetCoreObject()\n\nAddEventHandler(\'onResourceStart\', function(resourceName)\n  if GetCurrentResourceName() == resourceName then\n    print("Resource started")\n  end\nend)\n';
+
+      if (template === 'client_server' || template === 'client_only' || template === 'esx' || template === 'qb') {
+        fs.mkdirSync(path.join(resourcePath, 'client'), { recursive: true });
+        const stub = template === 'esx' ? esxClientStub : template === 'qb' ? qbClientStub : clientStub;
+        fs.writeFileSync(path.join(resourcePath, 'client', 'client.lua'), stub);
+        clientScriptsRaw = 'client/client.lua';
+      }
+
+      if (template === 'client_server' || template === 'server_only' || template === 'esx' || template === 'qb') {
+        fs.mkdirSync(path.join(resourcePath, 'server'), { recursive: true });
+        const stub = template === 'esx' ? esxServerStub : template === 'qb' ? qbServerStub : serverStub;
+        fs.writeFileSync(path.join(resourcePath, 'server', 'server.lua'), stub);
+        serverScriptsRaw = 'server/server.lua';
+      }
+
+      // Extra deps for ESX/QB templates
+      let finalDeps = dependencies;
+      if (template === 'esx' && !finalDeps.includes('es_extended')) {
+        finalDeps = finalDeps ? `es_extended, ${finalDeps}` : 'es_extended';
+      } else if (template === 'qb' && !finalDeps.includes('qb-core')) {
+        finalDeps = finalDeps ? `qb-core, ${finalDeps}` : 'qb-core';
+      }
+
+      const manifest = this._buildManifest({ name, description, version, author, clientScriptsRaw, serverScriptsRaw, dependenciesRaw: finalDeps });
+      fs.writeFileSync(path.join(resourcePath, 'fxmanifest.lua'), manifest);
+
+      return { success: true, resourcePath };
+    } catch (e) {
+      console.error('Error creating resource:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Read a fxmanifest.lua and return raw content + parsed fields
+   * @param {Object} options
+   * @returns {Object} - { success, raw, parsed }
+   */
+  readManifest({ resourcePath }) {
+    const fs = require('fs');
+    const manifestPath = path.join(resourcePath, 'fxmanifest.lua');
+
+    if (!fs.existsSync(manifestPath)) {
+      return { success: false, error: 'No fxmanifest.lua found' };
+    }
+
+    try {
+      const raw = fs.readFileSync(manifestPath, 'utf8');
+
+      const parsed = {
+        fxVersion: '',
+        game: 'gta5',
+        name: '',
+        description: '',
+        version: '',
+        author: '',
+        clientScripts: [],
+        serverScripts: [],
+        sharedScripts: [],
+        dependencies: []
+      };
+
+      // Parse single-value fields: key 'value'
+      const singleRe = /^(\w+)\s+'([^']+)'/gm;
+      let m;
+      while ((m = singleRe.exec(raw)) !== null) {
+        const [, key, value] = m;
+        if (key === 'fx_version') parsed.fxVersion = value;
+        else if (key === 'game') parsed.game = value;
+        else if (key === 'name') parsed.name = value;
+        else if (key === 'description') parsed.description = value;
+        else if (key === 'version') parsed.version = value;
+        else if (key === 'author') parsed.author = value;
+      }
+
+      // Parse array fields: key { 'a', 'b' }
+      const arrayRe = /^(\w+)\s*\{([^}]+)\}/gm;
+      while ((m = arrayRe.exec(raw)) !== null) {
+        const [, key, inner] = m;
+        const entries = [...inner.matchAll(/'([^']+)'/g)].map(x => x[1]);
+        if (key === 'client_scripts' || key === 'client_script') parsed.clientScripts = entries;
+        else if (key === 'server_scripts' || key === 'server_script') parsed.serverScripts = entries;
+        else if (key === 'shared_scripts' || key === 'shared_script') parsed.sharedScripts = entries;
+        else if (key === 'dependencies' || key === 'dependency') parsed.dependencies = entries;
+      }
+
+      return { success: true, raw, parsed };
+    } catch (e) {
+      console.error('Error reading manifest:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Write a fxmanifest.lua (atomic write)
+   * @param {Object} options
+   * @returns {Object} - { success } or { success: false, error }
+   */
+  writeManifest({ resourcePath, data }) {
+    const fs = require('fs');
+    const manifestPath = path.join(resourcePath, 'fxmanifest.lua');
+    const tmpPath = manifestPath + '.tmp';
+
+    try {
+      let content;
+      if (data.raw !== undefined) {
+        content = data.raw;
+      } else {
+        content = this._buildManifest(data);
+      }
+
+      fs.writeFileSync(tmpPath, content, 'utf8');
+      fs.renameSync(tmpPath, manifestPath);
+
+      return { success: true };
+    } catch (e) {
+      console.error('Error writing manifest:', e);
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
    * Scan resources for a FiveM project
    * @param {string} projectPath - Path to the FiveM server
    * @returns {Object} - List of resources with their status

@@ -39,6 +39,21 @@ function registerHandlers() {
   ipcMain.handle('fivem-resource-command', async (event, { projectIndex, command }) => {
     return fivemService.sendCommand(projectIndex, command);
   });
+
+  // Create a new resource with template
+  ipcMain.handle('fivem-create-resource', async (event, params) => {
+    return fivemService.createResource(params);
+  });
+
+  // Read fxmanifest.lua → raw + parsed fields
+  ipcMain.handle('fivem-read-manifest', async (event, params) => {
+    return fivemService.readManifest(params);
+  });
+
+  // Write fxmanifest.lua (atomic)
+  ipcMain.handle('fivem-write-manifest', async (event, params) => {
+    return fivemService.writeManifest(params);
+  });
 }
 
 module.exports = { registerHandlers, registerFivemHandlers: registerHandlers };

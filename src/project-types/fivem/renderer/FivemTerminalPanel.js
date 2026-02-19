@@ -6,6 +6,8 @@
 
 const { t } = require('../../../renderer/i18n');
 const { escapeHtml } = require('../../../renderer/utils');
+const { createModal, showModal, closeModal } = require('../../../renderer/ui/components/Modal');
+const { showSuccess, showError } = require('../../../renderer/ui/components/Toast');
 
 /**
  * Get the view switcher HTML for the FiveM console wrapper
@@ -61,6 +63,9 @@ function getViewSwitcherHtml() {
           </div>
           <button class="fivem-refresh-resources" title="${t('fivem.refreshResources')}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+          <button class="fivem-create-resource-btn" title="${t('fivem.createResource')}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </div>
         <div class="fivem-resources-list"></div>
@@ -151,6 +156,13 @@ function setupViewSwitcher(wrapper, terminalId, projectIndex, project, deps) {
   refreshBtn.onclick = () => {
     scanAndRenderResources(wrapper, projectIndex, project, deps);
   };
+
+  const createResourceBtn = wrapper.querySelector('.fivem-create-resource-btn');
+  if (createResourceBtn) {
+    createResourceBtn.onclick = () => {
+      showCreateResourceModal(wrapper, projectIndex, project, deps);
+    };
+  }
 
   searchInput.oninput = () => {
     renderResourcesList(wrapper, projectIndex, project, searchInput.value, deps);
@@ -407,6 +419,9 @@ function renderResourcesList(wrapper, projectIndex, project, searchFilter, deps)
                 <button class="fivem-resource-btn stop" title="${t('fivem.stop')}" data-action="stop" data-resource="${escapeHtml(resource.name)}">
                   <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="6" width="12" height="12"/></svg>
                 </button>
+                <button class="fivem-resource-btn manifest" title="${t('fivem.editManifest')}" data-action="manifest" data-path="${escapeHtml(resource.path)}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </button>
                 <button class="fivem-resource-btn folder" title="${t('fivem.openFolder')}" data-action="folder" data-path="${escapeHtml(resource.path)}">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 </button>
@@ -428,6 +443,11 @@ function renderResourcesList(wrapper, projectIndex, project, searchFilter, deps)
 
       if (action === 'folder') {
         deps.api.dialog.openInExplorer(resourcePath);
+        return;
+      }
+
+      if (action === 'manifest') {
+        showManifestEditorModal(resourcePath, deps.api);
         return;
       }
 
@@ -475,6 +495,17 @@ function renderResourcesList(wrapper, projectIndex, project, searchFilter, deps)
       header.parentElement.classList.toggle('collapsed');
     };
   });
+
+  // Right-click context menu on resource items
+  list.querySelectorAll('.fivem-resource-item').forEach(item => {
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const resourcePath = item.dataset.path;
+      const resourceName = item.dataset.name;
+      showResourceContextMenu(e.clientX, e.clientY, resourcePath, resourceName, deps.api);
+    });
+  });
 }
 
 /**
@@ -517,6 +548,417 @@ function captureResourceShortcut(btn, projectIndex, resourceName, wrapper, proje
   };
 
   document.addEventListener('keydown', handleKeyDown, true);
+}
+
+/**
+ * Show a context menu for a resource item
+ */
+function showResourceContextMenu(x, y, resourcePath, resourceName, api) {
+  document.querySelectorAll('.fivem-resource-context-menu').forEach(m => m.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'fivem-resource-context-menu';
+  menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:9999`;
+  menu.innerHTML = `
+    <button class="fivem-ctx-item" data-action="manifest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      ${t('fivem.editManifest')}
+    </button>
+    <button class="fivem-ctx-item" data-action="folder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      ${t('fivem.openFolder')}
+    </button>
+  `;
+
+  menu.querySelector('[data-action="manifest"]').onclick = () => {
+    menu.remove();
+    showManifestEditorModal(resourcePath, api);
+  };
+  menu.querySelector('[data-action="folder"]').onclick = () => {
+    menu.remove();
+    api.dialog.openInExplorer(resourcePath);
+  };
+
+  document.body.appendChild(menu);
+
+  // Clamp to viewport
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 4}px`;
+    if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 4}px`;
+  });
+
+  const dismiss = (e) => {
+    if (!menu.contains(e.target)) {
+      menu.remove();
+      document.removeEventListener('click', dismiss, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', dismiss, true), 0);
+}
+
+/**
+ * Show "Create Resource" modal
+ */
+function showCreateResourceModal(wrapper, projectIndex, project, deps) {
+  const content = `
+    <div class="fivem-resource-wizard">
+      <div class="form-group">
+        <label class="form-label">${t('fivem.resourceName')} *</label>
+        <input type="text" id="fivem-res-name" class="form-input" placeholder="my_resource" autocomplete="off">
+        <span class="form-hint">${t('fivem.resourceNameHint')}</span>
+        <span class="form-error" id="fivem-res-name-error" style="display:none"></span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('fivem.template')}</label>
+        <select id="fivem-res-template" class="form-input">
+          <option value="blank">${t('fivem.templateBlank')}</option>
+          <option value="client_server" selected>${t('fivem.templateClientServer')}</option>
+          <option value="client_only">${t('fivem.templateClientOnly')}</option>
+          <option value="server_only">${t('fivem.templateServerOnly')}</option>
+          <option value="esx">${t('fivem.templateEsx')}</option>
+          <option value="qb">${t('fivem.templateQb')}</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">${t('fivem.version')}</label>
+          <input type="text" id="fivem-res-version" class="form-input" value="1.0.0" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('fivem.author')}</label>
+          <input type="text" id="fivem-res-author" class="form-input" placeholder="${t('fivem.authorPlaceholder')}" autocomplete="off">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('fivem.description')}</label>
+        <input type="text" id="fivem-res-description" class="form-input" placeholder="${t('fivem.descriptionPlaceholder')}" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('fivem.dependencies')}</label>
+        <input type="text" id="fivem-res-dependencies" class="form-input" placeholder="es_extended, oxmysql" autocomplete="off">
+        <span class="form-hint">${t('fivem.dependenciesHint')}</span>
+      </div>
+    </div>
+  `;
+
+  const modal = createModal({
+    id: 'fivem-create-resource-modal',
+    title: t('fivem.createResource'),
+    content,
+    size: 'large',
+    buttons: [
+      {
+        label: t('common.cancel') || 'Cancel',
+        action: 'cancel',
+        onClick: (m) => closeModal(m)
+      },
+      {
+        label: t('fivem.createResourceBtn'),
+        action: 'create',
+        primary: true,
+        onClick: async (m) => {
+          const nameInput = m.querySelector('#fivem-res-name');
+          const nameError = m.querySelector('#fivem-res-name-error');
+          const name = nameInput.value.trim();
+
+          nameError.style.display = 'none';
+
+          if (!name) {
+            nameError.textContent = t('fivem.nameRequired');
+            nameError.style.display = '';
+            return;
+          }
+          if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+            nameError.textContent = t('fivem.nameInvalid');
+            nameError.style.display = '';
+            return;
+          }
+
+          const createBtn = m.querySelector('[data-action="create"]');
+          createBtn.disabled = true;
+          const origLabel = createBtn.textContent;
+          createBtn.textContent = t('fivem.creating');
+
+          try {
+            const result = await deps.api.fivem.createResource({
+              projectPath: project.path,
+              name,
+              template: m.querySelector('#fivem-res-template').value,
+              version: m.querySelector('#fivem-res-version').value.trim() || '1.0.0',
+              author: m.querySelector('#fivem-res-author').value.trim(),
+              description: m.querySelector('#fivem-res-description').value.trim(),
+              dependencies: m.querySelector('#fivem-res-dependencies').value.trim()
+            });
+
+            if (result.success) {
+              closeModal(m);
+              showSuccess(t('fivem.resourceCreated', { name }));
+              scanAndRenderResources(wrapper, projectIndex, project, deps);
+            } else {
+              nameError.textContent = result.error || 'Error creating resource';
+              nameError.style.display = '';
+              createBtn.disabled = false;
+              createBtn.textContent = origLabel;
+            }
+          } catch (err) {
+            console.error('Create resource error:', err);
+            nameError.textContent = 'Unexpected error';
+            nameError.style.display = '';
+            createBtn.disabled = false;
+            createBtn.textContent = origLabel;
+          }
+        }
+      }
+    ]
+  });
+
+  showModal(modal);
+  setTimeout(() => modal.querySelector('#fivem-res-name')?.focus(), 100);
+}
+
+/**
+ * Build raw fxmanifest.lua string from form fields
+ */
+function buildRawFromForm(modal) {
+  const get = (id) => modal.querySelector(id)?.value || '';
+  const lines = [];
+
+  const fxVersion = get('#mf-fxversion').trim() || 'cerulean';
+  const game = get('#mf-game') || 'gta5';
+  lines.push(`fx_version '${fxVersion}'`);
+  lines.push(`game '${game}'`);
+  lines.push('');
+
+  const name = get('#mf-name').trim();
+  const description = get('#mf-description').trim();
+  const version = get('#mf-version').trim();
+  const author = get('#mf-author').trim();
+  if (name) lines.push(`name '${name}'`);
+  if (description) lines.push(`description '${description}'`);
+  if (version) lines.push(`version '${version}'`);
+  if (author) lines.push(`author '${author}'`);
+
+  const formatScripts = (raw, key) => {
+    const entries = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!entries.length) return null;
+    return `${key} { ${entries.map(e => `'${e}'`).join(', ')} }`;
+  };
+  const formatDeps = (raw) => {
+    const entries = raw.split(/[\n,]/).map(l => l.trim()).filter(Boolean);
+    if (!entries.length) return null;
+    return `dependencies { ${entries.map(e => `'${e}'`).join(', ')} }`;
+  };
+
+  const clientLine = formatScripts(get('#mf-client'), 'client_scripts');
+  const serverLine = formatScripts(get('#mf-server'), 'server_scripts');
+  const sharedLine = formatScripts(get('#mf-shared'), 'shared_scripts');
+  const depsLine = formatDeps(get('#mf-deps'));
+
+  if (clientLine || serverLine || sharedLine || depsLine) lines.push('');
+  if (clientLine) lines.push(clientLine);
+  if (serverLine) lines.push(serverLine);
+  if (sharedLine) lines.push(sharedLine);
+  if (depsLine) lines.push(depsLine);
+
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * Sync visual form fields from raw Lua content (best-effort)
+ */
+function syncFormFromRaw(modal, rawText) {
+  const set = (id, value) => { const el = modal.querySelector(id); if (el) el.value = value; };
+
+  const singleRe = /^(\w+)\s+'([^']+)'/gm;
+  let m;
+  while ((m = singleRe.exec(rawText)) !== null) {
+    const [, key, value] = m;
+    if (key === 'fx_version') set('#mf-fxversion', value);
+    else if (key === 'game') set('#mf-game', value);
+    else if (key === 'name') set('#mf-name', value);
+    else if (key === 'description') set('#mf-description', value);
+    else if (key === 'version') set('#mf-version', value);
+    else if (key === 'author') set('#mf-author', value);
+  }
+
+  const arrayRe = /^(\w+)\s*\{([^}]+)\}/gm;
+  while ((m = arrayRe.exec(rawText)) !== null) {
+    const [, key, inner] = m;
+    const entries = [...inner.matchAll(/'([^']+)'/g)].map(x => x[1]);
+    if (key === 'client_scripts' || key === 'client_script') set('#mf-client', entries.join('\n'));
+    else if (key === 'server_scripts' || key === 'server_script') set('#mf-server', entries.join('\n'));
+    else if (key === 'shared_scripts' || key === 'shared_script') set('#mf-shared', entries.join('\n'));
+    else if (key === 'dependencies' || key === 'dependency') set('#mf-deps', entries.join('\n'));
+  }
+}
+
+/**
+ * Show fxmanifest.lua editor modal
+ */
+async function showManifestEditorModal(resourcePath, api) {
+  let manifestData;
+  try {
+    manifestData = await api.fivem.readManifest({ resourcePath });
+  } catch (e) {
+    showError(t('fivem.manifestReadError'));
+    return;
+  }
+
+  if (!manifestData.success) {
+    showError(manifestData.error || t('fivem.manifestReadError'));
+    return;
+  }
+
+  const { raw, parsed } = manifestData;
+  const resourceName = resourcePath.replace(/\\/g, '/').split('/').pop();
+
+  const esc = (s) => escapeHtml(s || '');
+
+  const content = `
+    <div class="fivem-manifest-editor">
+      <div class="manifest-tab-bar">
+        <button class="manifest-tab active" data-tab="visual">${t('fivem.manifestVisual')}</button>
+        <button class="manifest-tab" data-tab="raw">${t('fivem.manifestRaw')}</button>
+      </div>
+      <div class="manifest-tab-content" data-content="visual">
+        <div class="manifest-form-grid">
+          <div class="form-group">
+            <label class="form-label">fx_version</label>
+            <input type="text" id="mf-fxversion" class="form-input" value="${esc(parsed.fxVersion || 'cerulean')}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">game</label>
+            <select id="mf-game" class="form-input">
+              <option value="gta5" ${parsed.game === 'gta5' || !parsed.game ? 'selected' : ''}>gta5</option>
+              <option value="rdr3" ${parsed.game === 'rdr3' ? 'selected' : ''}>rdr3</option>
+              <option value="common" ${parsed.game === 'common' ? 'selected' : ''}>common</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">name</label>
+            <input type="text" id="mf-name" class="form-input" value="${esc(parsed.name)}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">version</label>
+            <input type="text" id="mf-version" class="form-input" value="${esc(parsed.version)}">
+          </div>
+          <div class="form-group form-group-full">
+            <label class="form-label">description</label>
+            <input type="text" id="mf-description" class="form-input" value="${esc(parsed.description)}">
+          </div>
+          <div class="form-group form-group-full">
+            <label class="form-label">author</label>
+            <input type="text" id="mf-author" class="form-input" value="${esc(parsed.author)}">
+          </div>
+          <div class="form-group form-group-full">
+            <label class="form-label">client_scripts</label>
+            <textarea id="mf-client" class="form-textarea form-code">${esc((parsed.clientScripts || []).join('\n'))}</textarea>
+            <span class="form-hint">${t('fivem.scriptsHint')}</span>
+          </div>
+          <div class="form-group form-group-full">
+            <label class="form-label">server_scripts</label>
+            <textarea id="mf-server" class="form-textarea form-code">${esc((parsed.serverScripts || []).join('\n'))}</textarea>
+          </div>
+          <div class="form-group form-group-full">
+            <label class="form-label">shared_scripts</label>
+            <textarea id="mf-shared" class="form-textarea form-code">${esc((parsed.sharedScripts || []).join('\n'))}</textarea>
+          </div>
+          <div class="form-group form-group-full">
+            <label class="form-label">dependencies</label>
+            <textarea id="mf-deps" class="form-textarea">${esc((parsed.dependencies || []).join('\n'))}</textarea>
+            <span class="form-hint">${t('fivem.dependenciesHint')}</span>
+          </div>
+        </div>
+      </div>
+      <div class="manifest-tab-content" data-content="raw" style="display:none">
+        <textarea id="mf-raw" class="form-textarea form-code manifest-raw-editor" spellcheck="false">${esc(raw)}</textarea>
+      </div>
+    </div>
+  `;
+
+  const modal = createModal({
+    id: 'fivem-manifest-editor-modal',
+    title: `${t('fivem.editManifest')} — ${escapeHtml(resourceName)}`,
+    content,
+    size: 'large',
+    buttons: [
+      {
+        label: t('common.cancel') || 'Cancel',
+        action: 'cancel',
+        onClick: (m) => closeModal(m)
+      },
+      {
+        label: t('common.save') || 'Save',
+        action: 'save',
+        primary: true,
+        onClick: async (m) => {
+          const activeTab = m.querySelector('.manifest-tab.active')?.dataset.tab;
+          let writeData;
+
+          if (activeTab === 'raw') {
+            writeData = { raw: m.querySelector('#mf-raw').value };
+          } else {
+            writeData = {
+              fxVersion: m.querySelector('#mf-fxversion').value.trim(),
+              game: m.querySelector('#mf-game').value,
+              name: m.querySelector('#mf-name').value.trim(),
+              version: m.querySelector('#mf-version').value.trim(),
+              author: m.querySelector('#mf-author').value.trim(),
+              description: m.querySelector('#mf-description').value.trim(),
+              clientScriptsRaw: m.querySelector('#mf-client').value,
+              serverScriptsRaw: m.querySelector('#mf-server').value,
+              sharedScriptsRaw: m.querySelector('#mf-shared').value,
+              dependenciesRaw: m.querySelector('#mf-deps').value
+            };
+          }
+
+          const saveBtn = m.querySelector('[data-action="save"]');
+          saveBtn.disabled = true;
+
+          try {
+            const result = await api.fivem.writeManifest({ resourcePath, data: writeData });
+            if (result.success) {
+              closeModal(m);
+              showSuccess(t('fivem.manifestSaved'));
+            } else {
+              showError(result.error || 'Error saving manifest');
+              saveBtn.disabled = false;
+            }
+          } catch (e) {
+            console.error('Manifest write error:', e);
+            showError('Unexpected error');
+            saveBtn.disabled = false;
+          }
+        }
+      }
+    ]
+  });
+
+  showModal(modal);
+
+  // Tab switching with data sync
+  const tabs = modal.querySelectorAll('.manifest-tab');
+  const contents = modal.querySelectorAll('.manifest-tab-content');
+
+  tabs.forEach(tab => {
+    tab.onclick = () => {
+      const targetTab = tab.dataset.tab;
+      const leavingTab = modal.querySelector('.manifest-tab.active')?.dataset.tab;
+
+      if (leavingTab === 'visual' && targetTab === 'raw') {
+        modal.querySelector('#mf-raw').value = buildRawFromForm(modal);
+      } else if (leavingTab === 'raw' && targetTab === 'visual') {
+        syncFormFromRaw(modal, modal.querySelector('#mf-raw').value);
+      }
+
+      tabs.forEach(t2 => t2.classList.remove('active'));
+      tab.classList.add('active');
+      contents.forEach(c => {
+        c.style.display = c.dataset.content === targetTab ? '' : 'none';
+      });
+    };
+  });
 }
 
 /**

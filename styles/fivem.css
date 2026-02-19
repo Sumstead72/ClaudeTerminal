@@ -1613,3 +1613,321 @@
   0% { background: rgba(217, 119, 6, 0.2); }
   100% { background: transparent; }
 }
+
+/* ── Create resource button (resources header) ── */
+.fivem-create-resource-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.fivem-create-resource-btn:hover {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--success);
+}
+
+.fivem-create-resource-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Manifest edit button ── */
+.fivem-resource-btn.manifest:hover {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--info);
+}
+
+/* ── Resource context menu ── */
+.fivem-resource-context-menu {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 9999;
+}
+
+.fivem-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+
+.fivem-ctx-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.fivem-ctx-item svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* ══════════════════════════════════════════════════════════
+   FiveM Modal Forms — Manifest Editor & Resource Wizard
+   Direction: Terminal industriel raffiné
+   ══════════════════════════════════════════════════════════ */
+
+.fivem-resource-wizard,
+.fivem-manifest-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Tab bar — pill switcher style ── */
+.manifest-tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+
+.manifest-tab {
+  position: relative;
+  padding: 6px 18px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s;
+  white-space: nowrap;
+}
+
+.manifest-tab:hover {
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.04);
+}
+
+.manifest-tab.active {
+  color: var(--bg-primary);
+  background: var(--accent);
+  box-shadow: 0 1px 8px rgba(217,119,6,0.35);
+}
+
+/* ── Form grid layout ── */
+.manifest-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+.form-group-full {
+  grid-column: 1 / -1;
+}
+
+.fivem-resource-wizard .form-group,
+.fivem-manifest-editor .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fivem-resource-wizard .form-row,
+.fivem-manifest-editor .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+/* ── Labels — monospace terminal aesthetic ── */
+.fivem-resource-wizard .form-label,
+.fivem-manifest-editor .form-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.fivem-resource-wizard .form-label::before,
+.fivem-manifest-editor .form-label::before {
+  content: '//';
+  color: var(--accent);
+  opacity: 0.6;
+  font-size: 9px;
+}
+
+/* ── Inputs ── */
+.fivem-resource-wizard .form-input,
+.fivem-manifest-editor .form-input {
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  transition: border-color 0.18s, border-left-color 0.18s, box-shadow 0.18s;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.fivem-resource-wizard .form-input:hover,
+.fivem-manifest-editor .form-input:hover {
+  border-color: rgba(255,255,255,0.12);
+}
+
+.fivem-resource-wizard .form-input:focus,
+.fivem-manifest-editor .form-input:focus {
+  outline: none;
+  border-color: rgba(217,119,6,0.35);
+  border-left-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(217,119,6,0.08);
+  background: rgba(217,119,6,0.03);
+}
+
+/* select arrow */
+.fivem-manifest-editor select.form-input,
+.fivem-resource-wizard select.form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+/* ── Textareas — code editor feel ── */
+.fivem-resource-wizard .form-textarea,
+.fivem-manifest-editor .form-textarea {
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-xs);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  resize: vertical;
+  min-height: 64px;
+  box-sizing: border-box;
+  width: 100%;
+  transition: border-color 0.18s, border-left-color 0.18s, box-shadow 0.18s;
+  line-height: 1.6;
+}
+
+.fivem-resource-wizard .form-textarea:hover,
+.fivem-manifest-editor .form-textarea:hover {
+  border-color: rgba(255,255,255,0.12);
+}
+
+.fivem-resource-wizard .form-textarea:focus,
+.fivem-manifest-editor .form-textarea:focus {
+  outline: none;
+  border-color: rgba(217,119,6,0.35);
+  border-left-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(217,119,6,0.08);
+  background: rgba(217,119,6,0.02);
+}
+
+.fivem-manifest-editor .form-code {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: var(--font-xs);
+  line-height: 1.7;
+}
+
+/* ── Raw editor — full code editor feel ── */
+.manifest-raw-editor {
+  min-height: 300px;
+  max-height: 420px;
+  resize: vertical;
+  background: #0a0a0a !important;
+  border-color: var(--border-color) !important;
+  border-left-color: rgba(217,119,6,0.4) !important;
+  color: #c9d1d9;
+  padding: 14px 16px !important;
+  font-size: 12.5px !important;
+  line-height: 1.75 !important;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.manifest-raw-editor:focus {
+  border-left-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(217,119,6,0.1), inset 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+
+/* Raw tab container — add a subtle chrome bar on top */
+.manifest-tab-content[data-content="raw"] {
+  position: relative;
+}
+
+.manifest-tab-content[data-content="raw"]::before {
+  content: 'fxmanifest.lua';
+  display: block;
+  padding: 6px 14px;
+  background: #0a0a0a;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: 10px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.3px;
+}
+
+.manifest-tab-content[data-content="raw"] .manifest-raw-editor {
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important;
+  border-top: none !important;
+}
+
+/* ── Hints & errors ── */
+.fivem-resource-wizard .form-hint,
+.fivem-manifest-editor .form-hint {
+  font-size: var(--font-2xs);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.fivem-resource-wizard .form-error,
+.fivem-manifest-editor .form-error {
+  font-size: var(--font-2xs);
+  color: var(--danger);
+  font-weight: 500;
+}
+
+/* ── Section dividers in visual form ── */
+.manifest-form-grid .form-group-full:not(:first-child) {
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  margin-top: 4px;
+}
