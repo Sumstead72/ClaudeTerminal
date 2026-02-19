@@ -61,9 +61,6 @@ contextBridge.exposeInMainWorld('electron_nodeModules', {
     resourcesPath: process.resourcesPath || '',
     platform: process.platform
   },
-  child_process: {
-    execSync: (cmd, options) => require('child_process').execSync(cmd, options)
-  },
   // __dirname from preload (src/main) - calculate app root by going up two levels
   __dirname: path.join(__dirname, '..', '..')
 });
@@ -157,6 +154,20 @@ contextBridge.exposeInMainWorld('electron_api', {
     writeManifest: (params) => ipcRenderer.invoke('fivem-write-manifest', params),
     onData: createListener('fivem-data'),
     onExit: createListener('fivem-exit')
+  },
+
+  // ==================== MINECRAFT ====================
+  minecraft: {
+    start: (params) => ipcRenderer.invoke('minecraft-start', params),
+    stop: (params) => ipcRenderer.invoke('minecraft-stop', params),
+    input: (params) => ipcRenderer.send('minecraft-input', params),
+    resize: (params) => ipcRenderer.send('minecraft-resize', params),
+    detect: (params) => ipcRenderer.invoke('minecraft-detect', params),
+    getStatus: (params) => ipcRenderer.invoke('minecraft-get-status', params),
+    onData: createListener('minecraft-data'),
+    onExit: createListener('minecraft-exit'),
+    onStatus: createListener('minecraft-status'),
+    onPlayerCount: createListener('minecraft-playercount')
   },
 
   // ==================== PYTHON ====================

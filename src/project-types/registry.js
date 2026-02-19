@@ -56,6 +56,11 @@ function discoverAll() {
   } catch (e) {
     console.warn('[Registry] Failed to load api type:', e.message);
   }
+  try {
+    register(require('./minecraft'));
+  } catch (e) {
+    console.warn('[Registry] Failed to load minecraft type:', e.message);
+  }
 
   console.debug(`[Registry] Discovered ${types.size} project type(s): ${[...types.keys()].join(', ')}`);
 }

@@ -20,6 +20,7 @@ const { registerMcpRegistryHandlers } = require('./mcpRegistry.ipc');
 const { registerPluginHandlers } = require('./plugin.ipc');
 const { registerChatHandlers } = require('./chat.ipc');
 const { registerHooksHandlers } = require('./hooks.ipc');
+const { registerMinecraftHandlers } = require('../../project-types/minecraft/main/minecraft.ipc');
 
 /**
  * Register all IPC handlers
@@ -47,6 +48,7 @@ function registerAllHandlers(mainWindow) {
   registerPluginHandlers();
   registerChatHandlers();
   registerHooksHandlers();
+  registerMinecraftHandlers();
 }
 
 module.exports = {

@@ -40,8 +40,10 @@ function showNotification({ title, body, terminalId, autoDismiss = 8000, labels 
     show: false,
     backgroundColor: '#00000000',
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      preload: path.join(__dirname, '..', 'preload-notification.js')
     }
   });
 

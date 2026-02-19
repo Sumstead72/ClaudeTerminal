@@ -2155,6 +2155,11 @@ document.getElementById('btn-new-project').onclick = () => {
     const typeConfig = typeHandler.getWizardConfig(document.getElementById('form-project'));
     Object.assign(project, typeConfig);
 
+    // Generate template files if type supports it
+    if (typeHandler.afterProjectCreate) {
+      await typeHandler.afterProjectCreate(project, projPath);
+    }
+
     const projects = [...projectsState.get().projects, project];
     const rootOrder = [...projectsState.get().rootOrder, project.id];
     projectsState.set({ projects, rootOrder });
