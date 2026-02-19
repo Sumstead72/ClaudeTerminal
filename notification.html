@@ -152,25 +152,17 @@
   </div>
 
   <script>
-    const { ipcRenderer } = require('electron');
-    const fs = require('fs');
-    const path = require('path');
-    const os = require('os');
+    // notifAPI est exposé par preload-notification.js via contextBridge
 
     const params = new URLSearchParams(window.location.search);
     const data = JSON.parse(decodeURIComponent(params.get('data')));
     const { title, body, terminalId, notifId, autoDismiss, labels } = data;
 
     // Load accent color
-    try {
-      const settingsFile = path.join(os.homedir(), '.claude-terminal', 'settings.json');
-      if (fs.existsSync(settingsFile)) {
-        const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-        if (settings.accentColor) {
-          document.documentElement.style.setProperty('--accent', settings.accentColor);
-        }
-      }
-    } catch (_) {}
+    const accentColor = notifAPI.readSettingsAccentColor();
+    if (accentColor) {
+      document.documentElement.style.setProperty('--accent', accentColor);
+    }
 
     // Fill content
     document.getElementById('title').textContent = title;
@@ -179,7 +171,7 @@
 
     // Show button — fire action IPC, then dismiss
     document.getElementById('btnShow').addEventListener('click', function() {
-      ipcRenderer.send('notification-action', { action: 'show', terminalId });
+      notifAPI.send('notification-action', { action: 'show', terminalId });
       dismiss();
     });
 
@@ -208,7 +200,7 @@
       if (dismissed) return;
       dismissed = true;
       if (autoDismissTimer) clearTimeout(autoDismissTimer);
-      ipcRenderer.send('notification-dismiss', { notifId: notifId });
+      notifAPI.send('notification-dismiss', { notifId: notifId });
     }
   </script>
 </body>

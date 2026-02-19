@@ -178,34 +178,20 @@
   </div>
 
   <script>
-    const { ipcRenderer } = require('electron');
-    const fs = require('fs');
-    const path = require('path');
-    const os = require('os');
-
-    const projectsFile = path.join(os.homedir(), '.claude-terminal', 'projects.json');
-    const settingsFile = path.join(os.homedir(), '.claude-terminal', 'settings.json');
+    // pickerAPI est exposé par preload-quickpicker.js via contextBridge
 
     let projects = [];
     let filtered = [];
     let selectedIndex = 0;
 
-    // Charger et appliquer la couleur d'accent
     function loadAccentColor() {
-      try {
-        if (fs.existsSync(settingsFile)) {
-          const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-          const color = settings.accentColor || '#d97706';
-          applyAccentColor(color);
-        }
-      } catch (e) {}
+      const color = pickerAPI.readAccentColor() || '#d97706';
+      applyAccentColor(color);
     }
 
     function applyAccentColor(color) {
       const root = document.documentElement;
       root.style.setProperty('--accent', color);
-
-      // Parse hex to rgb for dim version
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
       if (result) {
         const r = parseInt(result[1], 16);
@@ -215,13 +201,10 @@
       }
     }
 
-    // Charger les projets
     function loadProjects() {
       try {
-        if (fs.existsSync(projectsFile)) {
-          const data = JSON.parse(fs.readFileSync(projectsFile, 'utf8'));
-          projects = Array.isArray(data) ? data : (data.projects || []);
-        }
+        const data = pickerAPI.readProjects();
+        projects = data ? (Array.isArray(data) ? data : (data.projects || [])) : [];
       } catch (e) {
         projects = [];
       }
@@ -231,7 +214,6 @@
 
     function render() {
       const list = document.getElementById('list');
-
       if (filtered.length === 0) {
         list.innerHTML = `
           <div class="empty">
@@ -240,7 +222,6 @@
           </div>`;
         return;
       }
-
       list.innerHTML = filtered.map((p, i) => `
         <div class="item ${i === selectedIndex ? 'selected' : ''}" data-index="${i}">
           <div class="item-icon">
@@ -252,66 +233,38 @@
           </div>
         </div>
       `).join('');
-
       list.querySelectorAll('.item').forEach(item => {
         item.onclick = () => selectProject(parseInt(item.dataset.index));
       });
-
-      // Scroll to selected
       const selected = list.querySelector('.selected');
       if (selected) selected.scrollIntoView({ block: 'nearest' });
     }
 
     function filter(query) {
       const q = query.toLowerCase();
-      if (!q) {
-        filtered = [...projects];
-      } else {
-        filtered = projects.filter(p =>
-          p.name.toLowerCase().includes(q) ||
-          p.path.toLowerCase().includes(q)
-        );
-      }
+      filtered = q ? projects.filter(p =>
+        p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q)
+      ) : [...projects];
       selectedIndex = 0;
       render();
     }
 
     function selectProject(index) {
       const project = filtered[index];
-      if (project) {
-        ipcRenderer.send('quick-pick-select', project);
-      }
+      if (project) pickerAPI.send('quick-pick-select', project);
     }
 
-    // Events
-    document.getElementById('search').addEventListener('input', (e) => {
-      filter(e.target.value);
-    });
+    document.getElementById('search').addEventListener('input', (e) => filter(e.target.value));
 
     document.addEventListener('keydown', (e) => {
       switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          selectedIndex = Math.min(selectedIndex + 1, filtered.length - 1);
-          render();
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          selectedIndex = Math.max(selectedIndex - 1, 0);
-          render();
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (filtered.length > 0) selectProject(selectedIndex);
-          break;
-        case 'Escape':
-          e.preventDefault();
-          ipcRenderer.send('quick-pick-close');
-          break;
+        case 'ArrowDown': e.preventDefault(); selectedIndex = Math.min(selectedIndex + 1, filtered.length - 1); render(); break;
+        case 'ArrowUp':   e.preventDefault(); selectedIndex = Math.max(selectedIndex - 1, 0); render(); break;
+        case 'Enter':     e.preventDefault(); if (filtered.length > 0) selectProject(selectedIndex); break;
+        case 'Escape':    e.preventDefault(); pickerAPI.send('quick-pick-close'); break;
       }
     });
 
-    // Recharger les projets et la couleur à chaque fois que la fenêtre devient visible
     window.addEventListener('focus', () => {
       document.getElementById('search').value = '';
       loadAccentColor();
@@ -319,15 +272,13 @@
       document.getElementById('search').focus();
     });
 
-    // Écouter le message IPC pour recharger les projets
-    ipcRenderer.on('reload-projects', () => {
+    pickerAPI.onReloadProjects(() => {
       document.getElementById('search').value = '';
       loadAccentColor();
       loadProjects();
       document.getElementById('search').focus();
     });
 
-    // Initialisation
     loadAccentColor();
     loadProjects();
   </script>
