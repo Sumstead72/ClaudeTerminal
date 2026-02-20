@@ -2948,6 +2948,23 @@ function createChatView(wrapperEl, project, options = {}) {
   }
 
   function handleAssistantMessage(msg) {
+    // SDK-level errors on the assistant message (rate_limit, billing_error, etc.)
+    if (msg.error) {
+      const errorMessages = {
+        rate_limit: t('chat.errorRateLimit'),
+        billing_error: t('chat.errorBilling'),
+        authentication_failed: t('chat.errorAuth'),
+        invalid_request: t('chat.errorInvalidRequest'),
+        max_output_tokens: t('chat.errorMaxTokens'),
+        server_error: t('chat.errorServer'),
+      };
+      const text = errorMessages[msg.error] || t('chat.errorOccurred');
+      removeThinkingIndicator();
+      appendError(text);
+      setStreaming(false);
+      return;
+    }
+
     const content = msg.message?.content;
     if (!content) return;
 
