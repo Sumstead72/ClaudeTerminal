@@ -31,8 +31,10 @@ class MinecraftService {
   detectServerSetup(projectPath) {
     if (!fs.existsSync(projectPath)) return null;
 
-    // Check for Forge/Fabric launch scripts first
-    const scripts = ['run.bat', 'run.sh', 'start.bat', 'start.sh', 'launch.bat', 'launch.sh'];
+    // Check for Forge/Fabric launch scripts first (filter by OS)
+    const scripts = process.platform === 'win32'
+      ? ['run.bat', 'start.bat', 'launch.bat']
+      : ['run.sh', 'start.sh', 'launch.sh'];
     for (const script of scripts) {
       const scriptPath = path.join(projectPath, script);
       if (fs.existsSync(scriptPath)) {
