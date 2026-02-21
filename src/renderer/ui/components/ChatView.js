@@ -7,7 +7,7 @@
 const api = window.electron_api;
 const { escapeHtml, highlight } = require('../../utils');
 const { t } = require('../../i18n');
-const { recordActivity, recordOutputActivity } = require('../../state');
+const { heartbeat } = require('../../state');
 const { getSetting, setSetting } = require('../../state/settings.state');
 
 const MODEL_OPTIONS = [
@@ -1385,7 +1385,7 @@ function createChatView(wrapperEl, project, options = {}) {
     if ((!text && !hasImages && !hasMentions) || sendLock) return;
 
     sendLock = true;
-    if (project?.id) recordActivity(project.id);
+    if (project?.id) heartbeat(project.id, 'chat');
 
     // Reset scroll detection when user sends a message
     resetScrollDetection();
@@ -2777,12 +2777,9 @@ function createChatView(wrapperEl, project, options = {}) {
   unsubscribers.push(unsubMessage);
 
   // Throttled output activity tracker (max 1 call/sec)
-  let outputActivityThrottled = false;
   function trackOutputActivity() {
-    if (!project?.id || outputActivityThrottled) return;
-    recordOutputActivity(project.id);
-    outputActivityThrottled = true;
-    setTimeout(() => { outputActivityThrottled = false; }, 1000);
+    if (!project?.id) return;
+    heartbeat(project.id, 'chat');
   }
 
   function handleStreamEvent(event) {

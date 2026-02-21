@@ -1,25 +1,23 @@
 const {
   trackingState,
-  initTimeTracking,
-  startTracking,
-  stopTracking,
-  recordActivity,
-  pauseTracking,
-  resumeTracking,
+  dataState,
+  heartbeat,
+  stopProject,
+  saveAndShutdown,
   getProjectTimes,
   getGlobalTimes,
   getProjectSessions,
-  getTrackingState,
-  ensureTimeTracking,
+  getGlobalTrackingData,
   isTracking,
   getActiveProjectCount,
-  hasTerminalsForProject,
 } = require('../../src/renderer/state/timeTracking.state');
 
 // Mock ArchiveService
 jest.mock('../../src/renderer/services/ArchiveService', () => ({
   migrateOldArchives: jest.fn(),
   appendToArchive: jest.fn(),
+  isCurrentMonth: jest.fn(() => true),
+  getMonthsInRange: jest.fn(() => []),
 }));
 
 beforeEach(() => {
@@ -34,59 +32,131 @@ beforeEach(() => {
   window.electron_nodeModules.fs.renameSync = jest.fn();
   window.electron_nodeModules.fs.unlinkSync = jest.fn();
   window.electron_nodeModules.fs.promises.readFile = jest.fn().mockResolvedValue('{}');
+
+  // Reset tracking state
+  trackingState.set({
+    activeProjects: new Map(),
+    globalStartedAt: null,
+    globalLastHeartbeat: null
+  });
+
+  // Reset persisted data state
+  dataState.set({
+    version: 3,
+    month: null,
+    global: { sessions: [] },
+    projects: {}
+  });
 });
 
-afterEach(async () => {
+afterEach(() => {
   // Stop all active tracking to clean up timers
-  const state = getTrackingState();
-  if (state.activeSessions) {
-    for (const [id] of state.activeSessions) {
-      try { await stopTracking(id); } catch {}
-    }
+  const state = trackingState.get();
+  for (const [id] of state.activeProjects) {
+    stopProject(id);
   }
   jest.runOnlyPendingTimers();
   jest.useRealTimers();
 });
 
-// ── ensureTimeTracking ──
+// ── heartbeat ──
 
-describe('ensureTimeTracking', () => {
-  test('returns default tracking for null project', () => {
-    const result = ensureTimeTracking(null);
-    expect(result).toEqual({
-      totalTime: 0,
-      todayTime: 0,
-      lastActiveDate: null,
-      sessions: [],
-    });
+describe('heartbeat', () => {
+  test('auto-starts tracking for a project', () => {
+    heartbeat('proj-1', 'terminal');
+    expect(isTracking('proj-1')).toBe(true);
   });
 
-  test('returns default tracking for new project', () => {
-    const result = ensureTimeTracking({ id: 'new-project' });
-    expect(result).toEqual(expect.objectContaining({
-      totalTime: 0,
-      todayTime: 0,
-    }));
+  test('starts global timer on first heartbeat', () => {
+    heartbeat('proj-1', 'terminal');
+    const state = trackingState.get();
+    expect(state.globalStartedAt).toBeGreaterThan(0);
+    expect(state.globalLastHeartbeat).toBeGreaterThan(0);
+  });
+
+  test('throttles heartbeats within 1 second', () => {
+    heartbeat('proj-1', 'terminal');
+    const firstHb = trackingState.get().activeProjects.get('proj-1').lastHeartbeat;
+
+    // Second heartbeat within 1s should be ignored
+    jest.advanceTimersByTime(500);
+    heartbeat('proj-1', 'terminal');
+    const secondHb = trackingState.get().activeProjects.get('proj-1').lastHeartbeat;
+    expect(secondHb).toBe(firstHb);
+
+    // After 1s, heartbeat should go through
+    jest.advanceTimersByTime(600);
+    heartbeat('proj-1', 'terminal');
+    const thirdHb = trackingState.get().activeProjects.get('proj-1').lastHeartbeat;
+    expect(thirdHb).toBeGreaterThan(firstHb);
+  });
+
+  test('does nothing for null projectId', () => {
+    heartbeat(null, 'terminal');
+    expect(getActiveProjectCount()).toBe(0);
+  });
+
+  test('tracks multiple projects independently', () => {
+    heartbeat('proj-1', 'terminal');
+    heartbeat('proj-2', 'chat');
+    expect(getActiveProjectCount()).toBe(2);
+    expect(isTracking('proj-1')).toBe(true);
+    expect(isTracking('proj-2')).toBe(true);
+  });
+});
+
+// ── stopProject ──
+
+describe('stopProject', () => {
+  test('removes project from active sessions', () => {
+    heartbeat('proj-1', 'terminal');
+    jest.advanceTimersByTime(5000);
+    stopProject('proj-1');
+    expect(isTracking('proj-1')).toBe(false);
+  });
+
+  test('stops global timer when last project stopped', () => {
+    heartbeat('proj-1', 'terminal');
+    jest.advanceTimersByTime(5000);
+    stopProject('proj-1');
+    const state = trackingState.get();
+    expect(state.globalStartedAt).toBeNull();
+  });
+
+  test('keeps global timer when other projects still active', () => {
+    heartbeat('proj-1', 'terminal');
+    heartbeat('proj-2', 'chat');
+    jest.advanceTimersByTime(5000);
+    stopProject('proj-1');
+    const state = trackingState.get();
+    expect(state.globalStartedAt).toBeGreaterThan(0);
+    expect(isTracking('proj-2')).toBe(true);
+  });
+
+  test('does nothing for non-tracked project', () => {
+    // Should not throw
+    stopProject('unknown');
+    expect(getActiveProjectCount()).toBe(0);
   });
 });
 
 // ── isTracking ──
 
 describe('isTracking', () => {
-  test('returns falsy for non-tracked project', () => {
-    expect(isTracking('unknown-project')).toBeFalsy();
+  test('returns false for non-tracked project', () => {
+    expect(isTracking('unknown-project')).toBe(false);
   });
 
-  test('returns truthy after startTracking', () => {
-    startTracking('proj-1');
-    expect(isTracking('proj-1')).toBeTruthy();
+  test('returns true after heartbeat', () => {
+    heartbeat('proj-1', 'terminal');
+    expect(isTracking('proj-1')).toBe(true);
   });
 
-  test('returns falsy after stopTracking', async () => {
-    startTracking('proj-1');
+  test('returns false after stopProject', () => {
+    heartbeat('proj-1', 'terminal');
     jest.advanceTimersByTime(5000);
-    await stopTracking('proj-1');
-    expect(isTracking('proj-1')).toBeFalsy();
+    stopProject('proj-1');
+    expect(isTracking('proj-1')).toBe(false);
   });
 });
 
@@ -97,106 +167,10 @@ describe('getActiveProjectCount', () => {
     expect(getActiveProjectCount()).toBe(0);
   });
 
-  test('counts active (non-idle) sessions', () => {
-    startTracking('proj-1');
-    startTracking('proj-2');
+  test('counts active projects', () => {
+    heartbeat('proj-1', 'terminal');
+    heartbeat('proj-2', 'chat');
     expect(getActiveProjectCount()).toBe(2);
-  });
-});
-
-// ── startTracking / stopTracking ──
-
-describe('startTracking', () => {
-  test('creates active session', () => {
-    startTracking('proj-1');
-    const state = getTrackingState();
-    expect(state.activeSessions.has('proj-1')).toBe(true);
-    const session = state.activeSessions.get('proj-1');
-    expect(session.isIdle).toBe(false);
-    expect(session.sessionStartTime).toBeGreaterThan(0);
-  });
-
-  test('does not double-start already tracked project', () => {
-    startTracking('proj-1');
-    const firstStart = getTrackingState().activeSessions.get('proj-1').sessionStartTime;
-    startTracking('proj-1');
-    const secondStart = getTrackingState().activeSessions.get('proj-1').sessionStartTime;
-    expect(firstStart).toBe(secondStart);
-  });
-});
-
-describe('stopTracking', () => {
-  test('removes project from active sessions', async () => {
-    startTracking('proj-1');
-    jest.advanceTimersByTime(5000);
-    await stopTracking('proj-1');
-    expect(getTrackingState().activeSessions.has('proj-1')).toBe(false);
-  });
-});
-
-// ── pauseTracking / resumeTracking ──
-
-describe('pauseTracking', () => {
-  test('sets session to idle', async () => {
-    startTracking('proj-1');
-    jest.advanceTimersByTime(5000);
-    await pauseTracking('proj-1');
-    const session = getTrackingState().activeSessions.get('proj-1');
-    expect(session.isIdle).toBe(true);
-    expect(session.sessionStartTime).toBeNull();
-  });
-});
-
-describe('resumeTracking', () => {
-  test('resumes idle session', async () => {
-    startTracking('proj-1');
-    jest.advanceTimersByTime(5000);
-    await pauseTracking('proj-1');
-    resumeTracking('proj-1');
-    const session = getTrackingState().activeSessions.get('proj-1');
-    expect(session.isIdle).toBe(false);
-    expect(session.sessionStartTime).toBeGreaterThan(0);
-  });
-});
-
-// ── recordActivity ──
-
-describe('recordActivity', () => {
-  test('updates lastActivityTime on tracked project', () => {
-    startTracking('proj-1');
-    const before = getTrackingState().activeSessions.get('proj-1').lastActivityTime;
-    jest.advanceTimersByTime(1000);
-    recordActivity('proj-1');
-    const after = getTrackingState().activeSessions.get('proj-1').lastActivityTime;
-    expect(after).toBeGreaterThanOrEqual(before);
-  });
-
-  test('does nothing for non-tracked project', () => {
-    // Should not throw
-    recordActivity('unknown');
-  });
-});
-
-// ── hasTerminalsForProject ──
-
-describe('hasTerminalsForProject', () => {
-  test('returns true when terminals exist for project', () => {
-    const terminals = new Map([
-      ['t1', { project: { id: 'proj-1' } }],
-      ['t2', { project: { id: 'proj-2' } }],
-    ]);
-    expect(hasTerminalsForProject('proj-1', terminals)).toBe(true);
-  });
-
-  test('returns false when no terminals for project', () => {
-    const terminals = new Map([
-      ['t1', { project: { id: 'proj-2' } }],
-    ]);
-    expect(hasTerminalsForProject('proj-1', terminals)).toBe(false);
-  });
-
-  test('returns false for empty terminal map', () => {
-    expect(hasTerminalsForProject('proj-1', new Map())).toBe(false);
   });
 });
 
@@ -205,6 +179,12 @@ describe('hasTerminalsForProject', () => {
 describe('getProjectTimes', () => {
   test('returns zeros for unknown project', () => {
     const times = getProjectTimes('unknown');
+    expect(times.today).toBe(0);
+    expect(times.total).toBe(0);
+  });
+
+  test('returns null project gracefully', () => {
+    const times = getProjectTimes(null);
     expect(times.today).toBe(0);
     expect(times.total).toBe(0);
   });
@@ -222,6 +202,13 @@ describe('getGlobalTimes', () => {
     expect(typeof times.week).toBe('number');
     expect(typeof times.month).toBe('number');
   });
+
+  test('returns zeros when no sessions', () => {
+    const times = getGlobalTimes();
+    expect(times.today).toBe(0);
+    expect(times.week).toBe(0);
+    expect(times.month).toBe(0);
+  });
 });
 
 // ── getProjectSessions ──
@@ -229,5 +216,33 @@ describe('getGlobalTimes', () => {
 describe('getProjectSessions', () => {
   test('returns empty array for unknown project', () => {
     expect(getProjectSessions('unknown')).toEqual([]);
+  });
+
+  test('returns empty array for null project', () => {
+    expect(getProjectSessions(null)).toEqual([]);
+  });
+});
+
+// ── getGlobalTrackingData ──
+
+describe('getGlobalTrackingData', () => {
+  test('returns object with sessions array', () => {
+    const data = getGlobalTrackingData();
+    expect(data).toHaveProperty('sessions');
+    expect(Array.isArray(data.sessions)).toBe(true);
+  });
+});
+
+// ── saveAndShutdown ──
+
+describe('saveAndShutdown', () => {
+  test('clears all active sessions', () => {
+    heartbeat('proj-1', 'terminal');
+    heartbeat('proj-2', 'chat');
+    jest.advanceTimersByTime(5000);
+    saveAndShutdown();
+    expect(getActiveProjectCount()).toBe(0);
+    const state = trackingState.get();
+    expect(state.globalStartedAt).toBeNull();
   });
 });

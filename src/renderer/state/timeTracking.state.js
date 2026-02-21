@@ -1,9 +1,15 @@
 /**
- * Time Tracking State Module
- * Tracks time spent on each project based on terminal activity
- * Supports multiple projects being tracked simultaneously
+ * Time Tracking State Module (v3 - Heartbeat model)
  *
- * Persisted data lives in timetracking.json (separate from projects.json)
+ * Simplified time tracking based on a single heartbeat() entry point.
+ * Tracks all activity (Claude working + user interaction) with a 10-minute idle margin.
+ *
+ * Key design:
+ * - Single heartbeat(projectId, source) function replaces start/stop/record/pause/resume
+ * - All counters (today/week/month) computed on-the-fly from sessions (no stored counters that drift)
+ * - Global timer separate from per-project timers to avoid double-counting
+ * - Single 60s tick replaces 5 separate timers
+ * - Crash-safe: tick saves active session startedAt as checkpoint
  */
 
 const { fs } = window.electron_nodeModules;
@@ -11,1750 +17,764 @@ const { State } = require('./State');
 const { timeTrackingFile, projectsFile } = require('../utils/paths');
 const ArchiveService = require('../services/ArchiveService');
 
-// Constants
-const IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
-const OUTPUT_IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes - idle after last terminal output
-const SLEEP_GAP_THRESHOLD = 2 * 60 * 1000; // 2 minutes - gap indicating system sleep/wake
-const CHECKPOINT_INTERVAL = 5 * 60 * 1000; // 5 minutes - periodic session save
-const SESSION_MERGE_GAP = 30 * 60 * 1000; // 30 minutes - merge sessions closer than this
-const TT_SAVE_DEBOUNCE_MS = 500;
-let lastHeartbeat = Date.now();
-let heartbeatTimer = null;
-let checkpointTimer = null;
+// ============================================================
+// CONSTANTS
+// ============================================================
 
-// Runtime state (not persisted)
+const IDLE_TIMEOUT = 10 * 60 * 1000;    // 10 minutes without heartbeat → idle out
+const TICK_INTERVAL = 60 * 1000;         // 60s tick (idle check, midnight, sleep/wake, checkpoint)
+const SAVE_DEBOUNCE = 1000;              // 1 second debounce for disk writes
+const MERGE_GAP = 5 * 60 * 1000;        // 5 minutes: merge sessions closer than this
+const SLEEP_GAP = 2 * 60 * 1000;        // 2 minutes between ticks = system was asleep
+const HEARTBEAT_THROTTLE = 1000;         // 1 second: ignore heartbeats faster than this per project
+
+// ============================================================
+// STATE
+// ============================================================
+
+// Runtime state (not persisted) — observable for UI subscriptions
 const trackingState = new State({
-  activeSessions: new Map(),
-  globalSessionStartTime: null,
-  globalLastActivityTime: null,
-  globalIsIdle: false
+  activeProjects: new Map(),    // projectId -> { startedAt, lastHeartbeat, source }
+  globalStartedAt: null,        // When global timer started (first active project)
+  globalLastHeartbeat: null     // Last heartbeat from any source
 });
 
-// Persisted time tracking data (separate file: timetracking.json)
-const timeTrackingDataState = new State({
-  projects: {},  // projectId -> { totalTime, todayTime, lastActiveDate, sessions[] }
-  global: null   // { totalTime, todayTime, weekTime, monthTime, weekStart, monthStart, lastActiveDate, sessions[] }
+// Persisted state (timetracking.json)
+const dataState = new State({
+  version: 3,
+  month: null,
+  global: { sessions: [] },
+  projects: {}
 });
 
-// Internal state
-const idleTimers = new Map();
-const lastOutputTimes = new Map();
-let globalLastOutputTime = 0;
-let globalIdleTimer = null;
-let midnightCheckTimer = null;
+// Internal (not observable)
+let tickTimer = null;
+let lastTickTime = Date.now();
 let lastKnownDate = null;
-let projectsStateRef = null; // Still needed for project metadata (name, color)
-let globalTimesCache = null;
-let globalTimesCacheDate = null;
-let ttSaveDebounceTimer = null;
-let ttSaveInProgress = false;
-let ttPendingSave = false;
+let projectsStateRef = null;
+let saveDebounceTimer = null;
+let saveInProgress = false;
+let pendingSave = false;
+let dirty = false;
 
 // ============================================================
-// TIME TRACKING PERSISTENCE (timetracking.json)
+// PERSISTENCE
 // ============================================================
 
-/**
- * Load time tracking data from timetracking.json
- */
-async function loadTimeTrackingData() {
+async function loadData() {
   try {
     if (!fs.existsSync(timeTrackingFile)) return;
-
     const content = await fs.promises.readFile(timeTrackingFile, 'utf8');
     if (!content || !content.trim()) return;
-
     const data = JSON.parse(content);
-    timeTrackingDataState.set({
-      projects: data.projects || {},
-      global: data.global || null
+    dataState.set({
+      version: data.version || 2,
+      month: data.month || null,
+      global: data.global || { sessions: [] },
+      projects: data.projects || {}
     });
-    console.debug('[TimeTracking] Loaded timetracking.json');
-  } catch (error) {
-    console.warn('[TimeTracking] Failed to load timetracking.json:', error.message);
-  }
-}
-
-/**
- * Save time tracking data (debounced)
- */
-function saveTimeTracking() {
-  if (ttSaveDebounceTimer) {
-    clearTimeout(ttSaveDebounceTimer);
-  }
-
-  ttSaveDebounceTimer = setTimeout(() => {
-    if (ttSaveInProgress) {
-      ttPendingSave = true;
-      return;
-    }
-    saveTimeTrackingImmediate();
-  }, TT_SAVE_DEBOUNCE_MS);
-}
-
-/**
- * Save time tracking data immediately (atomic write)
- */
-function saveTimeTrackingImmediate() {
-  if (ttSaveInProgress) {
-    ttPendingSave = true;
-    return;
-  }
-
-  ttSaveInProgress = true;
-
-  const state = timeTrackingDataState.get();
-  const data = {
-    version: 2,
-    month: getMonthString(),
-    global: state.global,
-    projects: state.projects
-  };
-
-  const tempFile = `${timeTrackingFile}.tmp`;
-  const backupFile = `${timeTrackingFile}.bak`;
-
-  try {
-    if (fs.existsSync(timeTrackingFile)) {
-      try { fs.copyFileSync(timeTrackingFile, backupFile); } catch (_) {}
-    }
-
-    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2));
-    fs.renameSync(tempFile, timeTrackingFile);
-
-    try { if (fs.existsSync(backupFile)) fs.unlinkSync(backupFile); } catch (_) {}
-  } catch (error) {
-    console.error('[TimeTracking] Failed to save timetracking.json:', error.message);
-    if (fs.existsSync(backupFile)) {
-      try { fs.copyFileSync(backupFile, timeTrackingFile); } catch (_) {}
-    }
-    try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch (_) {}
-  } finally {
-    ttSaveInProgress = false;
-    if (ttPendingSave) {
-      ttPendingSave = false;
-      setTimeout(saveTimeTrackingImmediate, 50);
-    }
-  }
-}
-
-// ============================================================
-// MIGRATION
-// ============================================================
-
-/**
- * Migrate inline timeTracking from projects.json to timetracking.json
- * One-time migration for existing users
- */
-async function migrateInlineTimeTracking() {
-  // Read projects.json RAW from disk (not from state, which no longer includes timeTracking fields)
-  let rawData;
-  try {
-    if (!fs.existsSync(projectsFile)) return;
-    const content = await fs.promises.readFile(projectsFile, 'utf8');
-    if (!content || !content.trim()) return;
-    rawData = JSON.parse(content);
   } catch (e) {
-    console.warn('[TimeTracking] Cannot read projects.json for migration:', e.message);
-    return;
+    console.warn('[TimeTracking] Failed to load:', e.message);
   }
+}
 
-  const projects = rawData.projects || (Array.isArray(rawData) ? rawData : []);
-  let hasInlineData = false;
-  const ttState = timeTrackingDataState.get();
-  const migratedProjects = { ...ttState.projects };
-  let migratedGlobal = ttState.global;
+function save() {
+  dirty = true;
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(() => {
+    if (saveInProgress) { pendingSave = true; return; }
+    saveImmediate();
+  }, SAVE_DEBOUNCE);
+}
 
-  // Extract per-project timeTracking
-  for (const project of projects) {
-    if (project.timeTracking) {
-      hasInlineData = true;
-      const existing = migratedProjects[project.id];
-      if (!existing) {
-        migratedProjects[project.id] = { ...project.timeTracking };
-      } else {
-        // Merge: deduplicate sessions, then recalculate counters from sessions
-        const mergedSessions = deduplicateSessions(existing.sessions || [], project.timeTracking.sessions || []);
-        let total = 0;
-        for (const s of mergedSessions) total += s.duration || 0;
-        migratedProjects[project.id] = {
-          totalTime: total,
-          todayTime: 0, // Will be recalculated by compactExistingSessions
-          lastActiveDate: existing.lastActiveDate || project.timeTracking.lastActiveDate,
-          sessions: mergedSessions
-        };
+function saveImmediate() {
+  if (saveInProgress) { pendingSave = true; return; }
+  saveInProgress = true;
+
+  try {
+    const state = dataState.get();
+    const data = {
+      version: 3,
+      month: state.month || getMonthString(),
+      global: state.global,
+      projects: state.projects
+    };
+
+    // Save active sessions as checkpoint for crash recovery
+    const runtime = trackingState.get();
+    if (runtime.activeProjects.size > 0) {
+      data._activeCheckpoint = {};
+      for (const [pid, info] of runtime.activeProjects) {
+        data._activeCheckpoint[pid] = { startedAt: info.startedAt, source: info.source };
+      }
+      if (runtime.globalStartedAt) {
+        data._activeCheckpoint._global = { startedAt: runtime.globalStartedAt };
       }
     }
-  }
 
-  // Extract globalTimeTracking
-  if (rawData.globalTimeTracking) {
-    hasInlineData = true;
-    if (!migratedGlobal) {
-      migratedGlobal = { ...rawData.globalTimeTracking };
-    } else {
-      // Merge: deduplicate sessions, counters will be recalculated by compactExistingSessions
-      const mergedSessions = deduplicateSessions(migratedGlobal.sessions || [], rawData.globalTimeTracking.sessions || []);
-      let total = 0;
-      for (const s of mergedSessions) total += s.duration || 0;
-      migratedGlobal = {
-        ...migratedGlobal,
-        totalTime: total,
-        todayTime: 0,
-        weekTime: 0,
-        monthTime: 0,
-        lastActiveDate: migratedGlobal.lastActiveDate || rawData.globalTimeTracking.lastActiveDate,
-        weekStart: migratedGlobal.weekStart || rawData.globalTimeTracking.weekStart,
-        monthStart: migratedGlobal.monthStart || rawData.globalTimeTracking.monthStart,
-        sessions: mergedSessions
-      };
+    const tmpFile = timeTrackingFile + '.tmp';
+    const bakFile = timeTrackingFile + '.bak';
+
+    fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), 'utf8');
+
+    // Atomic rename
+    if (fs.existsSync(timeTrackingFile)) {
+      try { fs.copyFileSync(timeTrackingFile, bakFile); } catch (e) { /* ignore */ }
+    }
+    fs.renameSync(tmpFile, timeTrackingFile);
+    try { if (fs.existsSync(bakFile)) fs.unlinkSync(bakFile); } catch (e) { /* ignore */ }
+
+    dirty = false;
+  } catch (e) {
+    console.error('[TimeTracking] Save failed:', e.message);
+    // Try to restore from backup
+    const bakFile = timeTrackingFile + '.bak';
+    try {
+      if (fs.existsSync(bakFile)) fs.copyFileSync(bakFile, timeTrackingFile);
+    } catch (e2) { /* ignore */ }
+  } finally {
+    saveInProgress = false;
+    if (pendingSave) {
+      pendingSave = false;
+      setTimeout(saveImmediate, 50);
     }
   }
+}
 
-  if (!hasInlineData) return;
+// ============================================================
+// INITIALIZATION & MIGRATION
+// ============================================================
 
-  // 0. Backup projects.json before any migration changes
-  const backupFile = `${projectsFile}.pre-migration.bak`;
-  try {
-    fs.copyFileSync(projectsFile, backupFile);
-    console.debug('[TimeTracking] Backup created:', backupFile);
-  } catch (e) {
-    console.warn('[TimeTracking] Failed to backup projects.json, aborting migration:', e.message);
-    return;
+async function initTimeTracking(projectsState) {
+  projectsStateRef = projectsState;
+
+  // 1. Migrate old archive format
+  ArchiveService.migrateOldArchives();
+
+  // 2. Load data
+  await loadData();
+
+  // 3. Migrate v2 → v3
+  migrateV2ToV3();
+
+  // 4. Recover crashed sessions from checkpoint
+  recoverFromCheckpoint();
+
+  // 5. Archive past-month sessions
+  archivePastMonths();
+
+  // 6. Cleanup orphaned projects
+  cleanupOrphans();
+
+  // 7. Start tick
+  lastKnownDate = getTodayString();
+  lastTickTime = Date.now();
+  tickTimer = setInterval(tick, TICK_INTERVAL);
+
+  console.debug('[TimeTracking] Initialized (v3)');
+}
+
+function migrateV2ToV3() {
+  const state = dataState.get();
+  if (state.version >= 3) return;
+
+  console.debug('[TimeTracking] Migrating v2 → v3');
+
+  // Strip computed counters, keep only sessions
+  const migratedProjects = {};
+  for (const [id, tracking] of Object.entries(state.projects || {})) {
+    migratedProjects[id] = {
+      sessions: Array.isArray(tracking.sessions) ? tracking.sessions.filter(isValidSession) : []
+    };
   }
 
-  // 1. Save to timetracking.json FIRST (safety)
-  timeTrackingDataState.set({ projects: migratedProjects, global: migratedGlobal });
-  saveTimeTrackingImmediate();
+  const globalSessions = state.global?.sessions || [];
 
-  // 2. Strip timeTracking from projects.json (both state and disk)
-  const cleanedProjects = projects.map(p => {
-    if (!p.timeTracking) return p;
-    const { timeTracking, ...rest } = p;
-    return rest;
+  dataState.set({
+    version: 3,
+    month: state.month || getMonthString(),
+    global: { sessions: globalSessions.filter(isValidSession) },
+    projects: migratedProjects
   });
 
-  // Update state
-  if (projectsStateRef) {
-    const currentState = projectsStateRef.get();
-    const stateProjects = currentState.projects.map(p => {
-      if (!p.timeTracking) return p;
-      const { timeTracking, ...rest } = p;
-      return rest;
-    });
-    projectsStateRef.set({ ...currentState, projects: stateProjects });
-  }
-
-  // Write cleaned projects.json directly
-  const cleanedData = { ...rawData, projects: cleanedProjects };
-  delete cleanedData.globalTimeTracking;
-  const tempFile = `${projectsFile}.tmp`;
-  try {
-    fs.writeFileSync(tempFile, JSON.stringify(cleanedData, null, 2));
-    fs.renameSync(tempFile, projectsFile);
-  } catch (e) {
-    console.warn('[TimeTracking] Failed to clean projects.json:', e.message);
-    try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch (_) {}
-  }
-
-  console.debug('[TimeTracking] Migrated inline data to timetracking.json');
+  save();
 }
 
-/**
- * Deduplicate sessions by ID, keeping the version with the latest endTime
- */
-function deduplicateSessions(existing, incoming) {
-  const byId = new Map();
-  for (const s of existing) {
-    byId.set(s.id, s);
-  }
-  for (const s of incoming) {
-    const prev = byId.get(s.id);
-    if (!prev) {
-      byId.set(s.id, s);
-    } else {
-      // Keep the version with the latest endTime (most up-to-date)
-      const prevEnd = new Date(prev.endTime).getTime();
-      const sEnd = new Date(s.endTime).getTime();
-      if (sEnd > prevEnd) byId.set(s.id, s);
-    }
-  }
-  return Array.from(byId.values());
-}
+function recoverFromCheckpoint() {
+  const state = dataState.get();
+  const checkpoint = state._activeCheckpoint;
+  if (!checkpoint) return;
 
-/**
- * Remove orphaned time tracking entries for deleted projects
- */
-function cleanupOrphanedTimeTracking() {
-  if (!projectsStateRef) return;
-
-  const projectIds = new Set(projectsStateRef.get().projects.map(p => p.id));
-  const ttState = timeTrackingDataState.get();
-  const cleaned = {};
-  let hasOrphans = false;
-
-  for (const [id, data] of Object.entries(ttState.projects)) {
-    if (projectIds.has(id)) {
-      cleaned[id] = data;
-    } else {
-      hasOrphans = true;
-    }
-  }
-
-  if (hasOrphans) {
-    timeTrackingDataState.set({ ...ttState, projects: cleaned });
-    saveTimeTracking();
-    console.debug('[TimeTracking] Cleaned up orphaned time tracking entries');
-  }
-}
-
-// ============================================================
-// SANITIZATION
-// ============================================================
-
-/**
- * Sanitize and validate all time tracking data on load
- */
-function sanitizeTimeTrackingData() {
-  const ttState = timeTrackingDataState.get();
-  let needsSave = false;
   const now = Date.now();
-  const maxReasonableDuration = 24 * 60 * 60 * 1000;
+  let recovered = 0;
 
-  // Sanitize per-project time tracking
-  const projects = { ...ttState.projects };
-  for (const [projectId, tracking] of Object.entries(projects)) {
-    const sanitized = { ...tracking };
-    let changed = false;
+  for (const [pid, info] of Object.entries(checkpoint)) {
+    if (pid === '_global') continue;
+    if (!info.startedAt) continue;
 
-    if (!Number.isFinite(sanitized.totalTime) || sanitized.totalTime < 0) {
-      console.warn(`[TimeTracking] Sanitize: project ${projectId} totalTime was ${sanitized.totalTime}, reset to 0`);
-      sanitized.totalTime = 0;
-      changed = true;
-    }
+    // Only recover if the checkpoint is recent (< 1 hour)
+    const age = now - info.startedAt;
+    if (age > 60 * 60 * 1000) continue;
 
-    if (!Number.isFinite(sanitized.todayTime) || sanitized.todayTime < 0) {
-      sanitized.todayTime = 0;
-      changed = true;
-    }
-
-    if (sanitized.lastActiveDate) {
-      const lastDate = new Date(sanitized.lastActiveDate + 'T00:00:00');
-      if (lastDate.getTime() > now + 86400000) {
-        sanitized.lastActiveDate = null;
-        sanitized.todayTime = 0;
-        changed = true;
-      }
-    }
-
-    if (Array.isArray(sanitized.sessions)) {
-      const validSessions = sanitized.sessions.filter(s => {
-        if (!s || !s.startTime || !s.endTime) return false;
-        if (!Number.isFinite(s.duration) || s.duration <= 0) return false;
-        if (s.duration > maxReasonableDuration) return false;
-        const start = new Date(s.startTime).getTime();
-        const end = new Date(s.endTime).getTime();
-        if (isNaN(start) || isNaN(end)) return false;
-        if (end < start) return false;
-        return true;
-      });
-
-      if (validSessions.length !== sanitized.sessions.length) {
-        console.warn(`[TimeTracking] Sanitize: project ${projectId} removed ${sanitized.sessions.length - validSessions.length} invalid sessions`);
-        sanitized.sessions = validSessions;
-        changed = true;
-      }
-    } else {
-      sanitized.sessions = [];
-      changed = true;
-    }
-
-    if (changed) {
-      projects[projectId] = sanitized;
-      needsSave = true;
+    // Finalize the crashed session using the checkpoint data
+    // Use startedAt as both start, and estimate end as startedAt + (age capped at idle timeout)
+    const estimatedEnd = info.startedAt + Math.min(age, IDLE_TIMEOUT);
+    const duration = estimatedEnd - info.startedAt;
+    if (duration > 1000) {
+      addSession('projects', pid, info.startedAt, estimatedEnd, duration, info.source);
+      recovered++;
     }
   }
 
-  // Sanitize global time tracking
-  let global = ttState.global;
-  if (global) {
-    global = { ...global };
-    let gChanged = false;
-
-    for (const key of ['totalTime', 'todayTime', 'weekTime', 'monthTime']) {
-      if (!Number.isFinite(global[key]) || global[key] < 0) {
-        global[key] = 0;
-        gChanged = true;
+  // Recover global
+  if (checkpoint._global?.startedAt) {
+    const age = now - checkpoint._global.startedAt;
+    if (age <= 60 * 60 * 1000) {
+      const estimatedEnd = checkpoint._global.startedAt + Math.min(age, IDLE_TIMEOUT);
+      const duration = estimatedEnd - checkpoint._global.startedAt;
+      if (duration > 1000) {
+        addSession('global', null, checkpoint._global.startedAt, estimatedEnd, duration);
       }
     }
-
-    if (Array.isArray(global.sessions)) {
-      const validSessions = global.sessions.filter(s => {
-        if (!s || !s.startTime || !s.endTime) return false;
-        if (!Number.isFinite(s.duration) || s.duration <= 0) return false;
-        if (s.duration > maxReasonableDuration) return false;
-        const start = new Date(s.startTime).getTime();
-        const end = new Date(s.endTime).getTime();
-        if (isNaN(start) || isNaN(end)) return false;
-        if (end < start) return false;
-        return true;
-      });
-
-      if (validSessions.length !== global.sessions.length) {
-        console.warn(`[TimeTracking] Sanitize: global removed ${global.sessions.length - validSessions.length} invalid sessions`);
-        global.sessions = validSessions;
-        gChanged = true;
-      }
-    } else {
-      global.sessions = [];
-      gChanged = true;
-    }
-
-    if (gChanged) needsSave = true;
   }
 
-  if (needsSave) {
-    globalTimesCache = null;
-    timeTrackingDataState.set({ projects, global });
-    saveTimeTracking();
-    console.debug('[TimeTracking] Data sanitized and saved');
+  // Clear checkpoint from persisted data
+  const updated = { ...dataState.get() };
+  delete updated._activeCheckpoint;
+  dataState.set(updated);
+
+  if (recovered > 0) {
+    console.debug(`[TimeTracking] Recovered ${recovered} crashed sessions`);
+    save();
   }
 }
 
-// ============================================================
-// ARCHIVING
-// ============================================================
-
-/**
- * Archive past-month sessions to monthly archive files
- */
-async function archivePastMonthSessions() {
-  const ttState = timeTrackingDataState.get();
+function archivePastMonths() {
+  const state = dataState.get();
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
+  let changed = false;
 
-  let hasChanges = false;
+  // Archive global sessions from past months
+  if (state.global?.sessions?.length > 0) {
+    const current = [];
+    const past = {};
 
-  // --- Archive global sessions ---
-  let updatedGlobal = ttState.global;
-  if (updatedGlobal?.sessions?.length > 0) {
-    const currentMonthGlobal = [];
-    const pastByMonth = {};
-
-    for (const session of updatedGlobal.sessions) {
-      const d = new Date(session.startTime);
+    for (const s of state.global.sessions) {
+      const d = new Date(s.startTime);
       if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
-        currentMonthGlobal.push(session);
+        current.push(s);
       } else {
         const key = `${d.getFullYear()}-${d.getMonth()}`;
-        if (!pastByMonth[key]) pastByMonth[key] = [];
-        pastByMonth[key].push(session);
+        if (!past[key]) past[key] = { year: d.getFullYear(), month: d.getMonth(), sessions: [] };
+        past[key].sessions.push(s);
       }
     }
 
-    if (Object.keys(pastByMonth).length > 0) {
-      hasChanges = true;
-      updatedGlobal = { ...updatedGlobal, sessions: currentMonthGlobal };
-    }
-
-    for (const [key, sessions] of Object.entries(pastByMonth)) {
-      const [year, month] = key.split('-').map(Number);
-      await ArchiveService.appendToArchive(year, month, sessions, {});
+    if (Object.keys(past).length > 0) {
+      for (const { year, month, sessions } of Object.values(past)) {
+        ArchiveService.appendToArchive(year, month, sessions, {});
+      }
+      state.global.sessions = current;
+      changed = true;
     }
   }
 
-  // --- Archive per-project sessions ---
-  const pastProjectsByMonth = {};
-  const updatedProjects = { ...ttState.projects };
-  const projectsData = projectsStateRef ? projectsStateRef.get().projects : [];
+  // Archive project sessions from past months
+  for (const [pid, pData] of Object.entries(state.projects || {})) {
+    if (!pData.sessions?.length) continue;
+    const current = [];
+    const past = {};
 
-  for (const [projectId, tracking] of Object.entries(updatedProjects)) {
-    if (!tracking?.sessions?.length) continue;
-
-    const currentMonthSessions = [];
-    for (const session of tracking.sessions) {
-      const d = new Date(session.startTime);
+    for (const s of pData.sessions) {
+      const d = new Date(s.startTime);
       if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
-        currentMonthSessions.push(session);
+        current.push(s);
       } else {
         const key = `${d.getFullYear()}-${d.getMonth()}`;
-        if (!pastProjectsByMonth[key]) pastProjectsByMonth[key] = {};
-        const project = projectsData.find(p => p.id === projectId);
-        if (!pastProjectsByMonth[key][projectId]) {
-          pastProjectsByMonth[key][projectId] = { projectName: project?.name || 'Unknown', sessions: [] };
-        }
-        pastProjectsByMonth[key][projectId].sessions.push(session);
+        if (!past[key]) past[key] = { year: d.getFullYear(), month: d.getMonth(), sessions: [] };
+        past[key].sessions.push(s);
       }
     }
 
-    if (currentMonthSessions.length !== tracking.sessions.length) {
-      hasChanges = true;
-      // Recalculate totalTime from remaining sessions (archived ones are removed)
-      let newTotal = 0;
-      for (const s of currentMonthSessions) newTotal += s.duration || 0;
-      updatedProjects[projectId] = { ...tracking, sessions: currentMonthSessions, totalTime: newTotal };
+    if (Object.keys(past).length > 0) {
+      for (const { year, month, sessions } of Object.values(past)) {
+        const projectName = getProjectName(pid);
+        ArchiveService.appendToArchive(year, month, [], { [pid]: { projectName, sessions } });
+      }
+      pData.sessions = current;
+      changed = true;
     }
   }
 
-  for (const [key, projectsMap] of Object.entries(pastProjectsByMonth)) {
-    const [year, month] = key.split('-').map(Number);
-    await ArchiveService.appendToArchive(year, month, [], projectsMap);
+  if (changed) {
+    dataState.set({ ...state, month: getMonthString() });
+    save();
+  }
+}
+
+function cleanupOrphans() {
+  if (!projectsStateRef) return;
+  const projects = projectsStateRef.get().projects || [];
+  const projectIds = new Set(projects.map(p => p.id));
+  const state = dataState.get();
+  let changed = false;
+
+  for (const pid of Object.keys(state.projects || {})) {
+    if (!projectIds.has(pid)) {
+      delete state.projects[pid];
+      changed = true;
+    }
   }
 
-  if (hasChanges) {
-    globalTimesCache = null;
-    timeTrackingDataState.set({ projects: updatedProjects, global: updatedGlobal });
-    saveTimeTracking();
-    console.debug('[TimeTracking] Archived past-month sessions');
+  if (changed) {
+    dataState.set({ ...state });
+    save();
   }
 }
 
 // ============================================================
-// INITIALIZATION
+// CORE TRACKING
 // ============================================================
 
 /**
- * Initialize with references to projects state functions
+ * Record activity for a project. This is the SINGLE entry point.
+ * Auto-starts tracking if not already active. Internal 1s throttle.
  */
-async function initTimeTracking(projectsState) {
-  projectsStateRef = projectsState;
-  console.debug('[TimeTracking] Initialized');
+function heartbeat(projectId, source = 'terminal') {
+  if (!projectId) return;
 
-  // 1. Migrate old archives/ to timetracking/YYYY/
-  await ArchiveService.migrateOldArchives();
+  const now = Date.now();
+  const runtime = trackingState.get();
+  const activeProjects = new Map(runtime.activeProjects);
+  const existing = activeProjects.get(projectId);
 
-  // 2. Load timetracking.json
-  await loadTimeTrackingData();
+  if (existing) {
+    // Throttle: ignore if less than 1s since last heartbeat for this project
+    if (now - existing.lastHeartbeat < HEARTBEAT_THROTTLE) return;
+    existing.lastHeartbeat = now;
+  } else {
+    // Auto-start tracking for this project
+    activeProjects.set(projectId, { startedAt: now, lastHeartbeat: now, source });
+  }
 
-  // 3. Migrate inline timeTracking from projects.json (reads disk directly)
-  await migrateInlineTimeTracking();
+  // Global timer: start if this is the first active project
+  let globalStartedAt = runtime.globalStartedAt;
+  if (!globalStartedAt && activeProjects.size > 0) {
+    globalStartedAt = now;
+  }
 
-  // 4. Sanitize data
-  sanitizeTimeTrackingData();
-
-  // 5. Migrate global counters (weekTime/monthTime)
-  migrateGlobalTimeTracking();
-
-  // 6. Archive past-month sessions
-  await archivePastMonthSessions();
-
-  // 7. Restore global sessions from backup if missing
-  await rebuildGlobalSessionsIfNeeded();
-
-  // 8. Compact fragmented sessions (merge consecutive, preserves total time)
-  compactExistingSessions();
-
-  // 9. Cleanup orphaned entries
-  cleanupOrphanedTimeTracking();
-
-  // 10. Start timers
-  lastKnownDate = getTodayString();
-  startMidnightCheck();
-  startHeartbeat();
-  startCheckpointTimer();
+  trackingState.set({
+    activeProjects,
+    globalStartedAt,
+    globalLastHeartbeat: now
+  });
 }
 
 /**
- * Migrate global time tracking to use weekTime/monthTime counters
+ * Explicitly stop tracking for a project (terminal closed).
  */
-function migrateGlobalTimeTracking() {
-  const ttState = timeTrackingDataState.get();
-  const globalTracking = ttState.global;
+function stopProject(projectId) {
+  if (!projectId) return;
 
-  if (!globalTracking) return;
+  const now = Date.now();
+  const runtime = trackingState.get();
+  const activeProjects = new Map(runtime.activeProjects);
+  const info = activeProjects.get(projectId);
 
-  const weekStart = getWeekStartString();
-  const monthStart = getMonthString();
-  let needsSave = false;
-
-  const needsWeekMigration = globalTracking.weekTime === undefined || globalTracking.weekStart !== weekStart;
-  const needsMonthMigration = globalTracking.monthTime === undefined || globalTracking.monthStart !== monthStart;
-
-  if (needsWeekMigration || needsMonthMigration) {
-    const updated = { ...globalTracking };
-    const sessions = globalTracking.sessions || [];
-
-    // Always recalculate todayTime and totalTime from sessions
-    const todayStr = getTodayString();
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
-    let todayFromSessions = 0, totalFromSessions = 0;
-    for (const session of sessions) {
-      const dur = session.duration || 0;
-      totalFromSessions += dur;
-      const d = new Date(session.startTime);
-      if (d >= todayStart && d < todayEnd) todayFromSessions += dur;
+  if (info) {
+    // Finalize project session
+    const duration = now - info.startedAt;
+    if (duration > 1000) {
+      addSession('projects', projectId, info.startedAt, now, duration, info.source);
     }
-    updated.todayTime = todayFromSessions;
-    updated.totalTime = totalFromSessions;
-    updated.lastActiveDate = todayStr;
+    activeProjects.delete(projectId);
+  }
 
-    if (needsWeekMigration) {
-      const weekStartDate = new Date(weekStart + 'T00:00:00');
-      const weekEndDate = new Date(weekStartDate);
-      weekEndDate.setDate(weekEndDate.getDate() + 7);
+  // If last project stopped, finalize global session too
+  let globalStartedAt = runtime.globalStartedAt;
+  if (activeProjects.size === 0 && globalStartedAt) {
+    const duration = now - globalStartedAt;
+    if (duration > 1000) {
+      addSession('global', null, globalStartedAt, now, duration);
+    }
+    globalStartedAt = null;
+  }
 
-      let weekFromSessions = 0;
-      for (const session of sessions) {
-        const sessionDate = new Date(session.startTime);
-        if (sessionDate >= weekStartDate && sessionDate < weekEndDate) {
-          weekFromSessions += session.duration || 0;
-        }
+  trackingState.set({
+    activeProjects,
+    globalStartedAt,
+    globalLastHeartbeat: activeProjects.size > 0 ? runtime.globalLastHeartbeat : null
+  });
+
+  save();
+}
+
+/**
+ * Main tick — runs every 60s. Handles idle detection, midnight, sleep/wake, and checkpoint saves.
+ */
+function tick() {
+  const now = Date.now();
+  const elapsed = now - lastTickTime;
+  lastTickTime = now;
+
+  const runtime = trackingState.get();
+  const activeProjects = new Map(runtime.activeProjects);
+  let globalStartedAt = runtime.globalStartedAt;
+  let changed = false;
+
+  // --- Sleep/wake detection ---
+  if (elapsed > SLEEP_GAP) {
+    const sleepStart = now - elapsed;
+    // Finalize all sessions at the pre-sleep timestamp
+    for (const [pid, info] of activeProjects) {
+      const duration = sleepStart - info.startedAt;
+      if (duration > 1000) {
+        addSession('projects', pid, info.startedAt, sleepStart, duration, info.source);
       }
-
-      // Always use session-based calculation as source of truth
-      updated.weekTime = weekFromSessions;
-      updated.weekStart = weekStart;
-      needsSave = true;
+      info.startedAt = now;
+      info.lastHeartbeat = now;
     }
-
-    if (needsMonthMigration) {
-      const [year, month] = monthStart.split('-').map(Number);
-
-      let monthFromSessions = 0;
-      for (const session of sessions) {
-        const sessionDate = new Date(session.startTime);
-        if (sessionDate.getFullYear() === year && sessionDate.getMonth() + 1 === month) {
-          monthFromSessions += session.duration || 0;
-        }
+    if (globalStartedAt) {
+      const duration = sleepStart - globalStartedAt;
+      if (duration > 1000) {
+        addSession('global', null, globalStartedAt, sleepStart, duration);
       }
+      globalStartedAt = activeProjects.size > 0 ? now : null;
+    }
+    changed = true;
+  }
 
-      // Always use session-based calculation as source of truth
-      updated.monthTime = monthFromSessions;
-      updated.monthStart = monthStart;
-      needsSave = true;
+  // --- Per-project idle check ---
+  for (const [pid, info] of activeProjects) {
+    if (now - info.lastHeartbeat > IDLE_TIMEOUT) {
+      // Idle out: finalize at last heartbeat time
+      const duration = info.lastHeartbeat - info.startedAt;
+      if (duration > 1000) {
+        addSession('projects', pid, info.startedAt, info.lastHeartbeat, duration, info.source);
+      }
+      activeProjects.delete(pid);
+      changed = true;
+    }
+  }
+
+  // --- Global idle check ---
+  if (globalStartedAt && activeProjects.size === 0) {
+    const lastHb = runtime.globalLastHeartbeat || globalStartedAt;
+    const duration = lastHb - globalStartedAt;
+    if (duration > 1000) {
+      addSession('global', null, globalStartedAt, lastHb, duration);
+    }
+    globalStartedAt = null;
+    changed = true;
+  }
+
+  // --- Midnight check ---
+  const todayStr = getTodayString();
+  if (lastKnownDate && todayStr !== lastKnownDate) {
+    splitSessionsAtMidnight(activeProjects, globalStartedAt);
+    const midnight = startOfDay(now);
+
+    // Reset session starts to midnight
+    for (const info of activeProjects.values()) {
+      info.startedAt = midnight;
+    }
+    if (globalStartedAt && activeProjects.size > 0) {
+      globalStartedAt = midnight;
     }
 
-    if (needsSave) {
-      globalTimesCache = null;
-      timeTrackingDataState.set({ ...ttState, global: updated });
-      saveTimeTracking();
+    // Archive past months if month changed
+    const oldMonth = lastKnownDate.substring(0, 7);
+    const newMonth = todayStr.substring(0, 7);
+    if (oldMonth !== newMonth) {
+      archivePastMonths();
+    }
+
+    lastKnownDate = todayStr;
+    changed = true;
+  }
+
+  if (changed) {
+    trackingState.set({
+      activeProjects,
+      globalStartedAt,
+      globalLastHeartbeat: activeProjects.size > 0 ? runtime.globalLastHeartbeat : null
+    });
+  }
+
+  // --- Checkpoint save (always save on tick if there are active sessions) ---
+  if (activeProjects.size > 0 || dirty) {
+    save();
+  }
+}
+
+function splitSessionsAtMidnight(activeProjects, globalStartedAt) {
+  const midnight = startOfDay(Date.now());
+  const preMidnight = midnight - 1;
+
+  // Split project sessions
+  for (const [pid, info] of activeProjects) {
+    if (info.startedAt < midnight) {
+      const duration = preMidnight - info.startedAt;
+      if (duration > 1000) {
+        addSession('projects', pid, info.startedAt, preMidnight, duration, info.source);
+      }
+    }
+  }
+
+  // Split global session
+  if (globalStartedAt && globalStartedAt < midnight) {
+    const duration = preMidnight - globalStartedAt;
+    if (duration > 1000) {
+      addSession('global', null, globalStartedAt, preMidnight, duration);
     }
   }
 }
 
 // ============================================================
-// TIMERS (midnight, heartbeat, checkpoint)
+// SESSION STORAGE
 // ============================================================
 
-function startMidnightCheck() {
-  clearInterval(midnightCheckTimer);
-  midnightCheckTimer = setInterval(checkMidnightReset, 30 * 1000);
+function addSession(target, projectId, startTime, endTime, duration, source) {
+  const state = dataState.get();
+  const session = {
+    id: `sess-${startTime}-${Math.random().toString(36).slice(2, 10)}`,
+    startTime: new Date(startTime).toISOString(),
+    endTime: new Date(endTime).toISOString(),
+    duration
+  };
+  if (source) session.source = source;
+
+  if (target === 'global') {
+    if (!state.global) state.global = { sessions: [] };
+    state.global.sessions = mergeOrAppend(state.global.sessions, session);
+  } else {
+    if (!state.projects[projectId]) state.projects[projectId] = { sessions: [] };
+    state.projects[projectId].sessions = mergeOrAppend(state.projects[projectId].sessions, session);
+  }
+
+  dataState.set({ ...state });
+  dirty = true;
 }
 
-function startHeartbeat() {
-  clearInterval(heartbeatTimer);
-  lastHeartbeat = Date.now();
-  heartbeatTimer = setInterval(checkSleepWake, 30 * 1000);
+/**
+ * Merge a new session with the last one if gap < MERGE_GAP, otherwise append.
+ */
+function mergeOrAppend(sessions, newSession) {
+  if (!sessions.length) return [newSession];
+
+  const last = sessions[sessions.length - 1];
+  const lastEnd = new Date(last.endTime).getTime();
+  const newStart = new Date(newSession.startTime).getTime();
+  const gap = newStart - lastEnd;
+
+  if (gap >= 0 && gap < MERGE_GAP) {
+    // Merge: extend the last session
+    last.endTime = newSession.endTime;
+    last.duration += newSession.duration;
+    return sessions;
+  }
+
+  if (gap < 0) {
+    // Overlap: extend to max endTime, use wall-clock duration
+    const lastStart = new Date(last.startTime).getTime();
+    const newEnd = new Date(newSession.endTime).getTime();
+    last.endTime = new Date(Math.max(lastEnd, newEnd)).toISOString();
+    last.duration = Math.max(lastEnd, newEnd) - lastStart;
+    return sessions;
+  }
+
+  // Gap >= MERGE_GAP: new session
+  sessions.push(newSession);
+  return sessions;
 }
 
-function startCheckpointTimer() {
-  clearInterval(checkpointTimer);
-  checkpointTimer = setInterval(saveCheckpoints, CHECKPOINT_INTERVAL);
-}
+// ============================================================
+// GETTERS (computed from sessions, never cached wrong)
+// ============================================================
 
-async function saveCheckpoints() {
-  const state = trackingState.get();
+function getGlobalTimes() {
   const now = Date.now();
-  const activeSessions = new Map(state.activeSessions);
-  let projectsChanged = false;
+  const todayStart = startOfDay(now);
+  const weekStart = startOfWeek(now);
+  const monthStart = startOfMonth(now);
 
-  for (const [projectId, session] of activeSessions) {
-    if (session.sessionStartTime && !session.isIdle) {
-      const duration = now - session.sessionStartTime;
-      if (duration > 1000) {
-        await saveSession(projectId, session.sessionStartTime, now, duration);
-        activeSessions.set(projectId, { ...session, sessionStartTime: now });
-        projectsChanged = true;
-      }
-    }
+  const state = dataState.get();
+  let today = 0, week = 0, month = 0;
+
+  // Sum from saved sessions (sessions may span period boundaries due to merging)
+  for (const session of (state.global?.sessions || [])) {
+    const start = new Date(session.startTime).getTime();
+    const end = new Date(session.endTime).getTime();
+    // Only count the portion of the session that falls within each period
+    if (end > todayStart) today += Math.min(end, now) - Math.max(start, todayStart);
+    if (end > weekStart) week += Math.min(end, now) - Math.max(start, weekStart);
+    if (end > monthStart) month += Math.min(end, now) - Math.max(start, monthStart);
   }
 
-  let globalChanged = false;
-  if (state.globalSessionStartTime && !state.globalIsIdle) {
-    const duration = now - state.globalSessionStartTime;
-    if (duration > 1000) {
-      await saveGlobalSession(state.globalSessionStartTime, now, duration);
-      globalChanged = true;
-    }
+  // Add elapsed time from active global session
+  const runtime = trackingState.get();
+  if (runtime.globalStartedAt) {
+    const activeStart = runtime.globalStartedAt;
+    if (now > Math.max(activeStart, todayStart)) today += now - Math.max(activeStart, todayStart);
+    if (now > Math.max(activeStart, weekStart)) week += now - Math.max(activeStart, weekStart);
+    if (now > Math.max(activeStart, monthStart)) month += now - Math.max(activeStart, monthStart);
   }
 
-  if (projectsChanged || globalChanged) {
-    const newState = { ...trackingState.get() };
-    if (projectsChanged) newState.activeSessions = activeSessions;
-    if (globalChanged) newState.globalSessionStartTime = now;
-    trackingState.set(newState);
-    console.debug('[TimeTracking] Checkpoint saved');
-  }
+  return { today, week, month };
 }
 
-async function checkSleepWake() {
+function getProjectTimes(projectId) {
+  if (!projectId) return { today: 0, total: 0 };
+
   const now = Date.now();
-  const elapsed = now - lastHeartbeat;
-  lastHeartbeat = now;
+  const todayStart = startOfDay(now);
+  const state = dataState.get();
+  const sessions = state.projects?.[projectId]?.sessions || [];
 
-  if (elapsed > SLEEP_GAP_THRESHOLD) {
-    console.debug(`[TimeTracking] Sleep/wake detected: gap of ${Math.round(elapsed / 1000)}s`);
-    await handleSleepWake(now - elapsed, now);
+  let today = 0, total = 0;
+  for (const s of sessions) {
+    const start = new Date(s.startTime).getTime();
+    const end = new Date(s.endTime).getTime();
+    total += s.duration || 0;
+    // Only count the portion that falls within today
+    if (end > todayStart) today += Math.min(end, now) - Math.max(start, todayStart);
   }
+
+  // Add active session time
+  const runtime = trackingState.get();
+  const active = runtime.activeProjects.get(projectId);
+  if (active) {
+    const elapsed = now - active.startedAt;
+    total += elapsed;
+    if (now > Math.max(active.startedAt, todayStart)) today += now - Math.max(active.startedAt, todayStart);
+  }
+
+  return { today, total };
 }
 
-async function handleSleepWake(sleepStart, wakeTime) {
-  const state = trackingState.get();
-
-  if (state.globalSessionStartTime && !state.globalIsIdle) {
-    const duration = sleepStart - state.globalSessionStartTime;
-    if (duration > 1000) {
-      await saveGlobalSession(state.globalSessionStartTime, sleepStart, duration);
-    }
-    trackingState.set({
-      ...trackingState.get(),
-      globalSessionStartTime: wakeTime,
-      globalLastActivityTime: wakeTime
-    });
-  }
-
-  const activeSessions = new Map(trackingState.get().activeSessions);
-  for (const [projectId, session] of activeSessions) {
-    if (session.sessionStartTime && !session.isIdle) {
-      const duration = sleepStart - session.sessionStartTime;
-      if (duration > 1000) {
-        await saveSession(projectId, session.sessionStartTime, sleepStart, duration);
-      }
-      activeSessions.set(projectId, {
-        ...session,
-        sessionStartTime: wakeTime,
-        lastActivityTime: wakeTime
-      });
-    }
-  }
-
-  trackingState.set({ ...trackingState.get(), activeSessions });
+function getProjectSessions(projectId) {
+  if (!projectId) return [];
+  const state = dataState.get();
+  return state.projects?.[projectId]?.sessions || [];
 }
 
-async function checkMidnightReset() {
-  const today = getTodayString();
-
-  if (lastKnownDate && lastKnownDate !== today) {
-    console.debug('[TimeTracking] Midnight detected! Date changed from', lastKnownDate, 'to', today);
-
-    const oldDate = new Date(lastKnownDate + 'T00:00:00');
-    const newDate = new Date(today + 'T00:00:00');
-    const monthChanged = oldDate.getMonth() !== newDate.getMonth()
-      || oldDate.getFullYear() !== newDate.getFullYear();
-
-    lastKnownDate = today;
-    globalTimesCache = null;
-    await splitSessionsAtMidnight();
-
-    if (monthChanged) {
-      console.debug('[TimeTracking] Month boundary crossed, archiving past sessions');
-      await archivePastMonthSessions();
-    }
-  }
+function getGlobalTrackingData() {
+  return dataState.get().global || { sessions: [] };
 }
 
-async function splitSessionsAtMidnight() {
-  const state = trackingState.get();
+// ============================================================
+// SHUTDOWN
+// ============================================================
+
+function saveAndShutdown() {
   const now = Date.now();
-  const todayMidnight = new Date();
-  todayMidnight.setHours(0, 0, 0, 0);
-  const midnightTs = todayMidnight.getTime();
+  const runtime = trackingState.get();
 
-  // Save pre-midnight segments using yesterday's date context
-  // by passing endTime = midnightTs - 1ms so saveGlobalSession/saveSession
-  // attribute the time to the correct day/week/month
-  const preMidnight = midnightTs - 1;
-
-  if (state.globalSessionStartTime && !state.globalIsIdle) {
-    const duration = preMidnight - state.globalSessionStartTime;
+  // Finalize all active project sessions
+  for (const [pid, info] of runtime.activeProjects) {
+    const duration = now - info.startedAt;
     if (duration > 1000) {
-      await saveGlobalSessionAt(state.globalSessionStartTime, preMidnight, duration, new Date(preMidnight));
-    }
-    trackingState.set({
-      ...trackingState.get(),
-      globalSessionStartTime: midnightTs,
-      globalLastActivityTime: now
-    });
-  }
-
-  const activeSessions = new Map(trackingState.get().activeSessions);
-  for (const [projectId, session] of activeSessions) {
-    if (session.sessionStartTime && !session.isIdle) {
-      const duration = preMidnight - session.sessionStartTime;
-      if (duration > 1000) {
-        await saveSessionAt(projectId, session.sessionStartTime, preMidnight, duration, new Date(preMidnight));
-      }
-      activeSessions.set(projectId, {
-        ...session,
-        sessionStartTime: midnightTs,
-        lastActivityTime: now
-      });
+      addSession('projects', pid, info.startedAt, now, duration, info.source);
     }
   }
 
-  trackingState.set({ ...trackingState.get(), activeSessions });
+  // Finalize global session
+  if (runtime.globalStartedAt) {
+    const duration = now - runtime.globalStartedAt;
+    if (duration > 1000) {
+      addSession('global', null, runtime.globalStartedAt, now, duration);
+    }
+  }
+
+  // Stop tick
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  if (saveDebounceTimer) { clearTimeout(saveDebounceTimer); saveDebounceTimer = null; }
+
+  // Reset runtime
+  trackingState.set({
+    activeProjects: new Map(),
+    globalStartedAt: null,
+    globalLastHeartbeat: null
+  });
+
+  // Save immediately
+  saveImmediate();
 }
 
 // ============================================================
 // HELPERS
 // ============================================================
 
+function isValidSession(s) {
+  if (!s || !s.startTime || !s.endTime) return false;
+  if (!Number.isFinite(s.duration) || s.duration <= 0) return false;
+  if (s.duration > 24 * 60 * 60 * 1000) return false; // > 24h is invalid
+  const start = new Date(s.startTime).getTime();
+  const end = new Date(s.endTime).getTime();
+  if (isNaN(start) || isNaN(end) || end < start) return false;
+  return true;
+}
+
 function getTodayString() {
-  return getDateString(new Date());
-}
-
-function getDateString(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function getWeekStartString() {
-  return getWeekStartStringForDate(new Date());
-}
-
-function getWeekStartStringForDate(date) {
-  const day = date.getDay();
-  const diff = day === 0 ? 6 : day - 1;
-  const monday = new Date(date);
-  monday.setDate(monday.getDate() - diff);
-  monday.setHours(0, 0, 0, 0);
-  return monday.toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function getMonthString() {
-  return getMonthStringForDate(new Date());
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getMonthStringForDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+function startOfDay(ts) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }
 
-/**
- * Ensure time tracking data exists for a project
- */
-function ensureTimeTracking(project) {
-  if (!project) return { totalTime: 0, todayTime: 0, lastActiveDate: null, sessions: [] };
-
-  const ttState = timeTrackingDataState.get();
-  if (!ttState.projects[project.id]) {
-    const tracking = { totalTime: 0, todayTime: 0, lastActiveDate: null, sessions: [] };
-    timeTrackingDataState.set({
-      ...ttState,
-      projects: { ...ttState.projects, [project.id]: tracking }
-    });
-    return tracking;
-  }
-  return ttState.projects[project.id];
+function startOfWeek(ts) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? 6 : day - 1; // Monday = start of week
+  d.setDate(d.getDate() - diff);
+  return d.getTime();
 }
 
-function getProjectById(projectId) {
-  if (!projectsStateRef) return undefined;
-  return projectsStateRef.get().projects.find(p => p.id === projectId);
+function startOfMonth(ts) {
+  const d = new Date(ts);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }
 
-function generateSessionId() {
-  return `sess-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-function getActiveNonIdleCount() {
-  const state = trackingState.get();
-  let count = 0;
-  for (const session of state.activeSessions.values()) {
-    if (session.sessionStartTime && !session.isIdle) count++;
-  }
-  return count;
-}
-
-// ============================================================
-// GLOBAL TIMER
-// ============================================================
-
-function startGlobalTimer() {
-  const state = trackingState.get();
-  if (state.globalSessionStartTime && !state.globalIsIdle) return;
-
-  const now = Date.now();
-  trackingState.set({
-    ...state,
-    globalSessionStartTime: now,
-    globalLastActivityTime: now,
-    globalIsIdle: false
-  });
-
-  clearTimeout(globalIdleTimer);
-  globalIdleTimer = setTimeout(checkAndPauseGlobalTimer, IDLE_TIMEOUT);
-  console.debug('[TimeTracking] Global timer started');
-}
-
-async function pauseGlobalTimer() {
-  const state = trackingState.get();
-  if (!state.globalSessionStartTime || state.globalIsIdle) return;
-
-  const now = Date.now();
-  const duration = now - state.globalSessionStartTime;
-  if (duration > 1000) {
-    await saveGlobalSession(state.globalSessionStartTime, now, duration);
-  }
-
-  trackingState.set({ ...state, globalSessionStartTime: null, globalIsIdle: true });
-  console.debug('[TimeTracking] Global timer paused (idle)');
-}
-
-function resumeGlobalTimer() {
-  const state = trackingState.get();
-  if (!state.globalIsIdle) return;
-
-  const now = Date.now();
-  trackingState.set({
-    ...state,
-    globalSessionStartTime: now,
-    globalLastActivityTime: now,
-    globalIsIdle: false
-  });
-
-  clearTimeout(globalIdleTimer);
-  globalIdleTimer = setTimeout(checkAndPauseGlobalTimer, IDLE_TIMEOUT);
-  console.debug('[TimeTracking] Global timer resumed');
-}
-
-async function stopGlobalTimer() {
-  const state = trackingState.get();
-  if (state.globalSessionStartTime && !state.globalIsIdle) {
-    const now = Date.now();
-    const duration = now - state.globalSessionStartTime;
-    if (duration > 1000) {
-      await saveGlobalSession(state.globalSessionStartTime, now, duration);
-    }
-  }
-
-  clearTimeout(globalIdleTimer);
-  trackingState.set({
-    ...state,
-    globalSessionStartTime: null,
-    globalLastActivityTime: null,
-    globalIsIdle: false
-  });
-  console.debug('[TimeTracking] Global timer stopped');
-}
-
-function resetGlobalIdleTimer() {
-  const state = trackingState.get();
-  if (state.globalIsIdle) {
-    resumeGlobalTimer();
-    return;
-  }
-
-  if (state.globalSessionStartTime) {
-    clearTimeout(globalIdleTimer);
-    globalIdleTimer = setTimeout(checkAndPauseGlobalTimer, IDLE_TIMEOUT);
-    trackingState.set({ ...state, globalLastActivityTime: Date.now() });
-  }
-}
-
-// ============================================================
-// SESSION MERGING
-// ============================================================
-
-/**
- * Merge a new session segment into the last session if close enough, otherwise append.
- * This prevents checkpoint intervals from creating hundreds of micro-sessions.
- */
-function mergeOrAppendSession(sessions, startTime, endTime, duration) {
-  const startIso = new Date(startTime).toISOString();
-  const endIso = new Date(endTime).toISOString();
-  const startMs = new Date(startTime).getTime();
-  const endMs = new Date(endTime).getTime();
-
-  if (sessions.length > 0) {
-    const last = sessions[sessions.length - 1];
-    const lastStart = new Date(last.startTime).getTime();
-    const lastEnd = new Date(last.endTime).getTime();
-    const gap = startMs - lastEnd;
-
-    if (gap < SESSION_MERGE_GAP && gap >= 0) {
-      // Adjacent/close sessions: extend and sum durations
-      const merged = [...sessions];
-      merged[merged.length - 1] = {
-        ...last,
-        endTime: endIso,
-        duration: (last.duration || 0) + duration
-      };
-      return merged;
-    }
-
-    if (gap < 0 && startMs >= lastStart) {
-      // Overlapping session: merge without double-counting
-      const merged = [...sessions];
-      const mergedEnd = Math.max(lastEnd, endMs);
-      merged[merged.length - 1] = {
-        ...last,
-        endTime: new Date(mergedEnd).toISOString(),
-        duration: mergedEnd - lastStart
-      };
-      return merged;
-    }
-  }
-
-  // Too far apart or first session - create new
-  return [...sessions, {
-    id: generateSessionId(),
-    startTime: startIso,
-    endTime: endIso,
-    duration
-  }];
-}
-
-/**
- * Compact existing sessions by merging consecutive ones with small gaps.
- * This reduces file size without losing any time data (durations are summed).
- */
-function compactExistingSessions() {
-  const ttState = timeTrackingDataState.get();
-  let totalBefore = 0;
-  let totalAfter = 0;
-
-  const now = new Date();
-  const todayStr = getTodayString();
-  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
-
-  const compactedProjects = {};
-  for (const [projectId, tracking] of Object.entries(ttState.projects)) {
-    const sessions = tracking.sessions || [];
-    totalBefore += sessions.length;
-    const compacted = compactSessionArray(sessions);
-    totalAfter += compacted.length;
-
-    // Recalculate project counters from compacted sessions
-    let projTotal = 0, projToday = 0;
-    for (const s of compacted) {
-      const dur = s.duration || 0;
-      projTotal += dur;
-      const d = new Date(s.startTime);
-      if (d >= todayStart && d < todayEnd) projToday += dur;
-    }
-    compactedProjects[projectId] = {
-      ...tracking,
-      sessions: compacted,
-      totalTime: projTotal,
-      todayTime: projToday,
-      lastActiveDate: todayStr
-    };
-  }
-
-  let compactedGlobal = ttState.global;
-  if (compactedGlobal?.sessions?.length) {
-    totalBefore += compactedGlobal.sessions.length;
-    const compacted = compactSessionArray(compactedGlobal.sessions);
-    totalAfter += compacted.length;
-    compactedGlobal = { ...compactedGlobal, sessions: compacted };
-
-    // Recalculate stored counters from compacted sessions to fix drift
-    const now = new Date();
-    const todayStr = getTodayString();
-    const weekStartStr = getWeekStartString();
-    const monthStartStr = getMonthString();
-
-    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
-    const day = now.getDay();
-    const diffToMon = day === 0 ? 6 : day - 1;
-    const weekStartDate = new Date(now); weekStartDate.setDate(weekStartDate.getDate() - diffToMon); weekStartDate.setHours(0, 0, 0, 0);
-    const weekEndDate = new Date(weekStartDate); weekEndDate.setDate(weekEndDate.getDate() + 7);
-    const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-    let globalTotal = 0, todayTime = 0, weekTime = 0, monthTime = 0;
-    for (const s of compacted) {
-      const d = new Date(s.startTime);
-      const dur = s.duration || 0;
-      globalTotal += dur;
-      if (d >= todayStart && d < todayEnd) todayTime += dur;
-      if (d >= weekStartDate && d < weekEndDate) weekTime += dur;
-      if (d >= monthStartDate && d < monthEndDate) monthTime += dur;
-    }
-    compactedGlobal.totalTime = globalTotal;
-    compactedGlobal.todayTime = todayTime;
-    compactedGlobal.weekTime = weekTime;
-    compactedGlobal.monthTime = monthTime;
-    compactedGlobal.lastActiveDate = todayStr;
-    compactedGlobal.weekStart = weekStartStr;
-    compactedGlobal.monthStart = monthStartStr;
-  }
-
-  if (totalAfter < totalBefore) {
-    globalTimesCache = null;
-    timeTrackingDataState.set({ projects: compactedProjects, global: compactedGlobal });
-    saveTimeTracking();
-    console.debug(`[TimeTracking] Compacted sessions: ${totalBefore} -> ${totalAfter}`);
-  }
-}
-
-/**
- * Merge an array of sessions, combining consecutive ones with gap < SESSION_MERGE_GAP.
- * Total duration is preserved (durations are summed, not recalculated).
- */
-function compactSessionArray(sessions) {
-  if (!sessions.length) return [];
-
-  const sorted = [...sessions].sort((a, b) =>
-    new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-  );
-
-  const result = [{ ...sorted[0] }];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const current = sorted[i];
-    const last = result[result.length - 1];
-    const lastStart = new Date(last.startTime).getTime();
-    const lastEnd = new Date(last.endTime).getTime();
-    const currentStart = new Date(current.startTime).getTime();
-    const currentEnd = new Date(current.endTime).getTime();
-    const gap = currentStart - lastEnd;
-
-    if (gap < SESSION_MERGE_GAP && gap >= 0) {
-      // Adjacent or close sessions: extend and sum durations
-      last.endTime = current.endTime;
-      last.duration = (last.duration || 0) + (current.duration || 0);
-    } else if (gap < 0) {
-      // Overlapping sessions: merge without double-counting
-      const mergedEnd = Math.max(lastEnd, currentEnd);
-      last.endTime = new Date(mergedEnd).toISOString();
-      // Recalculate duration from merged wall-clock time
-      last.duration = mergedEnd - lastStart;
-    } else {
-      result.push({ ...current });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Restore global sessions from pre-migration backup if current data looks wrong.
- * The backup file (projects.json.pre-migration.bak) contains the original globalTimeTracking
- * with correct wall-clock times (no double-counting from overlapping project sessions).
- */
-async function rebuildGlobalSessionsIfNeeded() {
-  const ttState = timeTrackingDataState.get();
-  const globalSessions = ttState.global?.sessions || [];
-
-  // If we already have global sessions, don't overwrite them
-  if (globalSessions.length > 0) return;
-
-  // Try to restore from pre-migration backup
-  const backupFile = `${projectsFile}.pre-migration.bak`;
-  try {
-    if (!fs.existsSync(backupFile)) {
-      console.debug('[TimeTracking] No pre-migration backup found, skipping global restore');
-      return;
-    }
-
-    const content = await fs.promises.readFile(backupFile, 'utf8');
-    if (!content || !content.trim()) return;
-
-    const backupData = JSON.parse(content);
-    const backupGlobal = backupData.globalTimeTracking;
-
-    if (!backupGlobal || !backupGlobal.sessions || backupGlobal.sessions.length === 0) {
-      console.debug('[TimeTracking] Backup has no global sessions');
-      return;
-    }
-
-    // Filter to current month only (past months should already be archived)
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    const currentMonthSessions = backupGlobal.sessions.filter(s => {
-      const d = new Date(s.startTime);
-      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-    });
-
-    // Archive past-month sessions from backup
-    const pastByMonth = {};
-    for (const session of backupGlobal.sessions) {
-      const d = new Date(session.startTime);
-      if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) continue;
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      if (!pastByMonth[key]) pastByMonth[key] = [];
-      pastByMonth[key].push(session);
-    }
-
-    for (const [key, sessions] of Object.entries(pastByMonth)) {
-      const [year, month] = key.split('-').map(Number);
-      await ArchiveService.appendToArchive(year, month, sessions, {});
-    }
-
-    // Recalculate all counters from restored sessions (source of truth)
-    const currentWeekStart = getWeekStartString();
-    const currentMonthStart = getMonthString();
-    const todayStr = getTodayString();
-    const rTodayStart = new Date(); rTodayStart.setHours(0, 0, 0, 0);
-    const rTodayEnd = new Date(rTodayStart); rTodayEnd.setDate(rTodayEnd.getDate() + 1);
-    const rWeekStartDate = new Date(currentWeekStart + 'T00:00:00');
-    const rWeekEndDate = new Date(rWeekStartDate); rWeekEndDate.setDate(rWeekEndDate.getDate() + 7);
-    const [rYear, rMonth] = currentMonthStart.split('-').map(Number);
-
-    let rTotal = 0, rToday = 0, rWeek = 0, rMonthTime = 0;
-    for (const s of currentMonthSessions) {
-      const dur = s.duration || 0;
-      const d = new Date(s.startTime);
-      rTotal += dur;
-      if (d >= rTodayStart && d < rTodayEnd) rToday += dur;
-      if (d >= rWeekStartDate && d < rWeekEndDate) rWeek += dur;
-      if (d.getFullYear() === rYear && d.getMonth() + 1 === rMonth) rMonthTime += dur;
-    }
-
-    const updatedGlobal = {
-      ...(ttState.global || {}),
-      sessions: currentMonthSessions,
-      totalTime: rTotal,
-      todayTime: rToday,
-      weekTime: rWeek,
-      monthTime: rMonthTime,
-      lastActiveDate: todayStr,
-      weekStart: currentWeekStart,
-      monthStart: currentMonthStart
-    };
-
-    globalTimesCache = null;
-    timeTrackingDataState.set({ ...ttState, global: updatedGlobal });
-    saveTimeTracking();
-
-    console.debug(`[TimeTracking] Restored global sessions from backup: ${currentMonthSessions.length} sessions (current month), archived ${Object.keys(pastByMonth).length} past months`);
-  } catch (e) {
-    console.warn('[TimeTracking] Failed to restore global from backup:', e.message);
-  }
-}
-
-// rebuildArchivedGlobalSessions removed - cannot accurately reconstruct global sessions
-// from project sessions because overlapping sessions would double-count time.
-// Past month global sessions are now restored from the pre-migration backup in rebuildGlobalSessionsIfNeeded().
-
-// ============================================================
-// SESSION SAVE (to timeTrackingDataState)
-// ============================================================
-
-/**
- * Save a global session
- */
-async function saveGlobalSession(startTime, endTime, duration) {
-  await saveGlobalSessionAt(startTime, endTime, duration, new Date());
-}
-
-/**
- * Save a global session using a specific reference date for counter attribution
- * This ensures midnight splits attribute time to the correct day/week/month
- */
-async function saveGlobalSessionAt(startTime, endTime, duration, refDate) {
-  console.debug('[TimeTracking] saveGlobalSession:', { duration: Math.round(duration / 1000) + 's' });
-
-  const today = getDateString(refDate);
-  const weekStart = getWeekStartStringForDate(refDate);
-  const monthStart = getMonthStringForDate(refDate);
-
-  const ttState = timeTrackingDataState.get();
-  const prev = ttState.global || {
-    totalTime: 0, todayTime: 0, weekTime: 0, monthTime: 0,
-    lastActiveDate: null, weekStart: null, monthStart: null, sessions: []
-  };
-
-  const todayTime = (prev.lastActiveDate !== today ? 0 : (prev.todayTime || 0)) + duration;
-  const weekTime = (prev.weekStart !== weekStart ? 0 : (prev.weekTime || 0)) + duration;
-  const monthTime = (prev.monthStart !== monthStart ? 0 : (prev.monthTime || 0)) + duration;
-
-  const sessionDate = new Date(startTime);
-  const isCurrentMonthSession = sessionDate.getFullYear() === refDate.getFullYear()
-    && sessionDate.getMonth() === refDate.getMonth();
-
-  let sessions;
-  if (isCurrentMonthSession) {
-    sessions = mergeOrAppendSession(prev.sessions || [], startTime, endTime, duration);
-  } else {
-    const newSession = {
-      id: generateSessionId(),
-      startTime: new Date(startTime).toISOString(),
-      endTime: new Date(endTime).toISOString(),
-      duration
-    };
-    await ArchiveService.appendToArchive(sessionDate.getFullYear(), sessionDate.getMonth(), [newSession], {});
-    sessions = prev.sessions || [];
-  }
-
-  const globalTracking = {
-    ...prev,
-    totalTime: (prev.totalTime || 0) + duration,
-    todayTime, weekTime, monthTime,
-    lastActiveDate: today, weekStart, monthStart,
-    sessions
-  };
-
-  globalTimesCache = null;
-  timeTrackingDataState.set({ ...ttState, global: globalTracking });
-  saveTimeTracking();
-}
-
-/**
- * Save a session to a project's time tracking data
- */
-async function saveSession(projectId, startTime, endTime, duration) {
-  await saveSessionAt(projectId, startTime, endTime, duration, new Date());
-}
-
-/**
- * Save a project session using a specific reference date for counter attribution
- */
-async function saveSessionAt(projectId, startTime, endTime, duration, refDate) {
-  console.debug('[TimeTracking] saveSession:', { projectId, duration: Math.round(duration / 1000) + 's' });
-
-  const today = getDateString(refDate);
-
-  const sessionDate = new Date(startTime);
-  const isCurrentMonthSession = sessionDate.getFullYear() === refDate.getFullYear()
-    && sessionDate.getMonth() === refDate.getMonth();
-
-  const ttState = timeTrackingDataState.get();
-  const prev = ttState.projects[projectId] || {
-    totalTime: 0, todayTime: 0, lastActiveDate: null, sessions: []
-  };
-
-  const tracking = { ...prev };
-
-  if (tracking.lastActiveDate !== today) {
-    tracking.todayTime = 0;
-  }
-
-  tracking.totalTime = (tracking.totalTime || 0) + duration;
-  tracking.todayTime = (tracking.todayTime || 0) + duration;
-  tracking.lastActiveDate = today;
-
-  if (isCurrentMonthSession) {
-    tracking.sessions = mergeOrAppendSession(tracking.sessions || [], startTime, endTime, duration);
-  } else {
-    const newSession = {
-      id: generateSessionId(),
-      startTime: new Date(startTime).toISOString(),
-      endTime: new Date(endTime).toISOString(),
-      duration
-    };
-    const project = getProjectById(projectId);
-    await ArchiveService.appendToArchive(
-      sessionDate.getFullYear(),
-      sessionDate.getMonth(),
-      [],
-      { [projectId]: { projectName: project?.name || 'Unknown', sessions: [newSession] } }
-    );
-  }
-
-  timeTrackingDataState.set({
-    ...ttState,
-    projects: { ...ttState.projects, [projectId]: tracking }
-  });
-  saveTimeTracking();
-}
-
-// ============================================================
-// PROJECT TRACKING
-// ============================================================
-
-function startTracking(projectId) {
-  if (!projectId) return;
-
-  const state = trackingState.get();
-  const activeSessions = new Map(state.activeSessions);
-  const existingSession = activeSessions.get(projectId);
-
-  if (existingSession && existingSession.sessionStartTime && !existingSession.isIdle) return;
-
-  if (existingSession && existingSession.isIdle) {
-    resumeTracking(projectId);
-    return;
-  }
-
-  const wasEmpty = getActiveNonIdleCount() === 0;
-  const now = Date.now();
-
-  activeSessions.set(projectId, {
-    sessionStartTime: now,
-    lastActivityTime: now,
-    isIdle: false
-  });
-
-  trackingState.set({ ...trackingState.get(), activeSessions });
-
-  if (wasEmpty) startGlobalTimer();
-
-  clearTimeout(idleTimers.get(projectId));
-  idleTimers.set(projectId, setTimeout(() => checkAndPauseTracking(projectId), IDLE_TIMEOUT));
-}
-
-async function stopTracking(projectId) {
-  const state = trackingState.get();
-  const activeSessions = new Map(state.activeSessions);
-  const session = activeSessions.get(projectId);
-
-  if (!session || !session.sessionStartTime) {
-    activeSessions.delete(projectId);
-    trackingState.set({ ...trackingState.get(), activeSessions });
-    return;
-  }
-
-  const now = Date.now();
-  const duration = now - session.sessionStartTime;
-  if (duration > 1000) {
-    await saveSession(projectId, session.sessionStartTime, now, duration);
-  }
-
-  clearTimeout(idleTimers.get(projectId));
-  idleTimers.delete(projectId);
-  lastOutputTimes.delete(projectId);
-  activeSessions.delete(projectId);
-
-  trackingState.set({ ...trackingState.get(), activeSessions });
-
-  if (getActiveNonIdleCount() === 0) await stopGlobalTimer();
-}
-
-function recordActivity(projectId) {
-  if (!projectId) return;
-
-  const state = trackingState.get();
-  const activeSessions = new Map(state.activeSessions);
-  const session = activeSessions.get(projectId);
-
-  if (!session) {
-    startTracking(projectId);
-    return;
-  }
-
-  if (session.isIdle) {
-    resumeTracking(projectId);
-    return;
-  }
-
-  clearTimeout(idleTimers.get(projectId));
-  idleTimers.set(projectId, setTimeout(() => checkAndPauseTracking(projectId), IDLE_TIMEOUT));
-  resetGlobalIdleTimer();
-
-  activeSessions.set(projectId, { ...session, lastActivityTime: Date.now() });
-  trackingState.set({ ...trackingState.get(), activeSessions });
-}
-
-async function checkAndPauseTracking(projectId) {
-  const lastOutput = lastOutputTimes.get(projectId) || 0;
-  const timeSinceOutput = Date.now() - lastOutput;
-
-  if (timeSinceOutput < OUTPUT_IDLE_TIMEOUT) {
-    const delay = OUTPUT_IDLE_TIMEOUT - timeSinceOutput + 100;
-    clearTimeout(idleTimers.get(projectId));
-    idleTimers.set(projectId, setTimeout(() => checkAndPauseTracking(projectId), delay));
-    return;
-  }
-
-  await pauseTracking(projectId);
-}
-
-async function checkAndPauseGlobalTimer() {
-  const timeSinceOutput = Date.now() - globalLastOutputTime;
-
-  if (timeSinceOutput < OUTPUT_IDLE_TIMEOUT) {
-    const delay = OUTPUT_IDLE_TIMEOUT - timeSinceOutput + 100;
-    clearTimeout(globalIdleTimer);
-    globalIdleTimer = setTimeout(checkAndPauseGlobalTimer, delay);
-    return;
-  }
-
-  await pauseGlobalTimer();
-}
-
-function recordOutputActivity(projectId) {
-  if (!projectId) return;
-
-  const state = trackingState.get();
-  const session = state.activeSessions.get(projectId);
-  if (!session || session.isIdle) return;
-
-  lastOutputTimes.set(projectId, Date.now());
-  globalLastOutputTime = Date.now();
-}
-
-async function pauseTracking(projectId) {
-  const state = trackingState.get();
-  const activeSessions = new Map(state.activeSessions);
-  const session = activeSessions.get(projectId);
-
-  if (!session || !session.sessionStartTime || session.isIdle) return;
-
-  const now = Date.now();
-  const duration = now - session.sessionStartTime;
-  if (duration > 1000) {
-    await saveSession(projectId, session.sessionStartTime, now, duration);
-  }
-
-  activeSessions.set(projectId, { ...session, sessionStartTime: null, isIdle: true });
-  trackingState.set({ ...trackingState.get(), activeSessions });
-
-  if (getActiveNonIdleCount() === 0) await pauseGlobalTimer();
-}
-
-function resumeTracking(projectId) {
-  const state = trackingState.get();
-  const activeSessions = new Map(state.activeSessions);
-  const session = activeSessions.get(projectId);
-
-  if (!session || !session.isIdle) return;
-
-  const wasAllIdle = getActiveNonIdleCount() === 0;
-  const now = Date.now();
-
-  activeSessions.set(projectId, { sessionStartTime: now, lastActivityTime: now, isIdle: false });
-  trackingState.set({ ...trackingState.get(), activeSessions });
-
-  if (wasAllIdle) resumeGlobalTimer();
-
-  clearTimeout(idleTimers.get(projectId));
-  idleTimers.set(projectId, setTimeout(() => checkAndPauseTracking(projectId), IDLE_TIMEOUT));
-}
-
-async function switchProject(oldProjectId, newProjectId) {
-  if (oldProjectId && oldProjectId !== newProjectId) {
-    await stopTracking(oldProjectId);
-  }
-  if (newProjectId) startTracking(newProjectId);
-}
-
-// ============================================================
-// GETTERS
-// ============================================================
-
-/**
- * Get time tracking data for a project
- */
-function getProjectTimes(projectId) {
-  const ttState = timeTrackingDataState.get();
-  const tracking = ttState.projects[projectId];
-
-  if (!tracking) return { today: 0, total: 0 };
-
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(todayStart);
-  todayEnd.setDate(todayEnd.getDate() + 1);
-
-  // Calculate from sessions as source of truth (not stored counters)
-  let todayFromSessions = 0;
-  let totalFromSessions = 0;
-  if (Array.isArray(tracking.sessions)) {
-    for (const session of tracking.sessions) {
-      const dur = session.duration || 0;
-      totalFromSessions += dur;
-      const sessionDate = new Date(session.startTime);
-      if (sessionDate >= todayStart && sessionDate < todayEnd) {
-        todayFromSessions += dur;
-      }
-    }
-  }
-
-  const state = trackingState.get();
-  const session = state.activeSessions.get(projectId);
-  let currentSessionTime = 0;
-  let currentSessionTimeToday = 0;
-
-  if (session && session.sessionStartTime && !session.isIdle) {
-    const now = Date.now();
-    currentSessionTime = now - session.sessionStartTime;
-    const effectiveStart = Math.max(session.sessionStartTime, todayStart.getTime());
-    currentSessionTimeToday = Math.max(0, now - effectiveStart);
-  }
-
-  return {
-    today: todayFromSessions + currentSessionTimeToday,
-    total: totalFromSessions + currentSessionTime
-  };
-}
-
-/**
- * Get global time tracking stats
- */
-function getGlobalTimes() {
-  const now = new Date();
-  const nowMs = now.getTime();
-
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(todayStart);
-  todayEnd.setDate(todayEnd.getDate() + 1);
-
-  const day = now.getDay();
-  const diffToMonday = day === 0 ? 6 : day - 1;
-  const weekStartDate = new Date(now);
-  weekStartDate.setDate(weekStartDate.getDate() - diffToMonday);
-  weekStartDate.setHours(0, 0, 0, 0);
-  const weekEndDate = new Date(weekStartDate);
-  weekEndDate.setDate(weekEndDate.getDate() + 7);
-
-  const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-  let todayTotal, weekTotal, monthTotal;
-
-  // Invalidate cache if date changed
-  const todayStr = getTodayString();
-  if (globalTimesCache && globalTimesCacheDate !== todayStr) {
-    globalTimesCache = null;
-  }
-
-  if (globalTimesCache) {
-    todayTotal = globalTimesCache.sessionsToday;
-    weekTotal = globalTimesCache.sessionsWeek;
-    monthTotal = globalTimesCache.sessionsMonth;
-  } else {
-    const ttState = timeTrackingDataState.get();
-    const globalTracking = ttState.global;
-
-    // Calculate from sessions
-    let sessionsToday = 0, sessionsWeek = 0, sessionsMonth = 0;
-    if (globalTracking) {
-      const sessions = globalTracking.sessions || [];
-      for (const session of sessions) {
-        const sessionDate = new Date(session.startTime);
-        const duration = session.duration || 0;
-
-        if (sessionDate >= todayStart && sessionDate < todayEnd) sessionsToday += duration;
-        if (sessionDate >= weekStartDate && sessionDate < weekEndDate) sessionsWeek += duration;
-        if (sessionDate >= monthStartDate && sessionDate < monthEndDate) sessionsMonth += duration;
-      }
-    }
-
-    // Use session-based calculation as source of truth
-    // Stored counters (todayTime/weekTime/monthTime) can drift due to duplicate sessions
-    todayTotal = sessionsToday;
-    weekTotal = sessionsWeek;
-    monthTotal = sessionsMonth;
-
-    globalTimesCache = {
-      sessionsToday: todayTotal,
-      sessionsWeek: weekTotal,
-      sessionsMonth: monthTotal
-    };
-    globalTimesCacheDate = todayStr;
-  }
-
-  const state = trackingState.get();
-  if (state.globalSessionStartTime && !state.globalIsIdle) {
-    const sessionStart = state.globalSessionStartTime;
-
-    const todayEffectiveStart = Math.max(sessionStart, todayStart.getTime());
-    if (nowMs > todayEffectiveStart) todayTotal += nowMs - todayEffectiveStart;
-
-    const weekEffectiveStart = Math.max(sessionStart, weekStartDate.getTime());
-    if (nowMs > weekEffectiveStart) weekTotal += nowMs - weekEffectiveStart;
-
-    const monthEffectiveStart = Math.max(sessionStart, monthStartDate.getTime());
-    if (nowMs > monthEffectiveStart) monthTotal += nowMs - monthEffectiveStart;
-  }
-
-  return { today: todayTotal, week: weekTotal, month: monthTotal };
-}
-
-/**
- * Get sessions for a project (used by TimeTrackingDashboard)
- */
-function getProjectSessions(projectId) {
-  return timeTrackingDataState.get().projects[projectId]?.sessions || [];
-}
-
-/**
- * Get global tracking data (used by TimeTrackingDashboard)
- */
-function getGlobalTrackingData() {
-  return timeTrackingDataState.get().global;
-}
-
-async function saveAllActiveSessions() {
-  const state = trackingState.get();
-  const now = Date.now();
-
-  for (const [projectId, session] of state.activeSessions) {
-    if (session.sessionStartTime && !session.isIdle) {
-      const duration = now - session.sessionStartTime;
-      if (duration > 1000) {
-        await saveSession(projectId, session.sessionStartTime, now, duration);
-      }
-    }
-  }
-
-  if (state.globalSessionStartTime && !state.globalIsIdle) {
-    const duration = now - state.globalSessionStartTime;
-    if (duration > 1000) {
-      await saveGlobalSession(state.globalSessionStartTime, now, duration);
-    }
-  }
-
-  for (const timerId of idleTimers.values()) clearTimeout(timerId);
-  idleTimers.clear();
-  clearTimeout(globalIdleTimer);
-  clearInterval(midnightCheckTimer);
-  clearInterval(heartbeatTimer);
-  clearInterval(checkpointTimer);
-
-  trackingState.set({
-    activeSessions: new Map(),
-    globalSessionStartTime: null,
-    globalLastActivityTime: null,
-    globalIsIdle: false
-  });
-
-  saveTimeTrackingImmediate();
-  console.debug('[TimeTracking] Forced immediate save on quit');
-}
-
-function hasTerminalsForProject(projectId, terminals) {
-  for (const [, termData] of terminals) {
-    if (termData.project && termData.project.id === projectId) return true;
-  }
-  return false;
-}
-
-function getTrackingState() {
-  return trackingState.get();
+function getProjectName(projectId) {
+  if (!projectsStateRef) return projectId;
+  const projects = projectsStateRef.get().projects || [];
+  const project = projects.find(p => p.id === projectId);
+  return project?.name || projectId;
 }
 
 function isTracking(projectId) {
-  const state = trackingState.get();
-  const session = state.activeSessions.get(projectId);
-  return session && session.sessionStartTime && !session.isIdle;
+  return trackingState.get().activeProjects.has(projectId);
 }
 
 function getActiveProjectCount() {
-  const state = trackingState.get();
-  let count = 0;
-  for (const session of state.activeSessions.values()) {
-    if (session.sessionStartTime && !session.isIdle) count++;
-  }
-  return count;
+  return trackingState.get().activeProjects.size;
 }
 
 module.exports = {
   trackingState,
+  dataState,
   initTimeTracking,
-  startTracking,
-  stopTracking,
-  recordActivity,
-  recordOutputActivity,
-  pauseTracking,
-  resumeTracking,
-  switchProject,
+  heartbeat,
+  stopProject,
+  saveAndShutdown,
   getProjectTimes,
   getGlobalTimes,
   getProjectSessions,
   getGlobalTrackingData,
-  saveAllActiveSessions,
-  hasTerminalsForProject,
-  getTrackingState,
-  ensureTimeTracking,
   isTracking,
   getActiveProjectCount
 };

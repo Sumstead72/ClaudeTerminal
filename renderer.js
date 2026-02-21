@@ -3541,13 +3541,13 @@ if (timeElements.container) {
 // ========== TIME TRACKING SAVE ON QUIT ==========
 // Listen for app quit to save active time tracking sessions
 api.lifecycle.onWillQuit(() => {
-  const { saveAllActiveSessions } = require('./src/renderer');
-  saveAllActiveSessions();
+  const { saveAndShutdown } = require('./src/renderer');
+  saveAndShutdown();
 });
 
 // Backup cleanup on window unload (in case onWillQuit doesn't fire)
 window.addEventListener('beforeunload', () => {
-  const { saveAllActiveSessions } = require('./src/renderer');
-  saveAllActiveSessions();
+  const { saveAndShutdown } = require('./src/renderer');
+  saveAndShutdown();
 });
 

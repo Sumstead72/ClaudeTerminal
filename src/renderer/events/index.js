@@ -24,32 +24,24 @@ const sessionContext = new Map();
 
 // ── Consumer: Time Tracking (hooks-only — scraping uses existing direct calls in TerminalManager) ──
 function wireTimeTrackingConsumer() {
-  const { startTracking, stopTracking, recordActivity, recordOutputActivity } = require('../state/timeTracking.state');
+  const { heartbeat, stopProject } = require('../state/timeTracking.state');
 
   consumerUnsubscribers.push(
     eventBus.on(EVENT_TYPES.SESSION_START, (e) => {
       if (e.source !== 'hooks' || !e.projectId) return;
-      startTracking(e.projectId);
+      heartbeat(e.projectId, 'hooks');
     }),
     eventBus.on(EVENT_TYPES.SESSION_END, (e) => {
       if (e.source !== 'hooks' || !e.projectId) return;
-      stopTracking(e.projectId);
+      stopProject(e.projectId);
     }),
     eventBus.on(EVENT_TYPES.TOOL_START, (e) => {
       if (e.source !== 'hooks' || !e.projectId) return;
-      recordActivity(e.projectId);
+      heartbeat(e.projectId, 'hooks');
     }),
     eventBus.on(EVENT_TYPES.TOOL_END, (e) => {
       if (e.source !== 'hooks' || !e.projectId) return;
-      recordActivity(e.projectId);
-    }),
-    eventBus.on(EVENT_TYPES.PROMPT_SUBMIT, (e) => {
-      if (e.source !== 'hooks' || !e.projectId) return;
-      recordActivity(e.projectId);
-    }),
-    eventBus.on(EVENT_TYPES.CLAUDE_WORKING, (e) => {
-      if (e.source !== 'hooks' || !e.projectId) return;
-      recordOutputActivity(e.projectId);
+      heartbeat(e.projectId, 'hooks');
     })
   );
 }

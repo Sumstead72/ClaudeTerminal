@@ -28,12 +28,8 @@ const {
   setResourceShortcut,
   findResourceByShortcut,
   getSetting,
-  startTracking,
-  stopTracking,
-  recordActivity,
-  recordOutputActivity,
-  switchProject,
-  hasTerminalsForProject
+  heartbeat,
+  stopProject
 } = require('../../state');
 const { escapeHtml, getFileIcon, highlight } = require('../../utils');
 const { t, getCurrentLanguage } = require('../../i18n');
@@ -448,23 +444,6 @@ function extractTerminalContext(terminal) {
   return { type: 'done', text: null };
 }
 
-// ── Throttled recordActivity (max 1 call/sec per project) ──
-const activityThrottles = new Map();
-function throttledRecordActivity(projectId) {
-  if (!projectId || activityThrottles.has(projectId)) return;
-  recordActivity(projectId);
-  activityThrottles.set(projectId, true);
-  setTimeout(() => activityThrottles.delete(projectId), 1000);
-}
-
-// ── Throttled recordOutputActivity (max 1 call/5sec per project) ──
-const outputActivityThrottles = new Map();
-function throttledRecordOutputActivity(projectId) {
-  if (!projectId || outputActivityThrottles.has(projectId)) return;
-  recordOutputActivity(projectId);
-  outputActivityThrottles.set(projectId, true);
-  setTimeout(() => outputActivityThrottles.delete(projectId), 5000);
-}
 
 /**
  * Setup paste handler to prevent double-paste issue
@@ -934,7 +913,7 @@ function setActiveTerminal(id) {
     // Handle project switch for time tracking
     const newProjectId = termData.project?.id;
     if (prevProjectId !== newProjectId) {
-      switchProject(prevProjectId, newProjectId);
+      if (newProjectId) heartbeat(newProjectId, 'terminal');
     }
   }
 }
@@ -1032,7 +1011,7 @@ function closeTerminal(id) {
 
   // Stop time tracking if no more terminals for this project
   if (!sameProjectTerminalId && closedProjectId) {
-    stopTracking(closedProjectId);
+    stopProject(closedProjectId);
   }
 
   if (sameProjectTerminalId) {
@@ -1119,7 +1098,7 @@ async function createTerminal(project, options = {}) {
   addTerminal(id, termData);
 
   // Start time tracking for this project
-  startTracking(project.id);
+  heartbeat(project.id, 'terminal');
 
   // Create tab
   const tabsContainer = document.getElementById('terminals-tabs');
@@ -1195,7 +1174,7 @@ async function createTerminal(project, options = {}) {
       terminal.write(data.data);
       resetOutputSilenceTimer(id);
       const td = getTerminal(id);
-      if (td?.project?.id) throttledRecordOutputActivity(td.project.id);
+      if (td?.project?.id) heartbeat(td.project.id, 'terminal');
     },
     () => closeTerminal(id)
   );
@@ -1211,7 +1190,7 @@ async function createTerminal(project, options = {}) {
     api.terminal.input({ id, data });
     // Record activity for time tracking (resets idle timer)
     const td = getTerminal(id);
-    if (td?.project?.id) throttledRecordActivity(td.project.id);
+    if (td?.project?.id) heartbeat(td.project.id, 'terminal');
     if (data === '\r' || data === '\n') {
       cancelScheduledReady(id);
       updateTerminalStatus(id, 'working');
@@ -1382,7 +1361,7 @@ function createTypeConsole(project, projectIndex) {
   if (typeId === 'webapp') webappConsoleIds.set(projectIndex, id);
   if (typeId === 'api') apiConsoleIds.set(projectIndex, id);
 
-  startTracking(project.id);
+  heartbeat(project.id, 'terminal');
 
   // Create tab
   const tabsContainer = document.getElementById('terminals-tabs');
@@ -2523,7 +2502,7 @@ async function resumeSession(project, sessionId, options = {}) {
   addTerminal(id, termData);
 
   // Start time tracking for this project
-  startTracking(project.id);
+  heartbeat(project.id, 'terminal');
 
   // Create tab
   const tabsContainer = document.getElementById('terminals-tabs');
@@ -2570,7 +2549,7 @@ async function resumeSession(project, sessionId, options = {}) {
       terminal.write(data.data);
       resetOutputSilenceTimer(id);
       const td = getTerminal(id);
-      if (td?.project?.id) throttledRecordOutputActivity(td.project.id);
+      if (td?.project?.id) heartbeat(td.project.id, 'terminal');
     },
     () => closeTerminal(id)
   );
@@ -2586,7 +2565,7 @@ async function resumeSession(project, sessionId, options = {}) {
     api.terminal.input({ id, data });
     // Record activity for time tracking (resets idle timer)
     const td = getTerminal(id);
-    if (td?.project?.id) throttledRecordActivity(td.project.id);
+    if (td?.project?.id) heartbeat(td.project.id, 'terminal');
     if (data === '\r' || data === '\n') {
       cancelScheduledReady(id);
       updateTerminalStatus(id, 'working');
@@ -3048,7 +3027,7 @@ async function createChatTerminal(project, options = {}) {
   };
 
   addTerminal(id, termData);
-  startTracking(project.id);
+  heartbeat(project.id, 'terminal');
 
   // Create tab
   const tabsContainer = document.getElementById('terminals-tabs');
@@ -3266,7 +3245,7 @@ async function switchTerminalMode(id) {
         terminal.write(data.data);
         resetOutputSilenceTimer(id);
         const td = getTerminal(id);
-        if (td?.project?.id) throttledRecordOutputActivity(td.project.id);
+        if (td?.project?.id) heartbeat(td.project.id, 'terminal');
       },
       () => closeTerminal(id)
     );
@@ -3279,7 +3258,7 @@ async function switchTerminalMode(id) {
     terminal.onData(data => {
       api.terminal.input({ id: ptyId, data });
       const td = getTerminal(id);
-      if (td?.project?.id) throttledRecordActivity(td.project.id);
+      if (td?.project?.id) heartbeat(td.project.id, 'terminal');
       if (data === '\r' || data === '\n') {
         cancelScheduledReady(id);
         updateTerminalStatus(id, 'working');
