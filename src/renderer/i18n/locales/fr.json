@@ -119,7 +119,8 @@
     "searchPlaceholder": "Rechercher...",
     "noResults": "Aucun résultat",
     "deleteMultipleConfirm": "Supprimer {count} éléments ?",
-    "selectedItems": "éléments sélectionnés"
+    "selectedItems": "éléments sélectionnés",
+    "watchLimitWarning": "Projet volumineux : {count} chemins surveillés. L'actualisation automatique de l'explorateur peut être plus lente."
   },
   "quickActions": {
     "title": "Quick Actions",

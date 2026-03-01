@@ -26,6 +26,7 @@ const { registerWorkflowHandlers } = require('./workflow.ipc');
 const { registerCloudHandlers, setCloudMainWindow } = require('./cloud.ipc');
 const { registerDatabaseHandlers } = require('./database.ipc');
 const { registerTelemetryHandlers } = require('./telemetry.ipc');
+const { registerExplorerHandlers } = require('./explorer.ipc');
 const { registerTimeHandlers } = require('./time.ipc');
 
 /**
@@ -61,6 +62,7 @@ function registerAllHandlers(mainWindow) {
   registerCloudHandlers();
   registerDatabaseHandlers();
   registerTelemetryHandlers();
+  registerExplorerHandlers(mainWindow);
   registerTimeHandlers();
 }
 

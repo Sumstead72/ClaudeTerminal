@@ -759,7 +759,8 @@
     "searchPlaceholder": "Search files...",
     "noResults": "No results",
     "deleteMultipleConfirm": "Delete {count} items?",
-    "selectedItems": "items selected"
+    "selectedItems": "items selected",
+    "watchLimitWarning": "Large project: watching {count} paths. Explorer auto-refresh may be slower."
   },
   "quickActions": {
     "title": "Quick Actions",

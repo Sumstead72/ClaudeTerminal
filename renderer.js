@@ -2096,6 +2096,16 @@ if (btnNewTerminal) {
   };
 }
 
+// ========== FILE WATCHER ==========
+api.explorer.onChanges((changes) => {
+  FileExplorer.applyWatcherChanges(changes).catch(() => {
+    // Silently ignore — stale path, race condition, etc.
+  });
+});
+
+api.explorer.onWatchLimitWarning((totalPaths) => {
+  showToast({ type: 'warning', title: t('fileExplorer.title'), message: t('fileExplorer.watchLimitWarning', { count: totalPaths }) });
+});
 // Wire lightbulb resume session button
 const btnResumeSession = document.getElementById('btn-resume-session');
 if (btnResumeSession) {
@@ -2116,8 +2126,10 @@ projectsState.subscribe(() => {
 
   if (selectedFilter !== null && projects[selectedFilter]) {
     FileExplorer.setRootPath(projects[selectedFilter].path);
+    api.explorer.watchDir(projects[selectedFilter].path);
   } else {
     FileExplorer.hide();
+    api.explorer.stopWatch();
   }
 });
 
