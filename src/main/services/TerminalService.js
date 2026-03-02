@@ -207,6 +207,9 @@ class TerminalService {
     const pid = term.pid;
     this.terminals.delete(id);
 
+    // Notify renderer before disposing listeners
+    this.sendToRenderer('terminal-exit', { id });
+
     // Dispose event listeners before killing to prevent leaks
     if (term._disposables) {
       for (const d of term._disposables) {
