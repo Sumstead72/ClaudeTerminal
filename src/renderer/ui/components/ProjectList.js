@@ -164,7 +164,7 @@ function _renderCloudBadge(projectId) {
   if (!st) return '';
 
   if (st.uploading || st.autoSyncing) {
-    return '<span class="project-cloud-badge uploading" title="Cloud upload...">&#8679;</span>';
+    return `<span class="project-cloud-badge uploading" title="${t('projects.cloudUpload')}">&#8679;</span>`;
   }
   if (st.lastError) {
     const ago = _formatTimeAgo(st.lastError.timestamp);

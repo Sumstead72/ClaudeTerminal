@@ -196,7 +196,7 @@ function renderProjectsList() {
   const { projects, folders, rootOrder } = state;
 
   if (!projects || projects.length === 0) {
-    list.innerHTML = '<div class="git-sidebar-empty">No projects</div>';
+    list.innerHTML = `<div class="git-sidebar-empty">${t('projects.noProjects')}</div>`;
     return;
   }
 
@@ -1721,7 +1721,7 @@ async function handleViewDiff(filePath, staged) {
   if (modalTitle) modalTitle.textContent = filePath;
   if (modalBody) {
     if (!diff) {
-      modalBody.innerHTML = '<p style="color:var(--text-secondary);padding:16px">No diff available (new or binary file)</p>';
+      modalBody.innerHTML = `<p style="color:var(--text-secondary);padding:16px">${t('gitTab.noDiffAvailable')}</p>`;
     } else {
       const lines = diff.split('\n').map(line => {
         const cls = line.startsWith('+') ? 'diff-add' : line.startsWith('-') ? 'diff-del' : line.startsWith('@@') ? 'diff-hunk' : '';
@@ -1742,7 +1742,7 @@ async function handleCommitDetail(hash) {
   const modalBody = document.getElementById('modal-body');
   const modalFooter = document.getElementById('modal-footer');
 
-  if (modalTitle) modalTitle.textContent = `Commit ${hash.substring(0, 7)}`;
+  if (modalTitle) modalTitle.textContent = `${t('ui.commit')} ${hash.substring(0, 7)}`;
   if (modalBody) {
     modalBody.innerHTML = `<div class="git-diff-view"><pre class="git-diff-content">${escapeHtml(detail)}</pre></div>`;
   }

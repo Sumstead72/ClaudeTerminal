@@ -1,4 +1,5 @@
 const { escapeHtml } = require('../../utils');
+const { t } = require('../../i18n');
 const WorkflowMarketplace = require('./WorkflowMarketplacePanel');
 const { getAgents } = require('../../services/AgentService');
 const { getSkills } = require('../../services/SkillService');
@@ -582,7 +583,7 @@ function cardHtml(wf) {
               <svg width="12" height="12" viewBox="0 0 24 24" ${wf.favorite ? 'fill="currentColor"' : 'fill="none"'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </button>
             <span class="wf-card-name">${escapeHtml(wf.name)}</span>
-            ${!wf.enabled ? '<span class="wf-card-paused">PAUSED</span>' : ''}
+            ${!wf.enabled ? `<span class="wf-card-paused">${t('workflow.paused')}</span>` : ''}
           </div>
           <div class="wf-card-top-right">
             ${lastRun ? `<span class="wf-status-pill wf-status-pill--${lastRun.status}">${statusDot(lastRun.status)}${statusLabel(lastRun.status)}</span>` : ''}
@@ -861,7 +862,7 @@ function renderRunDetailInCol(col, run) {
           ${canExpand ? chevronSvg : ''}
         </div>
         ${isRunningAgent ? `<div class="wf-live-log" data-step-id="${step.id}"></div>` : ''}
-        ${errorMsg ? `<div class="wf-run-step-error"><span class="wf-run-step-error-label">Error</span> ${escapeHtml(errorMsg)}</div>` : ''}
+        ${errorMsg ? `<div class="wf-run-step-error"><span class="wf-run-step-error-label">${t('workflow.errorLabel')}</span> ${escapeHtml(errorMsg)}</div>` : ''}
         ${outputSection}
       </div>
     `;
@@ -1461,8 +1462,8 @@ function openEditor(workflowId = null) {
         </div>
         ${hasRunData ? `
         <div class="wf-props-tabs">
-          <button class="wf-props-tab ${activeTab === 'properties' ? 'active' : ''}" data-tab="properties">Properties</button>
-          <button class="wf-props-tab ${activeTab === 'lastrun' ? 'active' : ''}" data-tab="lastrun">Last Run</button>
+          <button class="wf-props-tab ${activeTab === 'properties' ? 'active' : ''}" data-tab="properties">${t('workflow.properties')}</button>
+          <button class="wf-props-tab ${activeTab === 'lastrun' ? 'active' : ''}" data-tab="lastrun">${t('workflow.lastRun')}</button>
         </div>` : ''}
         ${activeTab === 'lastrun' ? lastRunHtml : `
         ${nodeType !== 'trigger' ? `<div class="wf-node-id-badge"><code>$${nodeStepId}</code> <span>ID de ce node pour les variables</span></div>` : ''}
@@ -1986,7 +1987,7 @@ function openEditor(workflowId = null) {
     const oy = graphService._offsetY || 0;
     const cx = (-ox / s) + 200;
     const cy = (-oy / s) + 100;
-    graphService.addComment([cx, cy], [300, 200], 'Comment');
+    graphService.addComment([cx, cy], [300, 200], t('workflow.commentDefault'));
     updateStatusBar();
   });
 
@@ -2075,7 +2076,7 @@ function openEditor(workflowId = null) {
       return;
     }
     btn.disabled = true;
-    btn.textContent = 'Saving...';
+    btn.textContent = t('workflow.saving');
     try {
       const ok = await saveWorkflow();
       if (!ok) {
@@ -2085,7 +2086,7 @@ function openEditor(workflowId = null) {
         return;
       }
       if (workflowId) {
-        btn.textContent = 'Starting...';
+        btn.textContent = t('workflow.starting');
         await triggerWorkflow(workflowId);
         // Button will be updated by onRunStart listener below
       }
@@ -2453,7 +2454,7 @@ Rules:
       const oy = graphService._offsetY || 0;
       const cx = (-ox / s) + 200;
       const cy = (-oy / s) + 100;
-      graphService.addComment([cx, cy], [300, 200], 'Comment');
+      graphService.addComment([cx, cy], [300, 200], t('workflow.commentDefault'));
       updateStatusBar();
       return;
     }

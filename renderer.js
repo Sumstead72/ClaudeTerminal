@@ -143,6 +143,12 @@ function updateStaticTranslations() {
     const key = el.getAttribute('data-i18n-placeholder');
     if (key) el.placeholder = t(key);
   });
+
+  // Aria-label attribute: data-i18n-aria-label="key"
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+    const key = el.getAttribute('data-i18n-aria-label');
+    if (key) el.setAttribute('aria-label', t(key));
+  });
 }
 
 // Listen for language changes

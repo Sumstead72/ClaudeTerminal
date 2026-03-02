@@ -56,7 +56,7 @@
       </div>
       <div class="usage-item" data-type="sonnet">
         <div class="usage-header">
-          <span class="usage-label">Sonnet</span>
+          <span class="usage-label" data-i18n="ui.sonnet">Sonnet</span>
           <span class="usage-value"><span class="usage-percent" id="usage-percent-sonnet">--</span><span class="usage-reset" id="usage-reset-sonnet"></span></span>
         </div>
         <div class="usage-bar-container">
@@ -92,10 +92,10 @@
       </div>
     </div>
     <div class="titlebar-controls" role="group" aria-label="Window controls">
-      <button class="titlebar-btn" id="btn-minimize" aria-label="Minimize">
+      <button class="titlebar-btn" id="btn-minimize" data-i18n-aria-label="ui.minimize" aria-label="Minimize">
         <svg viewBox="0 0 12 12"><rect y="5" width="12" height="2" fill="currentColor"/></svg>
       </button>
-      <button class="titlebar-btn" id="btn-maximize" aria-label="Maximize">
+      <button class="titlebar-btn" id="btn-maximize" data-i18n-aria-label="ui.maximize" aria-label="Maximize">
         <svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
       </button>
       <button class="titlebar-btn btn-close" id="btn-close" aria-label="Close">
@@ -131,26 +131,26 @@
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.89 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zM6 10h2v2H6zm0 4h8v2H6zm10 0h2v2h-2zm-6-4h8v2h-8z"/>
           </svg>
-          <span>Claude</span>
+          <span data-i18n="ui.tabClaude">Claude</span>
         </button>
-        <div class="nav-separator"><span>Extensions</span></div>
+        <div class="nav-separator"><span data-i18n="ui.separatorExtensions">Extensions</span></div>
         <button class="nav-tab" data-tab="plugins" title="Plugins" role="tab" aria-selected="false">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>
           </svg>
-          <span>Plugins</span>
+          <span data-i18n="ui.tabPlugins">Plugins</span>
         </button>
         <button class="nav-tab" data-tab="skills" title="Skills">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
           </svg>
-          <span>Skills</span>
+          <span data-i18n="ui.tabSkills">Skills</span>
         </button>
         <button class="nav-tab" data-tab="agents" title="Agents">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM8 17.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM9.5 8c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5S9.5 9.38 9.5 8zm6.5 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
           </svg>
-          <span>Agents</span>
+          <span data-i18n="ui.tabAgents">Agents</span>
         </button>
         <button class="nav-tab" data-tab="workflows" title="Workflows">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -158,45 +158,45 @@
             <rect x="9" y="15" width="6" height="6" rx="1"/>
             <path d="M5 9v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M12 12v3"/>
           </svg>
-          <span>Workflows</span>
+          <span data-i18n="ui.tabWorkflows">Workflows</span>
         </button>
         <button class="nav-tab" data-tab="mcp" title="MCP">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M17 16l-4-4V8.82C14.16 8.4 15 7.3 15 6c0-1.66-1.34-3-3-3S9 4.34 9 6c0 1.3.84 2.4 2 2.82V12l-4 4H3v5h5v-3.05l4-4.2 4 4.2V21h5v-5h-4z"/>
           </svg>
-          <span>MCP</span>
+          <span data-i18n="ui.tabMcp">MCP</span>
         </button>
         <button class="nav-tab" data-tab="database" title="Database">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 3C7.58 3 4 4.79 4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7c0-2.21-3.58-4-8-4zm6 14c0 .5-2.13 2-6 2s-6-1.5-6-2v-2.23c1.61.78 3.72 1.23 6 1.23s4.39-.45 6-1.23V17zm0-5c0 .5-2.13 2-6 2s-6-1.5-6-2V9.77C7.61 10.55 9.72 11 12 11s4.39-.45 6-1.23V12zm-6-3c-3.87 0-6-1.5-6-2s2.13-2 6-2 6 1.5 6 2-2.13 2-6 2z"/>
           </svg>
-          <span>Database</span>
+          <span data-i18n="ui.tabDatabase">Database</span>
         </button>
         <button class="nav-tab" data-tab="git" title="Git">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M2.6 10.59L8.38 4.8l1.69 1.7c-.24.85.15 1.78.93 2.23v5.54c-.6.34-1 .99-1 1.73a2 2 0 0 0 2 2 2 2 0 0 0 2-2c0-.74-.4-1.39-1-1.73V9.41l1.35 1.36c-.02.13-.03.26-.03.4a2 2 0 0 0 2 2 2 2 0 0 0 2-2 2 2 0 0 0-2-2c-.14 0-.27.01-.4.04L13.2 7.07a2 2 0 0 0-1.12-2.51L13.71 2.9 21.41 10.59a2 2 0 0 1 0 2.82L13.41 21.41a2 2 0 0 1-2.82 0L2.59 13.41a2 2 0 0 1 0-2.82z"/>
           </svg>
-          <span>Git</span>
+          <span data-i18n="ui.tabGit">Git</span>
         </button>
-        <div class="nav-separator"><span>Cloud</span></div>
+        <div class="nav-separator"><span data-i18n="ui.separatorCloud">Cloud</span></div>
         <button class="nav-tab" data-tab="cloud-panel" title="Cloud" role="tab" aria-selected="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
           </svg>
           <span data-i18n="cloud.tabTitle">Cloud</span>
         </button>
-        <div class="nav-separator"><span>Analytics</span></div>
+        <div class="nav-separator"><span data-i18n="ui.separatorAnalytics">Analytics</span></div>
         <button class="nav-tab" data-tab="dashboard" title="Dashboard">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
           </svg>
-          <span>Dashboard</span>
+          <span data-i18n="ui.tabDashboard">Dashboard</span>
         </button>
         <button class="nav-tab" data-tab="timetracking" title="Time Tracking">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
           </svg>
-          <span>Time Tracking</span>
+          <span data-i18n="ui.tabTimeTracking">Time Tracking</span>
         </button>
         <button class="nav-tab" data-tab="memory" title="Memory">
           <svg viewBox="0 0 24 24" fill="currentColor">
@@ -206,7 +206,7 @@
         </button>
       </nav>
       <div class="sidebar-footer">
-        <button class="sidebar-collapse-btn" id="btn-collapse-sidebar" title="Collapse sidebar">
+        <button class="sidebar-collapse-btn" id="btn-collapse-sidebar" data-i18n-title="ui.collapseSidebar" title="Collapse sidebar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="collapse-icon">
             <path d="M15 18l-6-6 6-6"/>
           </svg>
@@ -233,7 +233,7 @@
       <div class="tab-content active" id="tab-claude" role="tabpanel" aria-label="Claude">
         <div class="claude-layout" id="claude-layout">
           <!-- Show projects button (visible when panel is hidden) -->
-          <button class="btn-show-projects" id="btn-show-projects" title="Show projects" aria-label="Show projects">
+          <button class="btn-show-projects" id="btn-show-projects" data-i18n-title="ui.showProjects" title="Show projects" aria-label="Show projects">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
           </button>
           <!-- Projects Panel -->
@@ -247,7 +247,7 @@
                 <button class="btn-icon" id="btn-new-project" data-i18n-title="common.new" aria-label="New project">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 </button>
-                <button class="btn-icon" id="btn-toggle-projects" title="Hide projects" aria-label="Toggle projects panel">
+                <button class="btn-icon" id="btn-toggle-projects" data-i18n-title="ui.hideProjects" title="Hide projects" aria-label="Toggle projects panel">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                 </button>
               </div>
@@ -261,13 +261,13 @@
             <div class="panel-header">
               <h2 data-i18n="fileExplorer.title">Explorer</h2>
               <div class="panel-actions">
-                <button class="btn-icon" id="btn-collapse-explorer" title="Collapse all">
+                <button class="btn-icon" id="btn-collapse-explorer" data-i18n-title="ui.collapseAll" title="Collapse all">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 18.59L8.83 20 12 16.83 15.17 20l1.41-1.41L12 14l-4.59 4.59zM16.59 5.41L15.17 4 12 7.17 8.83 4 7.41 5.41 12 10l4.59-4.59z"/></svg>
                 </button>
-                <button class="btn-icon" id="btn-refresh-explorer" title="Refresh">
+                <button class="btn-icon" id="btn-refresh-explorer" data-i18n-title="common.refresh" title="Refresh">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </button>
-                <button class="btn-icon" id="btn-close-explorer" title="Close">
+                <button class="btn-icon" id="btn-close-explorer" data-i18n-title="common.close" title="Close">
                   <svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
                 </button>
               </div>
@@ -275,7 +275,7 @@
             <div class="fe-search-container" id="fe-search-container" style="display: none;">
               <svg class="fe-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
               <input type="text" id="fe-search-input" class="fe-search-input" data-i18n-placeholder="fileExplorer.searchPlaceholder" placeholder="Search files...">
-              <button class="fe-search-clear" id="fe-search-clear" title="Clear" style="display: none;">
+              <button class="fe-search-clear" id="fe-search-clear" data-i18n-title="ui.clearSearch" title="Clear" style="display: none;">
                 <svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
               </button>
             </div>
@@ -286,7 +286,7 @@
           <!-- Terminals Panel -->
           <div class="terminals-panel">
             <div class="terminals-header">
-              <button class="btn-icon btn-toggle-explorer" id="btn-toggle-explorer" title="Toggle Explorer">
+              <button class="btn-icon btn-toggle-explorer" id="btn-toggle-explorer" data-i18n-title="ui.toggleExplorer" title="Toggle Explorer">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
               </button>
               <div class="terminals-filter" id="terminals-filter" style="display: none;">
@@ -297,7 +297,7 @@
                     <path d="M12 2a7 7 0 0 1 4 12.9V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.1A7 7 0 0 1 12 2z"/>
                   </svg>
                 </button>
-                <button class="filter-new-terminal-btn" id="btn-new-terminal" title="New terminal (Ctrl+T)">
+                <button class="filter-new-terminal-btn" id="btn-new-terminal" data-i18n-title="ui.newTerminal" title="New terminal (Ctrl+T)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
@@ -315,7 +315,7 @@
                   </div>
                   <button class="filter-git-btn filter-btn-changes" id="filter-btn-changes" data-i18n-title="ui.viewChanges">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                    <span>Changes</span>
+                    <span data-i18n="ui.changes">Changes</span>
                     <span class="changes-count" id="changes-count" style="display: none;">0</span>
                   </button>
                   <div class="branch-btn-wrapper">
@@ -337,7 +337,7 @@
                 <div class="actions-dropdown-wrapper" id="actions-dropdown-wrapper" style="display: none;">
                   <button class="filter-actions-btn" id="filter-btn-actions">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span>Actions</span>
+                    <span data-i18n="ui.actionsLabel">Actions</span>
                     <svg class="actions-arrow" viewBox="0 0 12 12"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
                   </button>
                   <div class="actions-dropdown" id="actions-dropdown"></div>
@@ -392,7 +392,7 @@
                       <span data-i18n="ui.generate">Generate</span>
                     </button>
                   </div>
-                  <textarea id="git-commit-message" placeholder="feat: describe changes..." rows="2"></textarea>
+                  <textarea id="git-commit-message" data-i18n-placeholder="gitChanges.commitPlaceholder" placeholder="feat: describe changes..." rows="2"></textarea>
                   <div class="git-commit-actions">
                     <button class="btn-primary" id="btn-commit-selected" disabled>
                       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
@@ -417,10 +417,10 @@
                 <span class="ci-branch" id="ci-branch">main</span>
                 <span class="ci-duration" id="ci-duration">0:00</span>
               </div>
-              <button class="ci-status-link" id="ci-status-link" title="Open in GitHub">
+              <button class="ci-status-link" id="ci-status-link" data-i18n-title="ci.openInGithub" title="Open in GitHub">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
               </button>
-              <button class="ci-status-close" id="ci-status-close" title="Dismiss">
+              <button class="ci-status-close" id="ci-status-close" data-i18n-title="ci.dismiss" title="Dismiss">
                 <svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
               </button>
             </div>
@@ -489,10 +489,10 @@
         <div class="list-layout">
           <div class="list-header">
             <div class="skills-header-left">
-              <h2>Skills</h2>
+              <h2 data-i18n="ui.tabSkills">Skills</h2>
               <div class="skills-sub-tabs">
                 <button class="skills-sub-tab active" data-subtab="local" data-i18n="marketplace.mySkills">My Skills</button>
-                <button class="skills-sub-tab" data-subtab="marketplace">Marketplace</button>
+                <button class="skills-sub-tab" data-subtab="marketplace" data-i18n="ui.skillsMarketplace">Marketplace</button>
               </div>
             </div>
             <div class="skills-header-right">
@@ -514,7 +514,7 @@
       <div class="tab-content" id="tab-agents">
         <div class="list-layout">
           <div class="list-header">
-            <h2>Agents</h2>
+            <h2 data-i18n="ui.tabAgents">Agents</h2>
             <button class="btn-primary" id="btn-new-agent">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               <span data-i18n="ui.newAgent">Nouvel Agent</span>
@@ -537,14 +537,14 @@
             </div>
             <div class="git-sidebar-section git-sidebar-quick-actions">
               <div class="git-sidebar-header">
-                <h3>Quick Actions</h3>
+                <h3 data-i18n="ui.quickActions">Quick Actions</h3>
               </div>
               <div class="git-quick-actions" id="git-quick-actions"></div>
             </div>
             <div class="git-sidebar-section git-sidebar-branches">
               <div class="git-sidebar-header">
                 <h3 data-i18n="git.branches">Branches</h3>
-                <button class="btn-icon btn-small" id="git-btn-new-branch" title="New branch">
+                <button class="btn-icon btn-small" id="git-btn-new-branch" data-i18n-title="gitTab.newBranch" title="New branch">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 </button>
               </div>
@@ -554,10 +554,10 @@
               <div class="git-sidebar-header">
                 <h3 data-i18n="gitTab.worktrees">Worktrees</h3>
                 <div class="git-sidebar-header-actions">
-                  <button class="btn-icon btn-small" id="git-btn-prune-worktrees" title="Prune stale worktrees">
+                  <button class="btn-icon btn-small" id="git-btn-prune-worktrees" data-i18n-title="gitTab.pruneWorktrees" title="Prune stale worktrees">
                     <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                   </button>
-                  <button class="btn-icon btn-small" id="git-btn-new-worktree" title="New worktree">
+                  <button class="btn-icon btn-small" id="git-btn-new-worktree" data-i18n-title="projects.newWorktree" title="New worktree">
                     <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                   </button>
                 </div>
@@ -566,7 +566,7 @@
             </div>
             <div class="git-sidebar-section git-sidebar-stashes">
               <div class="git-sidebar-header">
-                <h3>Stashes</h3>
+                <h3 data-i18n="ui.stashes">Stashes</h3>
               </div>
               <div class="git-stashes-list" id="git-stashes-list"></div>
             </div>
@@ -580,11 +580,11 @@
               </button>
               <button class="git-sub-tab" data-subtab="history">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-                <span>History</span>
+                <span data-i18n="gitTab.history">History</span>
               </button>
               <button class="git-sub-tab" data-subtab="pullrequests">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM4 6a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm2 8a1 1 0 0 0-1 1v3a3 3 0 1 0 2 0v-3a1 1 0 0 0-1-1zm-2 7a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm14-7a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm-2 3a2 2 0 1 1 4 0 2 2 0 0 1-4 0zM6 7a1 1 0 0 0-1 1v5a1 1 0 1 0 2 0V8a1 1 0 0 0-1-1zm12-4a3 3 0 0 0-3 3v8a1 1 0 1 0 2 0V6a1 1 0 1 1 2 0v8a1 1 0 1 0 2 0V6a3 3 0 0 0-3-3z"/></svg>
-                <span>Pull Requests</span>
+                <span data-i18n="gitTab.pullRequests">Pull Requests</span>
                 <span class="git-sub-tab-badge" id="git-pr-badge" style="display:none">0</span>
               </button>
             </div>

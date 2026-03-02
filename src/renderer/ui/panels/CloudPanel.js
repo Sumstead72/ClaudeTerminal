@@ -27,7 +27,7 @@ function buildHtml(settings) {
             </svg>
           </div>
           <div>
-            <div class="cp-topbar-title">Cloud Relay</div>
+            <div class="cp-topbar-title">${t('cloud.relayTitle')}</div>
             <div class="cp-topbar-subtitle">${t('cloud.infoBanner')}</div>
           </div>
         </div>
@@ -63,7 +63,7 @@ function buildHtml(settings) {
               <label for="cp-api-key">${t('cloud.apiKey')}</label>
               <div class="cp-key-row">
                 <input type="password" id="cp-api-key" class="cp-input cp-key-input" value="${_escapeHtml(settings.cloudApiKey || '')}" placeholder="${t('cloud.apiKeyPlaceholder')}">
-                <button class="cp-key-toggle" id="cp-key-toggle" type="button" title="Toggle visibility">
+                <button class="cp-key-toggle" id="cp-key-toggle" type="button" title="${t('cloud.toggleVisibility')}">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
                   </svg>
@@ -466,7 +466,7 @@ function setupHandlers(context) {
         const statusLabel = s.status === 'running' ? t('cloud.sessionRunning') : s.status === 'error' ? t('cloud.sessionError') : t('cloud.sessionIdle');
         const stopBtn = s.status === 'running'
           ? `<button class="cp-btn-sm cp-btn-danger cp-session-stop" data-id="${s.id}">${t('cloud.sessionStop')}</button>`
-          : `<button class="cp-btn-sm cp-session-stop" data-id="${s.id}" title="Delete">\u2715</button>`;
+          : `<button class="cp-btn-sm cp-session-stop" data-id="${s.id}" title="${t('cloud.deleteSession')}">\u2715</button>`;
         return `<div class="cp-session-item">
           <div class="cp-session-info">
             <span class="cp-session-project">${_escapeHtml(s.projectName)}</span>
@@ -546,7 +546,7 @@ function setupHandlers(context) {
         return `<div class="cp-sync-project" data-project="${_escapeHtml(projectName)}">
           <div class="cp-sync-project-header">
             <span class="cp-sync-project-name">${_escapeHtml(projectName)}</span>
-            <span class="cp-sync-count">${files.length} ${files.length === 1 ? 'file' : 'files'}</span>
+            <span class="cp-sync-count">${files.length === 1 ? t('cloud.fileCountSingular', { count: files.length }) : t('cloud.fileCountPlural', { count: files.length })}</span>
             <button class="cp-btn-sm cp-sync-apply" data-project="${_escapeHtml(projectName)}">${t('cloud.syncApply')}</button>
           </div>
           <div class="cp-sync-files">${fileList}${moreCount}</div>

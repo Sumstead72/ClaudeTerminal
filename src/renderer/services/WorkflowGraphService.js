@@ -7,6 +7,7 @@
 const { LiteGraph, LGraph, LGraphCanvas, LGraphNode } = require('litegraph.js');
 const { getAgents } = require('./AgentService');
 const { getSkills } = require('./SkillService');
+const { t } = require('../i18n');
 const {
   NODE_COLORS, PIN_TYPES, TYPE_COMPAT,
   NODE_DATA_OUTPUTS, NODE_DATA_OUT_OFFSET,
@@ -77,7 +78,7 @@ function formatOutputPreview(output, slotIndex) {
 
   // Error slot — show error message
   if (slotIndex === 1 && output.error) {
-    return `Error: ${String(output.error).substring(0, 120)}`;
+    return t('workflow.errorPreview', { msg: String(output.error).substring(0, 120) });
   }
 
   // DB output
@@ -87,7 +88,7 @@ function formatOutputPreview(output, slotIndex) {
     for (const row of preview) {
       lines.push(truncateJson(row, 60));
     }
-    if (output.rows.length > 3) lines.push(`... +${output.rows.length - 3} more`);
+    if (output.rows.length > 3) lines.push(`... ${t('workflow.andMore', { n: output.rows.length - 3 })}`);
     return lines.join('\n');
   }
 

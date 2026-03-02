@@ -236,7 +236,7 @@ function registerMcpListeners(onOutputCallback, onExitCallback) {
 
   api.mcp.onExit(({ id, code }) => {
     setMcpProcessStatus(id, 'stopped');
-    addMcpLog(id, 'info', `Exited with code ${code}`);
+    addMcpLog(id, 'info', t('mcp.exitedWithCode', { code }));
     if (onExitCallback) {
       onExitCallback(id, code);
     }

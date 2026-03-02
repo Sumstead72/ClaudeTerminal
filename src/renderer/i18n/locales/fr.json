@@ -60,7 +60,8 @@
     "filterBatch": "Fichiers batch",
     "filterExe": "Exécutables",
     "filterAll": "Tous les fichiers",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "cloudUpload": "Upload cloud..."
   },
   "terminals": {
     "noTerminals": "Aucun terminal pour ce projet",
@@ -93,7 +94,8 @@
     "startFailed": "Échec du démarrage",
     "stopping": "Arrêt...",
     "disconnected": "Déconnecté",
-    "stopped": "Arrêté"
+    "stopped": "Arrêté",
+    "exitedWithCode": "Terminé avec le code {code}"
   },
   "fileExplorer": {
     "title": "Explorer",
@@ -322,7 +324,8 @@
     "stashDroppedSuccess": "Stash supprimé",
     "prTitleRequired": "Le titre de la PR est requis",
     "prCreated": "PR #{number} créée",
-    "noProjects": "Aucun projet"
+    "noProjects": "Aucun projet",
+    "pruneWorktrees": "Nettoyer les worktrees inactifs"
   },
   "dashboard": {
     "openFolder": "Ouvrir dossier",
@@ -525,7 +528,9 @@
     "cancelled": "Annulé",
     "failed": "Échoué",
     "queued": "En attente",
-    "running": "En cours"
+    "running": "En cours",
+    "openInGithub": "Ouvrir sur GitHub",
+    "dismiss": "Ignorer"
   },
   "quickPicker": {
     "searchProjects": "Rechercher un projet...",
@@ -675,7 +680,14 @@
     "restoreTerminalSessions": "Mémoriser les derniers états des terminaux",
     "restoreTerminalSessionsDesc": "Restaurer les onglets de terminal et les sessions Claude de la session précédente au démarrage",
     "enable1MContext": "Contexte 1M tokens",
-    "enable1MContextDesc": "Activer la fenêtre de contexte de 1 million de tokens pour Opus et Sonnet (API uniquement, beta)"
+    "enable1MContextDesc": "Activer la fenêtre de contexte de 1 million de tokens pour Opus et Sonnet (API uniquement, beta)",
+    "projectBadge": "projet",
+    "itemCount": "{count} élément",
+    "itemCountPlural": "{count} éléments",
+    "contextPackNamePlaceholder": "Ex. : Backend API",
+    "removeItem": "Supprimer",
+    "templateNamePlaceholder": "Ex. : Revue de code",
+    "templateContentPlaceholder": "Revoir les changements sur la branche $branch..."
   },
   "ui": {
     "notifications": "Notifications",
@@ -733,7 +745,34 @@
     "generationFailed": "La génération a échoué",
     "generationCancelled": "La génération a été annulée",
     "mcpServers": "Serveurs MCP",
-    "newMcp": "Nouveau MCP"
+    "newMcp": "Nouveau MCP",
+    "tabClaude": "Claude",
+    "separatorExtensions": "Extensions",
+    "tabPlugins": "Plugins",
+    "tabSkills": "Skills",
+    "tabAgents": "Agents",
+    "tabWorkflows": "Workflows",
+    "tabMcp": "MCP",
+    "tabDatabase": "Base de données",
+    "tabGit": "Git",
+    "separatorCloud": "Cloud",
+    "separatorAnalytics": "Analytique",
+    "tabDashboard": "Dashboard",
+    "tabTimeTracking": "Suivi du temps",
+    "collapseSidebar": "Réduire la barre",
+    "showProjects": "Afficher les projets",
+    "hideProjects": "Masquer les projets",
+    "collapseAll": "Tout réduire",
+    "clearSearch": "Effacer",
+    "toggleExplorer": "Basculer l'explorateur",
+    "newTerminal": "Nouveau terminal (Ctrl+T)",
+    "actionsLabel": "Actions",
+    "quickActions": "Actions rapides",
+    "stashes": "Remisages",
+    "minimize": "Réduire",
+    "maximize": "Agrandir",
+    "sonnet": "Sonnet",
+    "skillsMarketplace": "Marketplace"
   },
   "memory": {
     "noProjects": "Aucun projet",
@@ -778,7 +817,8 @@
     "errorStatus": "Erreur : {message}",
     "showDiff": "Voir le diff",
     "hideDiff": "Masquer le diff",
-    "noDiff": "Aucun diff (fichier binaire ou nouveau)"
+    "noDiff": "Aucun diff (fichier binaire ou nouveau)",
+    "commitPlaceholder": "feat: décrire les changements..."
   },
   "skillsAgents": {
     "noSkills": "Aucun skill",
@@ -828,7 +868,10 @@
     "apply": "Appliquer",
     "selectRange": "Sélectionner une période",
     "startDate": "Date de début",
-    "endDate": "Date de fin"
+    "endDate": "Date de fin",
+    "chartStart": "début",
+    "chartEnd": "fin",
+    "chartProjects": "projets"
   },
   "setup": {
     "welcome": {
@@ -1259,7 +1302,12 @@
     "deleteTitle": "Supprimer du cloud",
     "confirmCloudDelete": "Supprimer « {name} » du cloud ? Les fichiers locaux ne seront pas affectés.",
     "deleteSuccess": "Supprimé du cloud",
-    "deleteError": "Échec de la suppression du cloud"
+    "deleteError": "Échec de la suppression du cloud",
+    "relayTitle": "Cloud Relay",
+    "toggleVisibility": "Basculer la visibilité",
+    "deleteSession": "Supprimer",
+    "fileCountSingular": "{count} fichier",
+    "fileCountPlural": "{count} fichiers"
   },
   "database": {
     "title": "Base de données",
@@ -1332,7 +1380,9 @@
     "browserInsertEmpty": "Remplissez au moins un champ",
     "browserEditNotSupported": "L'édition en ligne n'est pas supportée pour MongoDB",
     "browserSearchPlaceholder": "Rechercher dans les données...",
-    "browserSearchClear": "Effacer la recherche"
+    "browserSearchClear": "Effacer la recherche",
+    "statementsRun": "({count} instructions)",
+    "statementError": "Instruction {current}/{total} : {error}"
   },
   "mdViewer": {
     "tableOfContents": "Table des matières",
@@ -1364,5 +1414,19 @@
     "notCollect1": "Adresses IP",
     "notCollect2": "Noms de projets ou chemins de fichiers",
     "notCollect3": "Commandes terminal ou messages de chat"
+  },
+  "workflow": {
+    "paused": "EN PAUSE",
+    "errorLabel": "Erreur",
+    "properties": "Propriétés",
+    "lastRun": "Dernier run",
+    "commentDefault": "Commentaire",
+    "saving": "Sauvegarde...",
+    "starting": "Lancement...",
+    "importLoading": "Importation…",
+    "noDataYet": "Aucune donnée",
+    "expects": "attend {type}",
+    "errorPreview": "Erreur : {msg}",
+    "andMore": "+{n} de plus"
   }
 }

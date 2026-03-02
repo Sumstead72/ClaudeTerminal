@@ -957,7 +957,7 @@ function renderQuery(container) {
         ${escapeHtml(queryResult.error)}
       </div>`;
     } else {
-      const stmtInfo = queryResult.statementsRun ? ` (${queryResult.statementsRun} statements)` : '';
+      const stmtInfo = queryResult.statementsRun ? ` ${t('database.statementsRun', { count: queryResult.statementsRun })}` : '';
       const isDml = queryResult.rows && queryResult.rows.length === 1 && queryResult.columns &&
         (queryResult.columns.includes('affectedRows') || queryResult.columns.includes('changes'));
 
@@ -1174,7 +1174,7 @@ async function runQuery() {
 
         if (result.error) {
           state.setQueryResult(activeId, {
-            error: `Statement ${statementsRun}/${statements.length}: ${result.error}`,
+            error: t('database.statementError', { current: statementsRun, total: statements.length, error: result.error }),
             duration: totalDuration
           });
           panelState.queryRunning = false;

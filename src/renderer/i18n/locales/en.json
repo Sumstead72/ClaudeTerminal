@@ -60,7 +60,8 @@
     "filterBatch": "Batch files",
     "filterExe": "Executables",
     "filterAll": "All files",
-    "settings": "Settings"
+    "settings": "Settings",
+    "cloudUpload": "Cloud upload..."
   },
   "terminals": {
     "noTerminals": "No terminal for this project",
@@ -255,7 +256,8 @@
     "stashDroppedSuccess": "Stash dropped",
     "prTitleRequired": "PR title is required",
     "prCreated": "PR #{number} created",
-    "noProjects": "No projects"
+    "noProjects": "No projects",
+    "pruneWorktrees": "Prune stale worktrees"
   },
   "dashboard": {
     "openFolder": "Open folder",
@@ -458,7 +460,9 @@
     "cancelled": "Cancelled",
     "failed": "Failed",
     "queued": "Queued",
-    "running": "Running"
+    "running": "Running",
+    "openInGithub": "Open in GitHub",
+    "dismiss": "Dismiss"
   },
   "quickPicker": {
     "searchProjects": "Search projects...",
@@ -608,7 +612,14 @@
     "restoreTerminalSessions": "Remember last terminal states",
     "restoreTerminalSessionsDesc": "Restore terminal tabs and Claude sessions from the previous session on startup",
     "enable1MContext": "1M Token Context",
-    "enable1MContextDesc": "Enable 1 million token context window for Opus and Sonnet (API only, beta)"
+    "enable1MContextDesc": "Enable 1 million token context window for Opus and Sonnet (API only, beta)",
+    "projectBadge": "project",
+    "itemCount": "{count} item",
+    "itemCountPlural": "{count} items",
+    "contextPackNamePlaceholder": "e.g. Backend API",
+    "removeItem": "Remove",
+    "templateNamePlaceholder": "e.g. Code Review",
+    "templateContentPlaceholder": "Review the changes on branch $branch..."
   },
   "ui": {
     "notifications": "Notifications",
@@ -666,7 +677,34 @@
     "generationFailed": "Generation failed",
     "generationCancelled": "Generation was cancelled",
     "mcpServers": "MCP Servers",
-    "newMcp": "New MCP"
+    "newMcp": "New MCP",
+    "tabClaude": "Claude",
+    "separatorExtensions": "Extensions",
+    "tabPlugins": "Plugins",
+    "tabSkills": "Skills",
+    "tabAgents": "Agents",
+    "tabWorkflows": "Workflows",
+    "tabMcp": "MCP",
+    "tabDatabase": "Database",
+    "tabGit": "Git",
+    "separatorCloud": "Cloud",
+    "separatorAnalytics": "Analytics",
+    "tabDashboard": "Dashboard",
+    "tabTimeTracking": "Time Tracking",
+    "collapseSidebar": "Collapse sidebar",
+    "showProjects": "Show projects",
+    "hideProjects": "Hide projects",
+    "collapseAll": "Collapse all",
+    "clearSearch": "Clear",
+    "toggleExplorer": "Toggle Explorer",
+    "newTerminal": "New terminal (Ctrl+T)",
+    "actionsLabel": "Actions",
+    "quickActions": "Quick Actions",
+    "stashes": "Stashes",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "sonnet": "Sonnet",
+    "skillsMarketplace": "Marketplace"
   },
   "memory": {
     "noProjects": "No projects",
@@ -711,7 +749,8 @@
     "errorStatus": "Error: {message}",
     "showDiff": "Show diff",
     "hideDiff": "Hide diff",
-    "noDiff": "No diff (binary or new file)"
+    "noDiff": "No diff (binary or new file)",
+    "commitPlaceholder": "feat: describe changes..."
   },
   "skillsAgents": {
     "noSkills": "No skills",
@@ -740,7 +779,8 @@
     "startFailed": "Failed to start",
     "stopping": "Stopping...",
     "disconnected": "Disconnected",
-    "stopped": "Stopped"
+    "stopped": "Stopped",
+    "exitedWithCode": "Exited with code {code}"
   },
   "fileExplorer": {
     "title": "Explorer",
@@ -828,7 +868,10 @@
     "apply": "Apply",
     "selectRange": "Select a period",
     "startDate": "Start date",
-    "endDate": "End date"
+    "endDate": "End date",
+    "chartStart": "start",
+    "chartEnd": "end",
+    "chartProjects": "projects"
   },
   "setup": {
     "welcome": {
@@ -1259,7 +1302,12 @@
     "deleteTitle": "Remove from cloud",
     "confirmCloudDelete": "Remove \"{name}\" from the cloud? Local files won't be affected.",
     "deleteSuccess": "Removed from cloud",
-    "deleteError": "Failed to remove from cloud"
+    "deleteError": "Failed to remove from cloud",
+    "relayTitle": "Cloud Relay",
+    "toggleVisibility": "Toggle visibility",
+    "deleteSession": "Delete",
+    "fileCountSingular": "{count} file",
+    "fileCountPlural": "{count} files"
   },
   "database": {
     "title": "Database",
@@ -1332,7 +1380,9 @@
     "browserInsertEmpty": "Fill in at least one field",
     "browserEditNotSupported": "Inline editing is not supported for MongoDB",
     "browserSearchPlaceholder": "Search in data...",
-    "browserSearchClear": "Clear search"
+    "browserSearchClear": "Clear search",
+    "statementsRun": "({count} statements)",
+    "statementError": "Statement {current}/{total}: {error}"
   },
   "mdViewer": {
     "tableOfContents": "Table of Contents",
@@ -1364,5 +1414,19 @@
     "notCollect1": "IP addresses",
     "notCollect2": "Project names or file paths",
     "notCollect3": "Terminal commands or chat messages"
+  },
+  "workflow": {
+    "paused": "PAUSED",
+    "errorLabel": "Error",
+    "properties": "Properties",
+    "lastRun": "Last Run",
+    "commentDefault": "Comment",
+    "saving": "Saving...",
+    "starting": "Starting...",
+    "importLoading": "Importing…",
+    "noDataYet": "No data yet",
+    "expects": "expects {type}",
+    "errorPreview": "Error: {msg}",
+    "andMore": "+{n} more"
   }
 }

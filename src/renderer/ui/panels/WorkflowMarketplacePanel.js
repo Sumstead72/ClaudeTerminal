@@ -12,6 +12,7 @@
 'use strict';
 
 const { escapeHtml } = require('../../utils');
+const { t } = require('../../i18n');
 
 const HUB_URL = 'https://claude-terminal-hub.claudeterminal.workers.dev';
 const PAGE_SIZE = 20;
@@ -466,7 +467,7 @@ async function _importWorkflow(item, btn) {
 
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = `<span class="hub-spinner"></span> Import…`;
+  btn.innerHTML = `<span class="hub-spinner"></span> ${t('workflow.importLoading')}`;
 
   try {
     // Fetch full workflow detail to get workflowJson (not included in listing)

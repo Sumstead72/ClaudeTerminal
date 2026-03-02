@@ -16,6 +16,7 @@ const {
   getNodeColors, isValidConnection,
 } = require('../../shared/workflow-schema');
 const nodeRegistry = require('./NodeRegistry');
+const { t } = require('../i18n');
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -1416,12 +1417,12 @@ class WorkflowGraphEngine {
           lines.push({ text: this._truncateValue(output), color: '#888', mono: true });
         }
       } else {
-        if (pinType !== 'exec') lines.push({ text: 'No data yet', color: '#555', dim: true });
+        if (pinType !== 'exec') lines.push({ text: t('workflow.noDataYet'), color: '#555', dim: true });
       }
     } else {
       // Input pin
       lines.push({ text: pinName, color: pinColor, bold: true });
-      lines.push({ text: `expects ${pinType}`, color: pinColor, dim: true });
+      lines.push({ text: t('workflow.expects', { type: pinType }), color: pinColor, dim: true });
       // Show connected source
       if (slot.link != null) {
         const link = this._links.get(slot.link);

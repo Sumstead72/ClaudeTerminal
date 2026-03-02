@@ -169,7 +169,7 @@ async function loadAgents() {
           skillsAgentsState.agents.push({
             id,
             name: parsed.name || id,
-            description: parsed.description || 'Aucune description',
+            description: parsed.description || t('common.noDescription'),
             tools: parsed.tools || [],
             sections: parsed.sections || [],
             path: itemPath,

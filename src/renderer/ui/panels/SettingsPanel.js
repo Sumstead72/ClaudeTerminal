@@ -29,9 +29,9 @@ function buildLibraryPanel() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       </div>
       <div class="library-item-info">
-        <div class="library-item-name">${escapeHtml(p.name)}${p.scope === 'project' ? '<span class="library-item-badge">project</span>' : ''}</div>
+        <div class="library-item-name">${escapeHtml(p.name)}${p.scope === 'project' ? `<span class="library-item-badge">${t('settings.projectBadge')}</span>` : ''}</div>
         <div class="library-item-desc">${escapeHtml(p.description || '')}</div>
-        ${p.items ? `<div class="library-item-meta">${p.items.length} item${p.items.length > 1 ? 's' : ''} &middot; ${p.items.map(i => i.type).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</div>` : ''}
+        ${p.items ? `<div class="library-item-meta">${p.items.length > 1 ? t('settings.itemCountPlural', { count: p.items.length }) : t('settings.itemCount', { count: p.items.length })} &middot; ${p.items.map(i => i.type).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</div>` : ''}
       </div>
       <div class="library-item-actions">
         <button class="btn-icon library-edit-pack" data-id="${escapeHtml(p.id)}" title="${escapeHtml(t('settings.editContextPack'))}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
@@ -50,7 +50,7 @@ function buildLibraryPanel() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       </div>
       <div class="library-item-info">
-        <div class="library-item-name">${escapeHtml(tmpl.name)}${tmpl.scope === 'project' ? '<span class="library-item-badge">project</span>' : ''}</div>
+        <div class="library-item-name">${escapeHtml(tmpl.name)}${tmpl.scope === 'project' ? `<span class="library-item-badge">${t('settings.projectBadge')}</span>` : ''}</div>
         <div class="library-item-desc">${escapeHtml(tmpl.description || '')}</div>
       </div>
       <div class="library-item-actions">
@@ -117,7 +117,7 @@ function showContextPackModal(existingPack = null) {
       <div class="library-modal-form">
         <div class="form-field">
           <label>${t('settings.contextPackName')}</label>
-          <input type="text" id="ctx-pack-name" class="form-input" value="${escapeHtml(pack.name)}" placeholder="e.g. Backend API" />
+          <input type="text" id="ctx-pack-name" class="form-input" value="${escapeHtml(pack.name)}" placeholder="${t('settings.contextPackNamePlaceholder')}" />
         </div>
         <div class="form-field">
           <label>${t('settings.contextPackDescription')}</label>
@@ -198,7 +198,7 @@ function buildContextItemRow(item, index) {
     <div class="ctx-item-row" data-index="${index}">
       <select class="ctx-item-type">${typeOptions}</select>
       <div class="ctx-item-value-wrap">${valueField}</div>
-      <button class="ctx-item-remove" title="Remove">&times;</button>
+      <button class="ctx-item-remove" title="${t('settings.removeItem')}">&times;</button>
     </div>
   `;
 }
@@ -262,7 +262,7 @@ function showPromptTemplateModal(existingTemplate = null) {
       <div class="library-modal-form">
         <div class="form-field">
           <label>${t('settings.promptTemplateName')}</label>
-          <input type="text" id="prompt-tmpl-name" class="form-input" value="${escapeHtml(tmpl.name)}" placeholder="e.g. Code Review" />
+          <input type="text" id="prompt-tmpl-name" class="form-input" value="${escapeHtml(tmpl.name)}" placeholder="${t('settings.templateNamePlaceholder')}" />
         </div>
         <div class="form-field">
           <label>${t('settings.promptTemplateDescription')}</label>
@@ -278,7 +278,7 @@ function showPromptTemplateModal(existingTemplate = null) {
         </div>` : ''}
         <div class="form-field">
           <label>${t('settings.promptTemplateContent')}</label>
-          <textarea id="prompt-tmpl-content" class="form-input" rows="6" placeholder="Review the changes on branch $branch...">${escapeHtml(tmpl.template || '')}</textarea>
+          <textarea id="prompt-tmpl-content" class="form-input" rows="6" placeholder="${t('settings.templateContentPlaceholder')}">${escapeHtml(tmpl.template || '')}</textarea>
           <div class="form-help">${t('settings.promptTemplateVariablesHelp')}</div>
         </div>
       </div>
