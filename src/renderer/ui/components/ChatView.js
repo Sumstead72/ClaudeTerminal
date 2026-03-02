@@ -1416,6 +1416,18 @@ function createChatView(wrapperEl, project, options = {}) {
       return;
     }
 
+    // Tool group toggle
+    const groupHeader = e.target.closest('.chat-tool-group-header');
+    if (groupHeader && !e.target.closest('.chat-tool-card')) {
+      const group = groupHeader.closest('.chat-tool-group');
+      if (group) {
+        group.classList.toggle('open');
+        const chevron = groupHeader.querySelector('.chat-tool-group-chevron');
+        if (chevron) chevron.textContent = group.classList.contains('open') ? '▾' : '▸';
+      }
+      return;
+    }
+
     // Expandable tool cards
     const toolCard = e.target.closest('.chat-tool-card.expandable');
     if (toolCard) {
@@ -1433,6 +1445,17 @@ function createChatView(wrapperEl, project, options = {}) {
         const index = allImages.indexOf(clickedImage);
         openLightbox(srcs, Math.max(0, index));
       }
+      return;
+    }
+
+    // Inline image lightbox
+    const inlineImg = e.target.closest('.chat-inline-img');
+    if (inlineImg) {
+      const container = inlineImg.closest('.chat-inline-images');
+      const allImgs = container ? Array.from(container.querySelectorAll('.chat-inline-img')) : [inlineImg];
+      const srcs = allImgs.map(i => i.src);
+      const index = allImgs.indexOf(inlineImg);
+      openLightbox(srcs, Math.max(0, index));
       return;
     }
   });
@@ -1774,6 +1797,20 @@ function createChatView(wrapperEl, project, options = {}) {
       const limit = input.limit || '';
       const rangeInfo = limit ? `lines ${offset}–${offset + parseInt(limit, 10) - 1}` : (offset > 1 ? `from line ${offset}` : '');
 
+      const ext = path.split('.').pop().toLowerCase();
+      const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
+      const BINARY_EXTS = new Set(['pdf', 'zip', 'gz', 'tar', 'rar', '7z', 'exe', 'dll', 'so', 'dylib', 'bin', 'dat', 'db', 'sqlite', 'wasm', 'mp3', 'mp4', 'mov', 'avi', 'mkv', 'wav', 'ogg', 'ttf', 'otf', 'woff', 'woff2']);
+
+      if (IMAGE_EXTS.has(ext) && path) {
+        const fileUrl = 'file:///' + path.replace(/\\/g, '/');
+        return `<div class="chat-tool-content-path">${escapeHtml(path)}</div>
+          <div class="chat-inline-images"><div class="chat-inline-img-wrap"><img src="${fileUrl}" class="chat-inline-img" alt="${escapeHtml(path)}" loading="lazy"></div></div>`;
+      }
+
+      if (BINARY_EXTS.has(ext)) {
+        return `<div class="chat-tool-content-path">${escapeHtml(path)} <span class="chat-tool-content-meta">(fichier binaire)</span></div>`;
+      }
+
       let effectiveOutput = output;
       // If no output stored (live streaming), read file directly
       if (!effectiveOutput && path) {
@@ -1798,7 +1835,6 @@ function createChatView(wrapperEl, project, options = {}) {
         const maxLines = 80;
         const truncated = parsed.length > maxLines;
         const display = parsed.slice(0, maxLines);
-        const ext = path.split('.').pop().toLowerCase();
         const plainText = display.map(l => l.content).join('\n');
         const highlightedText = highlight(plainText, ext);
         const highlightedLines = highlightedText.split('\n');
@@ -2050,9 +2086,40 @@ function createChatView(wrapperEl, project, options = {}) {
     }
   }
 
+  const IMG_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']);
+  const IMG_PATH_RE = /([A-Za-z]:[\\\/][^\s"'<>|?*\x00-\x1f\n\r]+|\/[^\s"'<>|?*\x00-\x1f\n\r]+)\.([a-zA-Z]{2,5})(?=[\s,;:!?)"'\]]|$)/g;
+
+  function injectInlineImages(container) {
+    const text = container.textContent;
+    const paths = [];
+    const seen = new Set();
+    IMG_PATH_RE.lastIndex = 0;
+    let m;
+    while ((m = IMG_PATH_RE.exec(text)) !== null) {
+      const ext = m[2].toLowerCase();
+      if (IMG_EXTS.has(ext)) {
+        const fullPath = m[0].replace(/[.,;:!?]$/, '');
+        if (!seen.has(fullPath)) { seen.add(fullPath); paths.push(fullPath); }
+      }
+    }
+    if (paths.length === 0) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-inline-images';
+    paths.forEach(p => {
+      const fileUrl = 'file:///' + p.replace(/\\/g, '/').replace(/^\/\//, '/');
+      const imgWrap = document.createElement('div');
+      imgWrap.className = 'chat-inline-img-wrap';
+      imgWrap.innerHTML = `<img src="${fileUrl}" class="chat-inline-img" alt="${escapeHtml(p)}" loading="lazy">`;
+      imgWrap.querySelector('img').onerror = () => imgWrap.remove();
+      wrap.appendChild(imgWrap);
+    });
+    container.appendChild(wrap);
+  }
+
   function finalizeStreamBlock() {
     if (currentStreamEl && currentStreamText) {
       currentStreamEl.innerHTML = renderMarkdown(currentStreamText);
+      injectInlineImages(currentStreamEl);
     }
     currentStreamEl = null;
     currentStreamText = '';
@@ -2075,10 +2142,11 @@ function createChatView(wrapperEl, project, options = {}) {
     }
   }
 
-  function appendToolCard(toolName, detail) {
+  // ── Tool group helpers ──
+
+  function _makeToolCard(toolName, truncated) {
     const el = document.createElement('div');
     el.className = 'chat-tool-card';
-    const truncated = detail && detail.length > 80 ? '...' + detail.slice(-77) : (detail || '');
     el.innerHTML = `
       <div class="chat-tool-icon">${getToolIcon(toolName)}</div>
       <div class="chat-tool-info">
@@ -2088,6 +2156,65 @@ function createChatView(wrapperEl, project, options = {}) {
       <div class="chat-tool-status running"><div class="chat-tool-spinner"></div></div>
     `;
     applyToolColor(el, toolName);
+    return el;
+  }
+
+  function _makeToolGroup(toolName) {
+    const group = document.createElement('div');
+    group.className = 'chat-tool-group';
+    group.dataset.toolName = toolName;
+    group.innerHTML = `
+      <div class="chat-tool-group-header">
+        <div class="chat-tool-icon">${getToolIcon(toolName)}</div>
+        <div class="chat-tool-info">
+          <span class="chat-tool-name">${escapeHtml(toolName)}</span>
+          <span class="chat-tool-group-badge">×2</span>
+        </div>
+        <div class="chat-tool-group-status running"><div class="chat-tool-spinner"></div></div>
+        <div class="chat-tool-group-chevron">▸</div>
+      </div>
+      <div class="chat-tool-group-items"></div>
+    `;
+    applyToolColor(group, toolName);
+    return group;
+  }
+
+  function _updateGroupBadge(group) {
+    const count = group.querySelector('.chat-tool-group-items').childElementCount;
+    const badge = group.querySelector('.chat-tool-group-badge');
+    if (badge) badge.textContent = `×${count}`;
+  }
+
+  function appendToolCard(toolName, detail) {
+    const truncated = detail && detail.length > 80 ? '...' + detail.slice(-77) : (detail || '');
+    const last = messagesEl.lastElementChild;
+
+    // Add to existing group for same tool
+    if (last?.classList.contains('chat-tool-group') && last.dataset.toolName === toolName) {
+      const card = _makeToolCard(toolName, truncated);
+      last.querySelector('.chat-tool-group-items').appendChild(card);
+      _updateGroupBadge(last);
+      scrollToBottom();
+      return card;
+    }
+
+    // Convert previous lone card + new card into a group
+    if (last?.classList.contains('chat-tool-card') &&
+        !last.classList.contains('history') &&
+        last.querySelector('.chat-tool-name')?.textContent === toolName) {
+      const group = _makeToolGroup(toolName);
+      const items = group.querySelector('.chat-tool-group-items');
+      last.replaceWith(group);
+      items.appendChild(last);
+      const card = _makeToolCard(toolName, truncated);
+      items.appendChild(card);
+      _updateGroupBadge(group);
+      scrollToBottom();
+      return card;
+    }
+
+    // Normal lone card
+    const el = _makeToolCard(toolName, truncated);
     messagesEl.appendChild(el);
     scrollToBottom();
     return el;
@@ -2100,6 +2227,20 @@ function createChatView(wrapperEl, project, options = {}) {
       status.classList.remove('running');
       status.classList.add('complete');
       status.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+    }
+    // If inside a group, check if all items are done → mark group complete
+    const group = el.closest('.chat-tool-group');
+    if (group) {
+      const cards = group.querySelectorAll('.chat-tool-group-items > .chat-tool-card');
+      const allComplete = [...cards].every(c => c.querySelector('.chat-tool-status.complete'));
+      if (allComplete) {
+        const gs = group.querySelector('.chat-tool-group-status');
+        if (gs) {
+          gs.classList.remove('running');
+          gs.classList.add('complete');
+          gs.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+        }
+      }
     }
   }
 
@@ -3365,6 +3506,7 @@ function createChatView(wrapperEl, project, options = {}) {
           const el = document.createElement('div');
           el.className = 'chat-msg chat-msg-assistant history';
           el.innerHTML = `<div class="chat-msg-content">${renderMarkdown(msg.text)}</div>`;
+          injectInlineImages(el);
           fragment.appendChild(el);
 
         } else if (msg.role === 'assistant' && msg.type === 'thinking') {
@@ -3439,7 +3581,24 @@ function createChatView(wrapperEl, project, options = {}) {
             el.dataset.toolOutput = toolResults.get(msg.toolUseId);
           }
 
-          fragment.appendChild(el);
+          // Group consecutive same-tool cards in history
+          const fragLast = fragment.lastElementChild;
+          if (fragLast?.classList.contains('chat-tool-group') && fragLast.dataset.toolName === msg.toolName) {
+            fragLast.querySelector('.chat-tool-group-items').appendChild(el);
+            _updateGroupBadge(fragLast);
+          } else if (fragLast?.classList.contains('chat-tool-card') &&
+              fragLast.querySelector('.chat-tool-name')?.textContent === msg.toolName) {
+            const group = _makeToolGroup(msg.toolName);
+            const gs = group.querySelector('.chat-tool-group-status');
+            gs.classList.remove('running'); gs.classList.add('complete');
+            gs.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+            fragLast.replaceWith(group);
+            group.querySelector('.chat-tool-group-items').appendChild(fragLast);
+            group.querySelector('.chat-tool-group-items').appendChild(el);
+            _updateGroupBadge(group);
+          } else {
+            fragment.appendChild(el);
+          }
         }
       }
 
