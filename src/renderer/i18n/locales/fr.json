@@ -747,6 +747,8 @@
     "mcpServers": "Serveurs MCP",
     "newMcp": "Nouveau MCP",
     "tabClaude": "Claude",
+    "separatorTools": "Outils",
+    "separatorAI": "AI",
     "separatorExtensions": "Extensions",
     "tabPlugins": "Plugins",
     "tabSkills": "Skills",

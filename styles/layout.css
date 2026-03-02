@@ -476,6 +476,12 @@ body.platform-darwin .titlebar-drag {
   user-select: none;
 }
 
+.nav-separator--bare {
+  padding: 8px 14px 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
 .nav-tab {
   display: flex;
   align-items: center;
