@@ -1676,7 +1676,10 @@ if (api.cloud?.onUploadProgress) {
       uploading: t('cloud.uploadPhaseUploading'),
       done: t('cloud.uploadSuccess'),
     };
-    if (phases[progress.phase]) msgEl.textContent = phases[progress.phase];
+    if (phases[progress.phase]) {
+      const pct = typeof progress.percent === 'number' ? ` (${progress.percent}%)` : '';
+      msgEl.textContent = phases[progress.phase] + pct;
+    }
   });
 }
 
