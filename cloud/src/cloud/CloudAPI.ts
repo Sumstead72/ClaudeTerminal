@@ -36,7 +36,7 @@ async function authMiddleware(req: AuthRequest, res: Response, next: Function): 
 // Multer for zip uploads
 const upload = multer({
   dest: path.join(os.tmpdir(), 'ct-cloud-uploads'),
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  limits: { fileSize: 5 * 1024 * 1024 * 1024 }, // 5GB
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/zip' || file.originalname.endsWith('.zip')) {
       cb(null, true);
