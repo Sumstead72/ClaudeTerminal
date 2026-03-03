@@ -1272,6 +1272,11 @@ function setActiveTerminal(id) {
         if (history.length > 50) history.shift();
       }
     }
+
+    // Notify about active terminal change (used to update git buttons for worktrees)
+    if (callbacks.onActiveTerminalChange) {
+      callbacks.onActiveTerminalChange(id, termData);
+    }
   }
 }
 
