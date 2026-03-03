@@ -202,7 +202,8 @@ export function createCloudRouter(): Router {
         for (const file of files.untracked) {
           const dest = path.join(projectPath, file.originalname);
           await fs.promises.mkdir(path.dirname(dest), { recursive: true });
-          await fs.promises.rename(file.path, dest);
+          await fs.promises.copyFile(file.path, dest);
+          await fs.promises.unlink(file.path).catch(() => {});
         }
       }
 
