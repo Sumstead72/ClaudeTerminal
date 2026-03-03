@@ -20,7 +20,8 @@ fi
 
 cd "$INSTALL_DIR"
 
-# Fetch latest tags
+# Unshallow if needed (handles old --depth 1 clones), then fetch tags
+git fetch --unshallow --quiet 2>/dev/null || true
 git fetch origin --tags --quiet 2>/dev/null
 
 # Get latest semver tag
