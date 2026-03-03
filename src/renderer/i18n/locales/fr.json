@@ -1248,6 +1248,8 @@
     "uploadPhaseScanning": "Scan des fichiers...",
     "uploadPhaseCompressing": "Compression...",
     "uploadPhaseUploading": "Envoi...",
+    "uploadPhaseCloning": "Clonage depuis GitHub...",
+    "uploadPhasePatching": "Application des changements locaux...",
     "noProjects": "Aucun projet",
     "headlessReconnectTitle": "Session cloud active",
     "headlessReconnectMessage": "Une session cloud tourne sur \"{project}\". Que souhaitez-vous faire ?",
