@@ -21,7 +21,7 @@ module.exports = {
       type: 'custom',
       key:  'log_ui',
       render(field, props, node) {
-        // esc() imported from _registry
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const LOG_LEVELS = [
           { value: 'debug', label: 'Debug', icon: '🔍', color: 'var(--text-muted)' },
           { value: 'info',  label: 'Info',  icon: 'ℹ',  color: '#60a5fa' },

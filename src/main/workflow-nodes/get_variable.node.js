@@ -21,7 +21,7 @@ module.exports = {
       type: 'custom',
       key:  'get_variable_ui',
       render(field, props, node) {
-        // esc() imported from _registry
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const VAR_TYPE_OPTIONS = ['string', 'number', 'boolean', 'array', 'object', 'any'];
         const VAR_COLORS = {
           string:  '#c8c8c8',

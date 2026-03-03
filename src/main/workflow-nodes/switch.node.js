@@ -22,7 +22,7 @@ module.exports = {
       type: 'custom',
       key:  'switch_ui',
       render(field, props, node) {
-        // esc() imported from _registry
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const p     = props || {};
         const cases = (p.cases || '').split(',').map(c => c.trim()).filter(Boolean);
 
@@ -59,7 +59,7 @@ module.exports = {
         `;
       },
       bind(container, field, node, onChange) {
-        // esc() imported from _registry
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
         function getCases() {
           const inputs = container.querySelectorAll('.wf-switch-case-input');

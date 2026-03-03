@@ -45,7 +45,7 @@ module.exports = {
       type: 'custom',
       key:  'condition_ui',
       render(field, props, node) {
-        // esc() imported from _registry
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const CONDITION_OPS = [
           { value: '==',           group: 'compare', label: '==' },
           { value: '!=',           group: 'compare', label: '!=' },
