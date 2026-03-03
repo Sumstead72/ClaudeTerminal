@@ -3097,16 +3097,36 @@ function hideFilterGitActions() {
   filterBtnBranch.classList.remove('open');
   currentFilterProjectId = null;
   currentFilterWorktreePath = null;
+  const worktreeBadge = document.getElementById('worktree-badge');
+  if (worktreeBadge) worktreeBadge.style.display = 'none';
+}
+
+// Returns true if a terminal tab is actually working in a worktree path
+// (path comparison is more reliable than parentProjectId which can be stale)
+function isWorktreeTerminal(termData) {
+  if (!termData || !termData.project) return false;
+  const mainPath = getProject(termData.project.id)?.path;
+  if (!mainPath) return false;
+  // Chat tabs: project.path is overridden to worktree path
+  // Terminal tabs: cwd is set to worktree path
+  const activePath = termData.cwd || termData.project.path;
+  return !!activePath && activePath !== mainPath;
 }
 
 // Called by TerminalManager when the active tab changes
 function handleActiveTerminalChange(id, termData) {
-  if (!termData) { currentFilterWorktreePath = null; return; }
-  // A worktree tab has parentProjectId set and a cwd different from the base project path
-  if (termData.parentProjectId && termData.cwd && termData.cwd !== termData.project?.path) {
-    currentFilterWorktreePath = termData.cwd;
+  const worktreeBadge = document.getElementById('worktree-badge');
+  if (!termData) {
+    currentFilterWorktreePath = null;
+    if (worktreeBadge) worktreeBadge.style.display = 'none';
+    return;
+  }
+  if (isWorktreeTerminal(termData)) {
+    currentFilterWorktreePath = termData.cwd || termData.project?.path || null;
+    if (worktreeBadge) worktreeBadge.style.display = '';
   } else {
     currentFilterWorktreePath = null;
+    if (worktreeBadge) worktreeBadge.style.display = 'none';
   }
   // Refresh branch name if git buttons are visible
   if (currentFilterProjectId && filterGitActions.style.display !== 'none') {
@@ -3136,6 +3156,16 @@ async function showFilterGitActions(projectId) {
 
   currentFilterProjectId = projectId;
   filterGitActions.style.display = 'flex';
+
+  // Sync worktree badge with the currently active terminal
+  const activeId = terminalsState.get().activeTerminal;
+  const activeTermData = activeId ? terminalsState.get().terminals.get(activeId) : null;
+  const worktreeBadge = document.getElementById('worktree-badge');
+  if (worktreeBadge) {
+    const isWorktree = activeTermData && activeTermData.project?.id === projectId && isWorktreeTerminal(activeTermData);
+    worktreeBadge.style.display = isWorktree ? '' : 'none';
+    currentFilterWorktreePath = isWorktree ? (activeTermData.cwd || activeTermData.project?.path || null) : null;
+  }
 
   // Reset button states based on this project's git operations
   const gitOps = localState.gitOperations.get(projectId) || {};
