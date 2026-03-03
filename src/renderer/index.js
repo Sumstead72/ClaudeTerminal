@@ -24,6 +24,16 @@ const i18n = require('./i18n');
 // Event system
 const events = require('./events');
 
+// Expose states on window for workflow field renderers
+// _projectsState: State instance (field renderers call .get().projects)
+window._projectsState = state.projectsState;
+// _skillsAgentsState: plain object {agents, skills} — field renderers access .agents/.skills directly
+// Updated via subscription so it stays fresh when loadAgents/loadSkills complete (async)
+window._skillsAgentsState = state.skillsAgentsState.get();
+state.skillsAgentsState.subscribe(() => {
+  window._skillsAgentsState = state.skillsAgentsState.get();
+});
+
 /**
  * Initialize all renderer modules
  */
@@ -37,10 +47,6 @@ async function initialize() {
 
   // Initialize state
   await state.initializeState();
-
-  // Expose states on window for workflow field renderers
-  window._projectsState = require('./state/projects.state').projectsState;
-  window._skillsAgentsState = require('./state').skillsAgentsState;
 
   // Initialize i18n with saved language or auto-detect
   const savedLanguage = state.getSetting('language');
