@@ -99,6 +99,7 @@ function formatTrigger(trigger) {
   if (trigger.type === 'cron') return `cron: ${trigger.value}`;
   if (trigger.type === 'hook') return `hook: ${trigger.hookType || trigger.value}`;
   if (trigger.type === 'on_workflow') return `after: ${trigger.value}`;
+  if (trigger.type === 'webhook') return 'webhook (HTTP POST via cloud)';
   return trigger.type || 'manual';
 }
 
@@ -451,7 +452,7 @@ const tools = [
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Workflow name (required)' },
-        trigger_type: { type: 'string', enum: ['manual', 'cron', 'hook', 'on_workflow'], description: 'Trigger type (default: manual)' },
+        trigger_type: { type: 'string', enum: ['manual', 'cron', 'hook', 'on_workflow', 'webhook'], description: 'Trigger type (default: manual). webhook = triggered by external HTTP POST via cloud relay' },
         trigger_value: { type: 'string', description: 'Cron expression or hook type depending on trigger_type' },
         graph: { type: 'object', description: 'Optional full LiteGraph JSON { nodes[], links[] } to set immediately' },
       },

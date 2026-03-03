@@ -2156,8 +2156,12 @@ You do NOT need $node_X.stdout syntax when using data pin connections.
 NODE TYPES:
 
 workflow/trigger — Entry point (always the first node, required)
-  triggerType: manual | cron | hook | on_workflow
-  triggerValue: cron expression e.g. "0 9 * * 1-5"
+  triggerType: manual | cron | hook | on_workflow | webhook
+  triggerValue: cron expression e.g. "0 9 * * 1-5" (for cron)
+  hookType: PreToolUse | PostToolUse | UserPromptSubmit | Notification | Stop (for hook)
+  webhook: triggered by external HTTP POST via cloud relay (GitHub, Stripe, etc.)
+    URL format: {cloudServerUrl}/api/webhook/{workflowId} with Authorization: Bearer {apiKey}
+    The request body is available as $trigger.payload (e.g. $trigger.payload.event)
   Exec outputs: slot0=Start
 
 workflow/claude — AI task
@@ -2297,6 +2301,8 @@ When connecting data pins, slot indices start AFTER the exec slots:
 AVAILABLE VARIABLES IN PROPERTIES (legacy $var syntax, still works):
 $ctx.project — current project name
 $ctx.branch — active git branch
+$trigger.payload — webhook request body (when triggerType=webhook)
+$trigger.payload.X — access specific fields from the webhook payload
 $node_X.stdout — stdout output of node X (shell/git)
 $node_X.body — HTTP response body of node X
 $node_X.rows — SQL result rows of node X
