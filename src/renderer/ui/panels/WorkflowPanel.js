@@ -1308,14 +1308,16 @@ function openEditor(workflowId = null) {
 
       // Renderers built-in
       const value = props[field.key] ?? (field.default ?? '');
-      const label = field.label || field.key;
       const key = field.key;
+      // tField: translate if value looks like an i18n key (word chars + dots), else use raw
+      const tField = v => (v && /^[\w]+\.[\w.]+$/.test(v)) ? t(v) : (v || '');
+      const label = tField(field.label || field.key);
 
       switch (field.type) {
         case 'text':
           return `<div class="wf-step-edit-field">
             <label class="wf-step-edit-label">${escapeHtml(label)}</label>
-            ${field.hint ? `<span class="wf-field-hint">${escapeHtml(field.hint)}</span>` : ''}
+            ${field.hint ? `<span class="wf-field-hint">${escapeHtml(tField(field.hint))}</span>` : ''}
             <input class="wf-step-edit-input wf-node-prop${field.mono ? ' wf-field-mono' : ''}"
               data-key="${key}" value="${escapeHtml(String(value))}"
               placeholder="${escapeHtml(field.placeholder || '')}" />
@@ -1324,7 +1326,7 @@ function openEditor(workflowId = null) {
         case 'textarea':
           return `<div class="wf-step-edit-field">
             <label class="wf-step-edit-label">${escapeHtml(label)}</label>
-            ${field.hint ? `<span class="wf-field-hint">${escapeHtml(field.hint)}</span>` : ''}
+            ${field.hint ? `<span class="wf-field-hint">${escapeHtml(tField(field.hint))}</span>` : ''}
             <textarea class="wf-step-edit-input wf-node-prop${field.mono ? ' wf-field-mono' : ''}"
               data-key="${key}" rows="${field.rows || 3}"
               placeholder="${escapeHtml(field.placeholder || '')}">${escapeHtml(String(value))}</textarea>
@@ -1333,12 +1335,12 @@ function openEditor(workflowId = null) {
         case 'select': {
           const options = (field.options || []).map(opt => {
             const optVal = typeof opt === 'object' ? opt.value : opt;
-            const optLabel = typeof opt === 'object' ? opt.label : opt;
+            const optLabel = tField(typeof opt === 'object' ? opt.label : opt);
             return `<option value="${escapeHtml(String(optVal))}" ${String(value) === String(optVal) ? 'selected' : ''}>${escapeHtml(String(optLabel))}</option>`;
           }).join('');
           return `<div class="wf-step-edit-field">
             <label class="wf-step-edit-label">${escapeHtml(label)}</label>
-            ${field.hint ? `<span class="wf-field-hint">${escapeHtml(field.hint)}</span>` : ''}
+            ${field.hint ? `<span class="wf-field-hint">${escapeHtml(tField(field.hint))}</span>` : ''}
             <select class="wf-step-edit-input wf-node-prop" data-key="${key}">${options}</select>
           </div>`;
         }
@@ -1352,7 +1354,7 @@ function openEditor(workflowId = null) {
 
         case 'hint':
           return `<div class="wf-step-edit-field">
-            <span class="wf-field-hint">${escapeHtml(field.text || label)}</span>
+            <span class="wf-field-hint">${escapeHtml(tField(field.text || field.label || ''))}</span>
           </div>`;
 
         default:

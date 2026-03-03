@@ -23,7 +23,7 @@ module.exports = {
   props: { projectId: '', projectName: '', action: 'set_context' },
 
   fields: [
-    { type: 'project-config', key: 'action', label: 'Configuration projet' },
+    { type: 'project-config', key: 'action', label: 'wfn.project.label' },
   ],
 
   badge: (n) => (n.properties.action || 'set_context').toUpperCase().replace('_', ' '),

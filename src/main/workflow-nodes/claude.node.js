@@ -20,7 +20,7 @@ module.exports = {
   props: { mode: 'prompt', prompt: '', agentId: '', skillId: '', model: 'sonnet', effort: 'medium', outputSchema: null },
 
   fields: [
-    { type: 'claude-config', key: 'mode', label: 'Configuration Claude' },
+    { type: 'claude-config', key: 'mode', label: 'wfn.claude.label' },
   ],
 
   badge: (n) => ({ prompt: 'PROMPT', agent: 'AGENT', skill: 'SKILL' }[n.properties.mode] || 'PROMPT'),

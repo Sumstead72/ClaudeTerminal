@@ -15,9 +15,9 @@ module.exports = {
   props: { mode: 'duration', duration: '5s', timeout: '' },
 
   fields: [
-    { type: 'select', key: 'mode',     label: 'Mode',   options: ['duration', 'approval'] },
-    { type: 'text',   key: 'duration', label: 'Durée',  placeholder: '5s', showIf: (p) => !p.mode || p.mode === 'duration' },
-    { type: 'text',   key: 'timeout',  label: 'Timeout (approval)', placeholder: '60s', showIf: (p) => p.mode === 'approval' },
+    { type: 'select', key: 'mode',     label: 'wfn.wait.mode.label',     options: ['duration', 'approval'] },
+    { type: 'text',   key: 'duration', label: 'wfn.wait.duration.label', placeholder: '5s', showIf: (p) => !p.mode || p.mode === 'duration' },
+    { type: 'text',   key: 'timeout',  label: 'wfn.wait.timeout.label',  placeholder: '60s', showIf: (p) => p.mode === 'approval' },
   ],
 
   badge: (n) => n.properties.mode === 'approval' ? 'APPROVAL' : (n.properties.duration || '5s').toUpperCase(),

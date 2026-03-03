@@ -1534,5 +1534,157 @@
       "outputTables": "list of tables",
       "outputTableCount": "number of tables"
     }
+  },
+  "wfn": {
+    "file": {
+      "action": {
+        "label": "Action",
+        "read": "Read file",
+        "write": "Write (replace)",
+        "append": "Append",
+        "copy": "Copy",
+        "move": "Move / Rename",
+        "delete": "Delete",
+        "exists": "Check existence",
+        "list": "List (glob)"
+      },
+      "path": {
+        "label": "Path",
+        "hint": "Relative or absolute file path"
+      },
+      "folder": {
+        "label": "Folder",
+        "hint": "Base directory to explore (empty = current project)"
+      },
+      "pattern": {
+        "label": "Glob pattern",
+        "hint": "File filter — e.g. *.ts, **/*.test.js"
+      },
+      "type": {
+        "label": "Type",
+        "files": "Files only",
+        "dirs": "Directories only",
+        "all": "Files and directories"
+      },
+      "recursive": {
+        "label": "Recursive (subdirectories)"
+      },
+      "destination": {
+        "label": "Destination",
+        "hint": "Target path for copy or move"
+      },
+      "content": {
+        "label": "Content",
+        "hint": "Text or data to write to the file"
+      }
+    },
+    "git": {
+      "projectId": {
+        "label": "Target project",
+        "hint": "Git repository to operate on"
+      },
+      "action": {
+        "label": "Action",
+        "pull": "Pull — Fetch remote changes",
+        "push": "Push — Send local commits",
+        "commit": "Commit — Create a commit",
+        "checkout": "Checkout — Switch branch",
+        "merge": "Merge — Merge a branch",
+        "stash": "Stash — Save changes",
+        "stashpop": "Stash Pop — Restore changes",
+        "reset": "Reset — Discard uncommitted changes"
+      },
+      "message": {
+        "label": "Commit message",
+        "hint": "Convention: type(scope): description"
+      },
+      "branch": {
+        "label": "Branch",
+        "hint": "Git branch name"
+      }
+    },
+    "http": {
+      "method": {
+        "label": "Method"
+      },
+      "url": {
+        "label": "URL"
+      },
+      "headers": {
+        "label": "Headers",
+        "hint": "JSON object of HTTP headers"
+      },
+      "body": {
+        "label": "Body",
+        "hint": "Request body (JSON)"
+      }
+    },
+    "shell": {
+      "projectId": {
+        "label": "Run in",
+        "hint": "Working directory for the command"
+      },
+      "command": {
+        "label": "Command"
+      }
+    },
+    "notify": {
+      "title": {
+        "label": "Title"
+      },
+      "message": {
+        "label": "Message",
+        "hint": "Variables: $ctx.project, $ctx.branch, $node_X.output"
+      }
+    },
+    "wait": {
+      "mode": {
+        "label": "Mode"
+      },
+      "duration": {
+        "label": "Duration"
+      },
+      "timeout": {
+        "label": "Timeout (approval)"
+      }
+    },
+    "webhook": {
+      "url": {
+        "label": "Webhook URL"
+      },
+      "text": {
+        "label": "Message",
+        "hint": "Supports variables $ctx, $node_X, $loop"
+      },
+      "username": {
+        "label": "Display name (optional)"
+      },
+      "icon": {
+        "label": "Icon emoji (optional)"
+      }
+    },
+    "claude": {
+      "label": "Claude configuration"
+    },
+    "loop": {
+      "source": {
+        "label": "Loop configuration"
+      }
+    },
+    "db": {
+      "label": "Database configuration"
+    },
+    "project": {
+      "label": "Project configuration"
+    },
+    "subworkflow": {
+      "label": "Sub-workflow configuration"
+    },
+    "time": {
+      "label": "Time tracking configuration"
+    },
+    "trigger": {
+      "label": "Trigger"
+    }
   }
 }

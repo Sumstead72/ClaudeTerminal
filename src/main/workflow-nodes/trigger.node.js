@@ -16,7 +16,7 @@ module.exports = {
   props: { triggerType: 'manual', triggerValue: '', hookType: 'PostToolUse' },
 
   fields: [
-    { type: 'trigger-config', key: 'triggerType', label: 'Déclencheur' },
+    { type: 'trigger-config', key: 'triggerType', label: 'wfn.trigger.label' },
   ],
 
   badge: (n) => (n.properties.triggerType || 'manual').toUpperCase(),

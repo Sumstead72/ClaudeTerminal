@@ -1534,5 +1534,157 @@
       "outputTables": "liste des tables",
       "outputTableCount": "nombre de tables"
     }
+  },
+  "wfn": {
+    "file": {
+      "action": {
+        "label": "Action",
+        "read": "Lire le fichier",
+        "write": "Écrire (remplacer)",
+        "append": "Ajouter à la fin",
+        "copy": "Copier",
+        "move": "Déplacer / Renommer",
+        "delete": "Supprimer",
+        "exists": "Vérifier existence",
+        "list": "Lister (glob)"
+      },
+      "path": {
+        "label": "Chemin",
+        "hint": "Chemin relatif ou absolu du fichier"
+      },
+      "folder": {
+        "label": "Dossier",
+        "hint": "Répertoire de base à explorer (vide = projet courant)"
+      },
+      "pattern": {
+        "label": "Pattern glob",
+        "hint": "Filtre de fichiers — ex: *.ts, **/*.test.js"
+      },
+      "type": {
+        "label": "Type",
+        "files": "Fichiers uniquement",
+        "dirs": "Dossiers uniquement",
+        "all": "Fichiers et dossiers"
+      },
+      "recursive": {
+        "label": "Récursif (sous-dossiers)"
+      },
+      "destination": {
+        "label": "Destination",
+        "hint": "Chemin cible pour la copie ou le déplacement"
+      },
+      "content": {
+        "label": "Contenu",
+        "hint": "Texte ou données à écrire dans le fichier"
+      }
+    },
+    "git": {
+      "projectId": {
+        "label": "Projet cible",
+        "hint": "Dépôt git sur lequel opérer"
+      },
+      "action": {
+        "label": "Action",
+        "pull": "Pull — Récupérer les changements distants",
+        "push": "Push — Envoyer les commits locaux",
+        "commit": "Commit — Créer un commit",
+        "checkout": "Checkout — Changer de branche",
+        "merge": "Merge — Fusionner une branche",
+        "stash": "Stash — Mettre de côté les changements",
+        "stashpop": "Stash Pop — Restaurer les changements",
+        "reset": "Reset — Annuler les changements non commités"
+      },
+      "message": {
+        "label": "Message de commit",
+        "hint": "Convention: type(scope): description"
+      },
+      "branch": {
+        "label": "Branche",
+        "hint": "Nom de la branche git"
+      }
+    },
+    "http": {
+      "method": {
+        "label": "Méthode"
+      },
+      "url": {
+        "label": "URL"
+      },
+      "headers": {
+        "label": "Headers",
+        "hint": "Objet JSON des en-têtes HTTP"
+      },
+      "body": {
+        "label": "Body",
+        "hint": "Corps de la requête (JSON)"
+      }
+    },
+    "shell": {
+      "projectId": {
+        "label": "Exécuter dans",
+        "hint": "Répertoire de travail de la commande"
+      },
+      "command": {
+        "label": "Commande"
+      }
+    },
+    "notify": {
+      "title": {
+        "label": "Titre"
+      },
+      "message": {
+        "label": "Message",
+        "hint": "Variables : $ctx.project, $ctx.branch, $node_X.output"
+      }
+    },
+    "wait": {
+      "mode": {
+        "label": "Mode"
+      },
+      "duration": {
+        "label": "Durée"
+      },
+      "timeout": {
+        "label": "Timeout (approbation)"
+      }
+    },
+    "webhook": {
+      "url": {
+        "label": "URL du webhook"
+      },
+      "text": {
+        "label": "Message",
+        "hint": "Supporte les variables $ctx, $node_X, $loop"
+      },
+      "username": {
+        "label": "Nom d'affichage (optionnel)"
+      },
+      "icon": {
+        "label": "Emoji icône (optionnel)"
+      }
+    },
+    "claude": {
+      "label": "Configuration Claude"
+    },
+    "loop": {
+      "source": {
+        "label": "Configuration boucle"
+      }
+    },
+    "db": {
+      "label": "Configuration base de données"
+    },
+    "project": {
+      "label": "Configuration projet"
+    },
+    "subworkflow": {
+      "label": "Configuration sous-workflow"
+    },
+    "time": {
+      "label": "Configuration time tracking"
+    },
+    "trigger": {
+      "label": "Déclencheur"
+    }
   }
 }

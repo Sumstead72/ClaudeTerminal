@@ -22,7 +22,7 @@ module.exports = {
   props: { connection: '', query: '', action: 'query' },
 
   fields: [
-    { type: 'db-config', key: 'connection', label: 'Configuration base de données' },
+    { type: 'db-config', key: 'connection', label: 'wfn.db.label' },
   ],
 
   badge: (n) => (n.properties.action || 'query').toUpperCase(),

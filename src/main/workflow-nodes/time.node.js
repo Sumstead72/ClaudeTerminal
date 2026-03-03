@@ -19,7 +19,7 @@ module.exports = {
   props: { action: 'get_today', projectId: '' },
 
   fields: [
-    { type: 'time-config', key: 'action', label: 'Configuration time tracking' },
+    { type: 'time-config', key: 'action', label: 'wfn.time.label' },
   ],
 
   badge: (n) => (n.properties.action || 'get_today').replace('get_', '').toUpperCase(),

@@ -20,7 +20,7 @@ module.exports = {
   props: { workflow: '', inputVars: '', waitForCompletion: true },
 
   fields: [
-    { type: 'subworkflow-picker', key: 'workflow', label: 'Configuration sous-workflow' },
+    { type: 'subworkflow-picker', key: 'workflow', label: 'wfn.subworkflow.label' },
   ],
 
   badge: (n) => n.properties.workflow ? n.properties.workflow.slice(0, 12).toUpperCase() : 'WORKFLOW',

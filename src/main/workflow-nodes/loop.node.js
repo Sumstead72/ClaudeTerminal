@@ -24,7 +24,7 @@ module.exports = {
   props: { source: 'auto', items: '', mode: 'sequential', maxIterations: '', concurrency: '10', _itemSchema: [] },
 
   fields: [
-    { type: 'loop-config', key: 'source', label: 'Configuration boucle' },
+    { type: 'loop-config', key: 'source', label: 'wfn.loop.source.label' },
   ],
 
   badge: (n) => n.properties.mode === 'parallel' ? 'PARALLEL' : (n.properties.source || 'auto').toUpperCase(),

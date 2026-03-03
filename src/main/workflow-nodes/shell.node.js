@@ -21,9 +21,9 @@ module.exports = {
   props: { command: '' },
 
   fields: [
-    { type: 'cwd-picker', key: 'projectId', label: 'Exécuter dans',
-      hint: 'Répertoire de travail de la commande' },
-    { type: 'textarea', key: 'command', label: 'Commande', mono: true,
+    { type: 'cwd-picker', key: 'projectId', label: 'wfn.shell.projectId.label',
+      hint: 'wfn.shell.projectId.hint' },
+    { type: 'textarea', key: 'command', label: 'wfn.shell.command.label', mono: true,
       placeholder: 'npm run build' },
   ],
 

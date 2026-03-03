@@ -15,10 +15,10 @@ module.exports = {
   props: { title: '', message: '' },
 
   fields: [
-    { type: 'text',     key: 'title',   label: 'Titre',   placeholder: 'Build terminé' },
-    { type: 'textarea', key: 'message', label: 'Message',
-      hint: 'Variables : $ctx.project, $ctx.branch, $node_X.output',
-      placeholder: 'Le build de $ctx.project est terminé avec succès.' },
+    { type: 'text',     key: 'title',   label: 'wfn.notify.title.label',   placeholder: 'Build done' },
+    { type: 'textarea', key: 'message', label: 'wfn.notify.message.label',
+      hint: 'wfn.notify.message.hint',
+      placeholder: '$ctx.project build completed successfully.' },
   ],
 
   async run(config, vars, signal, ctx) {
