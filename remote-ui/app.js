@@ -494,6 +494,10 @@ function _scheduleReconnect() {
 function _onDesktopOffline() {
   _debugLog('[State] Desktop offline, relay mode=' + conn.mode);
   state.desktopOffline = true;
+  // Clear desktop sessions — they're no longer reachable
+  state.sessions = {};
+  state.selectedSessionId = null;
+  renderSessionBar(); renderChatMessages();
   const labelEl = $('status-label');
   if (labelEl) labelEl.textContent = _isFr ? 'PC hors ligne' : 'Desktop offline';
   const dot = $('connection-dot');
