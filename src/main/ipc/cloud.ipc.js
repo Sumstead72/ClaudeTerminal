@@ -1036,6 +1036,46 @@ async function _checkPendingChangesOnReconnect() {
   }
 }
 
+  // ── Import cloud project to local machine ──
+
+  ipcMain.handle('cloud:import-project', async (event, { projectName }) => {
+    const { url, key } = _getCloudConfig();
+    const os = require('os');
+    const extractZip = require('extract-zip');
+    const { dialog } = require('electron');
+
+    // Ask user where to import the project
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: `Import "${projectName}"`,
+      buttonLabel: 'Import here',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (canceled || !filePaths.length) return { canceled: true };
+
+    const parentFolder = filePaths[0];
+    const destFolder = path.join(parentFolder, projectName);
+
+    // Download zip (5 min timeout for large projects)
+    const resp = await _fetchCloud(
+      `${url}/api/projects/${encodeURIComponent(projectName)}/download`,
+      { headers: { 'Authorization': `Bearer ${key}` } },
+      300_000
+    );
+    if (!resp.ok) throw new Error(await resp.text());
+
+    // Write to temp zip file
+    const tmpZip = path.join(os.tmpdir(), `ct-import-${Date.now()}.zip`);
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    await fs.promises.writeFile(tmpZip, buffer);
+
+    // Extract to destination
+    await fs.promises.mkdir(destFolder, { recursive: true });
+    await extractZip(tmpZip, { dir: destFolder });
+    await fs.promises.unlink(tmpZip).catch(() => {});
+
+    return { projectPath: destFolder, projectName };
+  });
+
 function setCloudMainWindow(win) {
   mainWindow = win;
 }

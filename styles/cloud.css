@@ -773,6 +773,18 @@
   padding: 24px 18px;
 }
 
+/* ── Cloud Project Local Badge ── */
+.cp-cloud-project-local {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ── Sync Section ── */
 .cp-sync-badge {
   background: var(--accent);

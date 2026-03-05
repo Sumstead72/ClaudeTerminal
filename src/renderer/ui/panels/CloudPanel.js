@@ -139,6 +139,32 @@ function buildHtml(settings) {
               </div>
             </div>
 
+            <!-- Cloud Projects -->
+            <div class="cp-section">
+              <div class="cp-section-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>
+                </svg>
+                <span>${t('cloud.cloudProjects')}</span>
+                <span class="cp-sessions-count" id="cp-cloud-projects-count" style="display:none"></span>
+                <div class="cp-header-actions">
+                  <span class="cp-sessions-loading" id="cp-cloud-projects-loading" style="display:none">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                  </span>
+                  <button class="cp-btn-icon" id="cp-cloud-projects-refresh" title="${t('cloud.cloudProjectsRefresh')}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="cp-section-body" style="padding:0">
+                <div id="cp-cloud-projects-list" class="cp-sessions-list"></div>
+              </div>
+            </div>
+
             <!-- Connection Details (collapsed) -->
             <div class="cp-section">
               <div class="cp-section-body">
@@ -414,6 +440,7 @@ function setupHandlers(context) {
     if (connected) {
       _loadCloudUser();
       _loadCloudSessions(true);
+      _loadCloudProjects(true);
       _startSessionsPolling();
       _checkCloudChanges();
       // Sync polling is now handled by CloudSyncService in main process
@@ -624,6 +651,93 @@ function setupHandlers(context) {
       await _loadCloudSessions(true);
       sessionsRefresh.disabled = false;
       setTimeout(() => sessionsRefresh.classList.remove('spinning'), 400);
+    });
+  }
+
+  // ── Cloud Projects (cross-machine) ──
+
+  async function _loadCloudProjects(showLoading = false) {
+    const listEl = document.getElementById('cp-cloud-projects-list');
+    const loadingEl = document.getElementById('cp-cloud-projects-loading');
+    const countEl = document.getElementById('cp-cloud-projects-count');
+    if (!listEl) return;
+
+    if (showLoading && loadingEl) loadingEl.style.display = '';
+
+    try {
+      const { projects: cloudProjects } = await api.cloud.getProjects();
+      if (loadingEl) loadingEl.style.display = 'none';
+
+      if (!cloudProjects || cloudProjects.length === 0) {
+        if (countEl) countEl.style.display = 'none';
+        listEl.innerHTML = `<div class="cp-sessions-empty">${t('cloud.cloudProjectsEmpty')}</div>`;
+        return;
+      }
+
+      if (countEl) {
+        countEl.textContent = String(cloudProjects.length);
+        countEl.className = 'cp-sessions-count';
+        countEl.style.display = '';
+      }
+
+      const localProjects = _ctx.projectsState?.get()?.projects || [];
+      const localNames = new Set(localProjects.map(p => p.name));
+      const localBasenames = new Set(localProjects.map(p => p.path?.replace(/\\/g, '/').split('/').pop()).filter(Boolean));
+
+      listEl.innerHTML = cloudProjects.map(p => {
+        const isLocal = localNames.has(p.name) || localBasenames.has(p.name);
+        const badge = isLocal
+          ? `<span class="cp-cloud-project-local">${t('cloud.cloudProjectLocal')}</span>`
+          : `<button class="cp-btn-sm cp-cloud-project-import" data-name="${_escapeHtml(p.name)}">${t('cloud.cloudProjectImport')}</button>`;
+        return `<div class="cp-session-item">
+          <div class="cp-session-info">
+            <div class="cp-session-top">
+              <span class="cp-session-project">${_escapeHtml(p.name)}</span>
+            </div>
+          </div>
+          ${badge}
+        </div>`;
+      }).join('');
+
+      listEl.querySelectorAll('.cp-cloud-project-import').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const projectName = btn.dataset.name;
+          btn.disabled = true;
+          btn.textContent = t('cloud.cloudProjectImporting');
+          const Toast = require('../../ui/components/Toast');
+          try {
+            const result = await api.cloud.importProject({ projectName });
+            if (result.canceled) {
+              btn.disabled = false;
+              btn.textContent = t('cloud.cloudProjectImport');
+              return;
+            }
+            // Add to local projects state
+            const { addProject } = require('../../state');
+            addProject({ name: result.projectName, path: result.projectPath, type: 'standalone' });
+            Toast.show(t('cloud.cloudProjectImported', { name: projectName }), 'success');
+            await _loadCloudProjects(false);
+          } catch (err) {
+            Toast.show(err.message || t('cloud.uploadError'), 'error');
+            btn.disabled = false;
+            btn.textContent = t('cloud.cloudProjectImport');
+          }
+        });
+      });
+    } catch {
+      if (loadingEl) loadingEl.style.display = 'none';
+      listEl.innerHTML = `<div class="cp-sessions-empty">${t('cloud.cloudProjectsEmpty')}</div>`;
+    }
+  }
+
+  const cloudProjectsRefresh = document.getElementById('cp-cloud-projects-refresh');
+  if (cloudProjectsRefresh) {
+    cloudProjectsRefresh.addEventListener('click', async () => {
+      cloudProjectsRefresh.disabled = true;
+      cloudProjectsRefresh.classList.add('spinning');
+      await _loadCloudProjects(true);
+      cloudProjectsRefresh.disabled = false;
+      setTimeout(() => cloudProjectsRefresh.classList.remove('spinning'), 400);
     });
   }
 

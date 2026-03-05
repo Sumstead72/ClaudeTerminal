@@ -1325,7 +1325,14 @@
     "toggleVisibility": "Toggle visibility",
     "deleteSession": "Delete",
     "fileCountSingular": "{count} file",
-    "fileCountPlural": "{count} files"
+    "fileCountPlural": "{count} files",
+    "cloudProjects": "Cloud projects",
+    "cloudProjectsRefresh": "Refresh",
+    "cloudProjectsEmpty": "No projects in cloud",
+    "cloudProjectLocal": "Local",
+    "cloudProjectImport": "Import",
+    "cloudProjectImporting": "Importing...",
+    "cloudProjectImported": "\"{name}\" imported successfully"
   },
   "database": {
     "title": "Database",
