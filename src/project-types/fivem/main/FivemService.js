@@ -5,7 +5,7 @@
 
 const path = require('path');
 const pty = require('node-pty');
-const { execFile } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 
 class FivemService {
   constructor() {
@@ -195,16 +195,26 @@ class FivemService {
   stopAll() {
     this.processes.forEach((proc) => {
       const pid = proc.pid;
-      try {
-        proc.write('quit\r');
-        setTimeout(() => {
-          this._forceKill(pid);
-        }, 2000);
-      } catch (e) {
-        this._forceKill(pid);
-      }
+      try { proc.write('quit\r'); } catch (e) {}
+      // Force kill synchronously to ensure process tree is dead before app exits
+      this._forceKillSync(pid);
     });
     this.processes.clear();
+  }
+
+  /**
+   * Synchronous force kill — used during app shutdown to prevent orphaned processes
+   * @param {number} pid - Process ID
+   */
+  _forceKillSync(pid) {
+    if (!pid || !Number.isInteger(pid) || pid <= 0) return;
+    try {
+      if (process.platform === 'win32') {
+        execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { timeout: 5000, windowsHide: true });
+      } else {
+        process.kill(-pid, 'SIGKILL');
+      }
+    } catch (e) {}
   }
 
   /**

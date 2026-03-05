@@ -145,6 +145,9 @@ function cleanupServices() {
   cloudSyncService.stop();
   databaseService.disconnectAll().catch(() => {});
   if (_mcpPollTimer) clearInterval(_mcpPollTimer);
+  // Kill any active git child processes (clone, pull, push, etc.)
+  const { killAllGitProcesses } = require('../utils/git');
+  killAllGitProcesses();
 }
 
 module.exports = {

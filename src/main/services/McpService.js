@@ -3,7 +3,7 @@
  * Manages MCP (Model Context Protocol) server processes
  */
 
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 
 const MAX_RESTARTS    = 3;
 const RESTART_DELAY   = 3000; // ms
@@ -192,7 +192,8 @@ class McpService {
     this.processes.forEach((proc, id) => {
       try {
         if (process.platform === 'win32') {
-          spawn('taskkill', ['/pid', proc.pid.toString(), '/f', '/t'], { windowsHide: true });
+          // Use synchronous taskkill to ensure process tree is dead before app exits
+          execFileSync('taskkill', ['/pid', proc.pid.toString(), '/f', '/t'], { timeout: 5000, windowsHide: true });
         } else {
           proc.kill('SIGKILL');
         }

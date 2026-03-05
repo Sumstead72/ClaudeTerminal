@@ -3,9 +3,12 @@
  * Helper functions for git operations in the main process
  */
 
-const { execFile, exec } = require('child_process');
+const { execFile, execFileSync, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+// Track all active git child processes for cleanup on app quit
+const _activeProcesses = new Set();
 
 /**
  * Build safe.directory args array for git
@@ -29,11 +32,15 @@ function execGit(cwd, args, timeout = 10000) {
     const fullArgs = [...safeDirArgs(cwd), ...argsArray];
     const child = execFile('git', fullArgs, { cwd, encoding: 'utf8', maxBuffer: 1024 * 1024 }, (error, stdout) => {
       if (timer) clearTimeout(timer);
+      _activeProcesses.delete(child);
       resolve(error ? null : stdout.trimEnd());
     });
 
+    _activeProcesses.add(child);
+
     // Manual timeout with explicit kill (exec timeout doesn't kill the process)
     const timer = setTimeout(() => {
+      _activeProcesses.delete(child);
       try { child.kill('SIGTERM'); } catch (_) {}
       setTimeout(() => { try { child.kill('SIGKILL'); } catch (_) {} }, 1000);
       resolve(null);
@@ -41,6 +48,7 @@ function execGit(cwd, args, timeout = 10000) {
 
     child.on('error', () => {
       if (timer) clearTimeout(timer);
+      _activeProcesses.delete(child);
       resolve(null);
     });
   });
@@ -59,6 +67,7 @@ function spawnGit(cwd, args, opts = {}) {
     const fullArgs = [...safeDirArgs(cwd), ...args];
     const child = execFile('git', fullArgs, { cwd, encoding: 'utf8', maxBuffer, timeout }, (error, stdout, stderr) => {
       if (timer) clearTimeout(timer);
+      _activeProcesses.delete(child);
       if (error) {
         resolve({ success: false, error: stderr || error.message });
       } else {
@@ -66,7 +75,10 @@ function spawnGit(cwd, args, opts = {}) {
       }
     });
 
+    _activeProcesses.add(child);
+
     const timer = setTimeout(() => {
+      _activeProcesses.delete(child);
       try { child.kill('SIGTERM'); } catch (_) {}
       setTimeout(() => { try { child.kill('SIGKILL'); } catch (_) {} }, 1000);
       resolve({ success: false, error: 'Git command timed out' });
@@ -74,6 +86,7 @@ function spawnGit(cwd, args, opts = {}) {
 
     child.on('error', (err) => {
       if (timer) clearTimeout(timer);
+      _activeProcesses.delete(child);
       resolve({ success: false, error: err.message });
     });
   });
@@ -530,6 +543,7 @@ function gitClone(repoUrl, targetPath, options = {}) {
       ['clone', '--progress', cloneUrl, targetPath],
       { encoding: 'utf8', maxBuffer: 1024 * 1024 * 10, timeout: 300000 }, // 5 min timeout
       (error, stdout, stderr) => {
+        _activeProcesses.delete(cloneProcess);
         if (error) {
           // Check common errors
           if (stderr.includes('already exists')) {
@@ -546,6 +560,8 @@ function gitClone(repoUrl, targetPath, options = {}) {
         }
       }
     );
+
+    _activeProcesses.add(cloneProcess);
 
     // Handle progress if callback provided
     if (onProgress && cloneProcess.stderr) {
@@ -1187,10 +1203,31 @@ async function diffWorktreeBranches(projectPath, branch1, branch2, filePath = ''
   return diff || '';
 }
 
+/**
+ * Kill all active git child processes.
+ * Called during app shutdown to prevent orphaned git processes.
+ */
+function killAllGitProcesses() {
+  if (_activeProcesses.size === 0) return;
+  console.log(`[Git] Killing ${_activeProcesses.size} active git process(es)`);
+  for (const child of _activeProcesses) {
+    const pid = child.pid;
+    try { child.kill('SIGTERM'); } catch (_) {}
+    // On Windows, use synchronous taskkill to ensure the process tree is dead before app exits
+    if (process.platform === 'win32' && pid) {
+      try {
+        execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { timeout: 5000, windowsHide: true });
+      } catch (_) {}
+    }
+  }
+  _activeProcesses.clear();
+}
+
 module.exports = {
   parseGitStatus,
   parseDiffNumstat,
   execGit,
+  killAllGitProcesses,
   getGitInfo,
   getGitInfoFull,
   getGitStatusQuick,

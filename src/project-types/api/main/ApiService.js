@@ -6,7 +6,7 @@
 const path = require('path');
 const fs = require('fs');
 const pty = require('node-pty');
-const { execFile } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 
 // Port detection patterns from server output
 const PORT_PATTERNS = [
@@ -302,16 +302,28 @@ class ApiService {
   stopAll() {
     this.processes.forEach((proc, index) => {
       const pid = proc.pid;
-      try {
-        proc.write('\x03');
-        setTimeout(() => this._forceKill(pid), 2000);
-      } catch (e) {
-        this._forceKill(pid);
-      }
+      try { proc.write('\x03'); } catch (e) {}
+      // Force kill synchronously to ensure process tree is dead before app exits
+      this._forceKillSync(pid);
     });
     this.processes.clear();
     this.detectedPorts.clear();
     this.outputBuffers.clear();
+  }
+
+  /**
+   * Synchronous force kill — used during app shutdown to prevent orphaned processes
+   * @param {number} pid - Process ID
+   */
+  _forceKillSync(pid) {
+    if (!pid || !Number.isInteger(pid) || pid <= 0) return;
+    try {
+      if (process.platform === 'win32') {
+        execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { timeout: 5000, windowsHide: true });
+      } else {
+        process.kill(-pid, 'SIGKILL');
+      }
+    } catch (e) {}
   }
 
   count() {

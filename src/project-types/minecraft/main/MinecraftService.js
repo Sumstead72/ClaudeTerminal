@@ -6,7 +6,7 @@
 const path = require('path');
 const fs = require('fs');
 const pty = require('node-pty');
-const { exec, execSync } = require('child_process');
+const { exec, execSync, execFileSync } = require('child_process');
 
 class MinecraftService {
   constructor() {
@@ -341,15 +341,27 @@ class MinecraftService {
   stopAll() {
     this.processes.forEach((proc) => {
       const pid = proc.pid;
-      try {
-        proc.write('stop\r');
-        setTimeout(() => this._forceKill(pid), 3000);
-      } catch (e) {
-        this._forceKill(pid);
-      }
+      try { proc.write('stop\r'); } catch (e) {}
+      // Force kill synchronously to ensure process tree is dead before app exits
+      this._forceKillSync(pid);
     });
     this.processes.clear();
     this.playerCounts.clear();
+  }
+
+  /**
+   * Synchronous force kill — used during app shutdown to prevent orphaned processes
+   * @param {number} pid - Process ID
+   */
+  _forceKillSync(pid) {
+    if (!pid) return;
+    try {
+      if (process.platform === 'win32') {
+        execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { timeout: 5000, windowsHide: true });
+      } else {
+        process.kill(-pid, 'SIGKILL');
+      }
+    } catch (e) {}
   }
 
   /**
