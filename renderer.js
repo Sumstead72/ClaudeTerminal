@@ -4184,22 +4184,37 @@ function updateUsageBar(elements, percent) {
 
 /**
  * Update extra usage display (paid tokens beyond plan)
- * extraUsage from API: { cost_usd: number } or null
+ * extraUsage from API: { is_enabled, used_credits, utilization } or { cost_usd } or null
  */
 function updateExtraUsage(extraUsage) {
   const { item, bar, percent } = usageElements.extra;
   if (!item || !bar || !percent) return;
 
-  // extraUsage can be an object { cost_usd } or a number or null
-  let costUsd = null;
-  if (extraUsage !== null && extraUsage !== undefined) {
-    if (typeof extraUsage === 'object' && extraUsage.cost_usd != null) {
-      costUsd = extraUsage.cost_usd;
-    } else if (typeof extraUsage === 'number') {
-      costUsd = extraUsage;
-    }
+  if (!extraUsage || typeof extraUsage !== 'object') {
+    item.style.display = 'none';
+    return;
   }
 
+  // New format: { is_enabled, used_credits, utilization }
+  if ('is_enabled' in extraUsage) {
+    if (!extraUsage.is_enabled || extraUsage.used_credits == null || extraUsage.used_credits <= 0) {
+      item.style.display = 'none';
+      return;
+    }
+    item.style.display = '';
+    const credits = extraUsage.used_credits;
+    percent.textContent = credits < 0.01 ? '<$0.01' : `$${credits.toFixed(2)}`;
+    const MAX_COST = 5;
+    const pct = Math.min((credits / MAX_COST) * 100, 100);
+    bar.style.width = `${pct}%`;
+    bar.classList.remove('warning', 'danger');
+    if (credits >= 2) bar.classList.add('danger');
+    else if (credits >= 0.5) bar.classList.add('warning');
+    return;
+  }
+
+  // Legacy format: { cost_usd }
+  const costUsd = extraUsage.cost_usd ?? (typeof extraUsage === 'number' ? extraUsage : null);
   if (costUsd === null || costUsd <= 0) {
     item.style.display = 'none';
     return;
@@ -4207,8 +4222,6 @@ function updateExtraUsage(extraUsage) {
 
   item.style.display = '';
   percent.textContent = costUsd < 0.01 ? '<$0.01' : `$${costUsd.toFixed(2)}`;
-
-  // Bar shows relative cost: full at $5, as a visual indicator
   const MAX_COST = 5;
   const pct = Math.min((costUsd / MAX_COST) * 100, 100);
   bar.style.width = `${pct}%`;

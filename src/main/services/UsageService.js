@@ -68,7 +68,8 @@ function fetchUsageFromAPI(token) {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
-        'anthropic-beta': OAUTH_BETA_HEADER
+        'anthropic-beta': OAUTH_BETA_HEADER,
+        'User-Agent': 'claude-code/1.0'
       },
       timeout: 5000
     }, (res) => {
